@@ -1,0 +1,7 @@
+*.db
+*.spec
+/.vscode/
+/__pycache__/
+/build/
+/dist/
+/Photo/*.tif
