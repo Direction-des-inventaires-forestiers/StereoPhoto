@@ -203,6 +203,7 @@ class app(QApplication):
         a = QImage(self.temp)
         scene.addPixmap(QPixmap.fromImage(a))
         self.optWindow.ui.graphicsViewRed.setScene(scene)
+        self.optWindow.ui.graphicsViewRed.fitInView(self.optWindow.ui.graphicsViewRed.sceneRect(), Qt.KeepAspectRatio)
         os.remove(self.temp)
         self.redOrientation = value
 
@@ -244,6 +245,7 @@ class app(QApplication):
         a = QImage(self.temp)
         self.cyanScene = scene.addPixmap(QPixmap.fromImage(a))
         self.optWindow.ui.graphicsViewCyan.setScene(scene)
+        self.optWindow.ui.graphicsViewCyan.fitInView(self.optWindow.ui.graphicsViewCyan.sceneRect(), Qt.KeepAspectRatio)
         os.remove(self.temp)
         self.cyanOrientation = value
         
@@ -278,6 +280,7 @@ class app(QApplication):
         a = QImage(self.temp)
         scene.addPixmap(QPixmap.fromImage(a))
         self.optWindow.ui.graphicsViewRed.setScene(scene)
+        self.optWindow.ui.graphicsViewRed.fitInView(self.optWindow.ui.graphicsViewRed.sceneRect(), Qt.KeepAspectRatio)
         os.remove(self.temp)
         self.redMiroir = value
         
@@ -309,6 +312,7 @@ class app(QApplication):
         a = QImage(self.temp)
         self.cyanScene = scene.addPixmap(QPixmap.fromImage(a))
         self.optWindow.ui.graphicsViewCyan.setScene(scene)
+        self.optWindow.ui.graphicsViewCyan.fitInView(self.optWindow.ui.graphicsViewCyan.sceneRect(), Qt.KeepAspectRatio)
         os.remove(self.temp)
         self.cyanMiroir = value
 
@@ -395,9 +399,10 @@ class app(QApplication):
 
         self.leftPic = Image.open(self.optWindow.ui.importLineRed.text())
 
-        #TODO
-        #Gérer le resize selon la taille de l'image, plus gros cote = plus gros size du resize
-        self.demoLeftPic = self.leftPic.resize((200,300))
+        if self.leftPic.size[0] > self.leftPic.size[1] :
+            self.demoLeftPic = self.leftPic.resize((300,200))
+        else :
+            self.demoLeftPic = self.leftPic.resize((200,300))   
 
         draw = ImageDraw.Draw(self.demoLeftPic)
         draw.ellipse((20,20,60,60), fill="red", outline="white")
@@ -456,7 +461,12 @@ class app(QApplication):
         
 
         self.rightPic = Image.open(self.optWindow.ui.importLineCyan.text())
-        self.demoRightPic = self.rightPic.resize((200,300))
+
+        if self.rightPic.size[0] > self.rightPic.size[1] :
+            self.demoRightPic = self.rightPic.resize((300,200))
+        else :
+            self.demoRightPic = self.rightPic.resize((200,300))
+       
         draw = ImageDraw.Draw(self.demoRightPic)
         draw.ellipse((20,20,60,60), fill="red", outline="white")
         self.demoRightPic.save(self.temp)

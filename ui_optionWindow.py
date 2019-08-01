@@ -352,17 +352,7 @@ class optionWindow(QtWidgets.QMainWindow):
     def closeEvent(self,event):
         self.closeWindow.emit()
 
-    def addDemoPic(self) : 
 
-        sceneRed = QtWidgets.QGraphicsScene()
-        sceneCyan = QtWidgets.QGraphicsScene()
-        img = QtGui.QImage("Photo/Demo.jpg")
-        sceneRed.addPixmap(QtGui.QPixmap.fromImage(img))
-        sceneCyan.addPixmap(QtGui.QPixmap.fromImage(img))
-        self.ui.graphicsViewRed.setScene(sceneRed)
-        self.ui.graphicsViewCyan.setScene(sceneCyan)
-        self.ui.graphicsViewRed.show()
-        self.ui.graphicsViewCyan.show()
 
 
 
