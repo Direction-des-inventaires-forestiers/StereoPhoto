@@ -1,37 +1,44 @@
 import cv2
 import numpy as np
+import math, time
+from PIL import Image
+Image.MAX_IMAGE_PIXELS = 1000000000 
 
 
-img = cv2.imread("Photo/Q18066_406_RGB.tif")
-height, width, channels = img.shape
 
-# Gaussian Pyramid
-layer = img.copy()
-gaussian_pyramid = [layer]
-#for i in range(3):
-layer = cv2.pyrUp(layer)
-    #gaussian_pyramid.append(layer)
-    #cv2.imshow(str(i), layer)
+specifiedWidth = 1500
+specifiedHeight = 2000
 
-cv2.imwrite("a.jpg", layer)
-#cv2.imshow("Original image", img)
-#cv2.waitKey(0)
-#cv2.destroyAllWindows()
+def createPyramid(self, path):
+    img = cv2.imread(path)
+    height, width, channel = img.shape
+    numberOfHorizontalTile = math.ceil(width/specifiedWidth)
+    numberOfVerticalTile = math.ceil(height/specifiedHeight)
+    numberOfIterationA = math.floor(math.log2(numberOfHorizontalTile))
+    numberOfIterationB = math.floor(math.log2(numberOfVerticalTile))
+    nbPyramid = min(numberOfIterationA, numberOfIterationB)
 
+    layer = img.copy()
+    gaussian_pyramid = [cv2.cvtColor(layer,cv2.COLOR_BGR2RGB)]
+    for i in range(nbPyramid):
+        layer = cv2.pyrDown(layer)
+        gaussian_pyramid.append(cv2.cvtColor(layer,cv2.COLOR_BGR2RGB))
 
-"""
-        img = cv2.imread(self.optWindow.ui.importLineRed.text())
-        layer = img.copy()
-        gaussian_pyramid = [layer]
-        for i in range(3):
-            layer = cv2.pyrDown(layer)
-            gaussian_pyramid.append(layer)
-        
-        #cv2.imwrite("a.jpg", layer)
-        #self.leftPic = Image.open("a.jpg")
-        #print(type(gaussian_pyramid[2][0,0,0]))"""
+    listPic = []
+    for j in range(nbPyramid):
+        a = gaussian_pyramid[j]
+        height, width, channel = a.shape
+        numberOfHorizontalTile = math.ceil(width/specifiedWidth)
+        numberOfVerticalTile = math.ceil(height/specifiedHeight)
 
+        b = [[0 for u in range(numberOfHorizontalTile)] for v in range(numberOfVerticalTile)]
+        for x in range(numberOfVerticalTile):
+            for y in range(numberOfHorizontalTile):
+                b[x][y] = np.fliplr(a[x*specifiedHeight : ((x+1)*specifiedHeight)- 1, y*specifiedWidth : ((y+1)*specifiedWidth) - 1, :])
+                #b[x][y] = (a[x*specifiedHeight : ((x+1)*specifiedHeight)- 1, y*specifiedWidth : ((y+1)*specifiedWidth) - 1, :])
+        listPic.append(b)
 
+    return nbPyramid, gaussian_pyramid, listPic
 
 
 """import numpy as np
