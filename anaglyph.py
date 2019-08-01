@@ -53,8 +53,6 @@ class app(QApplication):
         self.optWindow.ui.rightCyan.clicked.connect(self.mRightCyan)
         self.optWindow.ui.origineRed.clicked.connect(self.mOrigineRed)
         self.optWindow.ui.origineCyan.clicked.connect(self.mOrigineCyan)
-        self.optWindow.ui.zoomInRed.clicked.connect(self.mZoomInRed)
-        self.optWindow.ui.zoomOutRed.clicked.connect(self.mZoomOutRed)
 
         self.optWindow.ui.radioNoirBlanc.toggled.connect(self.setSuper)
         self.optWindow.ui.saveSuper.clicked.connect(self.saveSuper)
@@ -384,18 +382,7 @@ class app(QApplication):
         except :
             pass
 
-        #Here
-        img = cv2.imread(self.optWindow.ui.importLineRed.text())
-        layer = img.copy()
-        gaussian_pyramid = [layer]
-        for i in range(3):
-            layer = cv2.pyrDown(layer)
-            gaussian_pyramid.append(layer)
-
-        rgbLayer = cv2.cvtColor(layer, cv2.COLOR_BGR2RGB)
-        self.leftPic = Image.fromarray(rgbLayer)
-        
-        #self.leftPic = Image.open(self.optWindow.ui.importLineRed.text())
+        self.leftPic = Image.open(self.optWindow.ui.importLineRed.text())
         self.graphWindowLeft = graphicsWindow("Image Gauche")
         self.initGraphicsWindow(self.graphWindowLeft,"Gauche")
         self.mRougePicOrientation = self.leftPic
@@ -549,8 +536,6 @@ class app(QApplication):
         self.optWindow.ui.label_4.setEnabled(action)
         self.optWindow.ui.boxMiroirCyan.setEnabled(action)        
         self.optWindow.ui.boxOrientationCyan.setEnabled(action)
-        self.optWindow.ui.zoomInCyan.setEnabled(action)
-        self.optWindow.ui.zoomOutCyan.setEnabled(action)
 
         self.optWindow.ui.boxOrientationRouge.setEnabled(action)
         self.optWindow.ui.label.setEnabled(action)
@@ -561,20 +546,6 @@ class app(QApplication):
         self.optWindow.ui.downRed.setEnabled(action)
         self.optWindow.ui.upRed.setEnabled(action)
         self.optWindow.ui.origineRed.setEnabled(action)
-        self.optWindow.ui.zoomInRed.setEnabled(action)
-        self.optWindow.ui.zoomOutRed.setEnabled(action)
-
-
-    def mZoomInRed(self) : 
-        rect = QRectF(0,0, int(self.leftPic.size[0]/1.25), int(self.leftPic.size[1]/1.25))
-        self.graphWindowLeft.ui.graphicsView.fitInView(rect,Qt.KeepAspectRatio)
-        #factor = 1.25
-        #self.graphWindowLeft.ui.graphicsView.scale(factor,factor)
-
-    def mZoomOutRed(self):
-        factor = 0.8
-        self.graphWindowLeft.ui.graphicsView.scale(factor,factor)
-
 
 if __name__ == "__main__":
     app = app(sys.argv)
