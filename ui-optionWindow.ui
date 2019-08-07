@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>437</width>
-    <height>693</height>
+    <width>436</width>
+    <height>700</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -59,7 +59,7 @@
      <x>10</x>
      <y>30</y>
      <width>201</width>
-     <height>381</height>
+     <height>371</height>
     </rect>
    </property>
    <property name="title">
@@ -193,8 +193,8 @@
     </property>
     <property name="geometry">
      <rect>
-      <x>40</x>
-      <y>290</y>
+      <x>80</x>
+      <y>320</y>
       <width>21</width>
       <height>21</height>
      </rect>
@@ -209,8 +209,8 @@
     </property>
     <property name="geometry">
      <rect>
-      <x>60</x>
-      <y>310</y>
+      <x>100</x>
+      <y>340</y>
       <width>21</width>
       <height>21</height>
      </rect>
@@ -228,8 +228,8 @@
     </property>
     <property name="geometry">
      <rect>
-      <x>60</x>
-      <y>270</y>
+      <x>100</x>
+      <y>300</y>
       <width>21</width>
       <height>21</height>
      </rect>
@@ -247,8 +247,8 @@
     </property>
     <property name="geometry">
      <rect>
-      <x>80</x>
-      <y>290</y>
+      <x>120</x>
+      <y>320</y>
       <width>21</width>
       <height>21</height>
      </rect>
@@ -263,46 +263,14 @@
     </property>
     <property name="geometry">
      <rect>
-      <x>120</x>
-      <y>290</y>
+      <x>150</x>
+      <y>320</y>
       <width>43</width>
       <height>21</height>
      </rect>
     </property>
     <property name="text">
      <string>Origine</string>
-    </property>
-   </widget>
-   <widget class="QPushButton" name="zoomInRed">
-    <property name="enabled">
-     <bool>false</bool>
-    </property>
-    <property name="geometry">
-     <rect>
-      <x>30</x>
-      <y>340</y>
-      <width>61</width>
-      <height>23</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Zoom In</string>
-    </property>
-   </widget>
-   <widget class="QPushButton" name="zoomOutRed">
-    <property name="enabled">
-     <bool>false</bool>
-    </property>
-    <property name="geometry">
-     <rect>
-      <x>110</x>
-      <y>340</y>
-      <width>61</width>
-      <height>23</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Zoom Out</string>
     </property>
    </widget>
    <widget class="Line" name="lineRed">
@@ -350,6 +318,67 @@
      <enum>Qt::ScrollBarAlwaysOff</enum>
     </property>
    </widget>
+   <widget class="QSpinBox" name="offsetValRed">
+    <property name="enabled">
+     <bool>false</bool>
+    </property>
+    <property name="geometry">
+     <rect>
+      <x>11</x>
+      <y>320</y>
+      <width>61</width>
+      <height>22</height>
+     </rect>
+    </property>
+    <property name="maximum">
+     <number>1000</number>
+    </property>
+    <property name="singleStep">
+     <number>5</number>
+    </property>
+    <property name="value">
+     <number>50</number>
+    </property>
+   </widget>
+   <widget class="QLabel" name="label_7">
+    <property name="enabled">
+     <bool>false</bool>
+    </property>
+    <property name="geometry">
+     <rect>
+      <x>70</x>
+      <y>270</y>
+      <width>91</width>
+      <height>16</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <pointsize>10</pointsize>
+      <weight>75</weight>
+      <bold>true</bold>
+     </font>
+    </property>
+    <property name="text">
+     <string>Décalage</string>
+    </property>
+   </widget>
+   <widget class="QLabel" name="importDoneRed">
+    <property name="geometry">
+     <rect>
+      <x>150</x>
+      <y>233</y>
+      <width>21</width>
+      <height>16</height>
+     </rect>
+    </property>
+    <property name="styleSheet">
+     <string notr="true">image: url(:/Anaglyph/Icons/redCross.png);</string>
+    </property>
+    <property name="text">
+     <string/>
+    </property>
+   </widget>
   </widget>
   <widget class="QGroupBox" name="groupBoxCyan">
    <property name="geometry">
@@ -357,7 +386,7 @@
      <x>220</x>
      <y>30</y>
      <width>201</width>
-     <height>381</height>
+     <height>371</height>
     </rect>
    </property>
    <property name="title">
@@ -414,8 +443,8 @@
     </property>
     <property name="geometry">
      <rect>
-      <x>80</x>
-      <y>290</y>
+      <x>120</x>
+      <y>320</y>
       <width>21</width>
       <height>21</height>
      </rect>
@@ -446,8 +475,8 @@
     </property>
     <property name="geometry">
      <rect>
-      <x>60</x>
-      <y>270</y>
+      <x>100</x>
+      <y>300</y>
       <width>21</width>
       <height>21</height>
      </rect>
@@ -465,8 +494,8 @@
     </property>
     <property name="geometry">
      <rect>
-      <x>40</x>
-      <y>290</y>
+      <x>80</x>
+      <y>320</y>
       <width>21</width>
       <height>21</height>
      </rect>
@@ -509,8 +538,8 @@
     </property>
     <property name="geometry">
      <rect>
-      <x>60</x>
-      <y>310</y>
+      <x>100</x>
+      <y>340</y>
       <width>21</width>
       <height>21</height>
      </rect>
@@ -561,46 +590,14 @@
     </property>
     <property name="geometry">
      <rect>
-      <x>120</x>
-      <y>290</y>
+      <x>150</x>
+      <y>320</y>
       <width>43</width>
       <height>21</height>
      </rect>
     </property>
     <property name="text">
      <string>Origine</string>
-    </property>
-   </widget>
-   <widget class="QPushButton" name="zoomOutCyan">
-    <property name="enabled">
-     <bool>false</bool>
-    </property>
-    <property name="geometry">
-     <rect>
-      <x>110</x>
-      <y>340</y>
-      <width>61</width>
-      <height>23</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Zoom Out</string>
-    </property>
-   </widget>
-   <widget class="QPushButton" name="zoomInCyan">
-    <property name="enabled">
-     <bool>false</bool>
-    </property>
-    <property name="geometry">
-     <rect>
-      <x>30</x>
-      <y>340</y>
-      <width>61</width>
-      <height>23</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Zoom In</string>
     </property>
    </widget>
    <widget class="Line" name="lineCyan">
@@ -648,12 +645,73 @@
      <enum>Qt::ScrollBarAlwaysOff</enum>
     </property>
    </widget>
+   <widget class="QSpinBox" name="offsetValCyan">
+    <property name="enabled">
+     <bool>false</bool>
+    </property>
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>320</y>
+      <width>61</width>
+      <height>21</height>
+     </rect>
+    </property>
+    <property name="maximum">
+     <number>1000</number>
+    </property>
+    <property name="singleStep">
+     <number>5</number>
+    </property>
+    <property name="value">
+     <number>50</number>
+    </property>
+   </widget>
+   <widget class="QLabel" name="label_8">
+    <property name="enabled">
+     <bool>false</bool>
+    </property>
+    <property name="geometry">
+     <rect>
+      <x>70</x>
+      <y>270</y>
+      <width>61</width>
+      <height>16</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <pointsize>10</pointsize>
+      <weight>75</weight>
+      <bold>true</bold>
+     </font>
+    </property>
+    <property name="text">
+     <string>Décalage</string>
+    </property>
+   </widget>
+   <widget class="QLabel" name="importDoneCyan">
+    <property name="geometry">
+     <rect>
+      <x>150</x>
+      <y>233</y>
+      <width>21</width>
+      <height>16</height>
+     </rect>
+    </property>
+    <property name="styleSheet">
+     <string notr="true">image: url(:/Anaglyph/Icons/redCross.png);</string>
+    </property>
+    <property name="text">
+     <string/>
+    </property>
+   </widget>
   </widget>
   <widget class="QLabel" name="label_9">
    <property name="geometry">
     <rect>
      <x>180</x>
-     <y>420</y>
+     <y>450</y>
      <width>101</width>
      <height>16</height>
     </rect>
@@ -673,7 +731,7 @@
    <property name="geometry">
     <rect>
      <x>90</x>
-     <y>600</y>
+     <y>620</y>
      <width>261</width>
      <height>71</height>
     </rect>
@@ -734,7 +792,7 @@
    <property name="geometry">
     <rect>
      <x>90</x>
-     <y>440</y>
+     <y>470</y>
      <width>261</width>
      <height>142</height>
     </rect>
@@ -787,7 +845,7 @@
    <widget class="QPushButton" name="origineSuper">
     <property name="geometry">
      <rect>
-      <x>160</x>
+      <x>180</x>
       <y>80</y>
       <width>43</width>
       <height>21</height>
@@ -800,7 +858,7 @@
    <widget class="QToolButton" name="leftSuper">
     <property name="geometry">
      <rect>
-      <x>80</x>
+      <x>100</x>
       <y>80</y>
       <width>21</width>
       <height>21</height>
@@ -813,7 +871,7 @@
    <widget class="QToolButton" name="upSuper">
     <property name="geometry">
      <rect>
-      <x>100</x>
+      <x>120</x>
       <y>60</y>
       <width>21</width>
       <height>21</height>
@@ -829,7 +887,7 @@
    <widget class="QToolButton" name="downSuper">
     <property name="geometry">
      <rect>
-      <x>100</x>
+      <x>120</x>
       <y>100</y>
       <width>21</width>
       <height>21</height>
@@ -845,7 +903,7 @@
    <widget class="QToolButton" name="rightSuper">
     <property name="geometry">
      <rect>
-      <x>120</x>
+      <x>140</x>
       <y>80</y>
       <width>21</width>
       <height>21</height>
@@ -855,6 +913,95 @@
      <enum>Qt::RightArrow</enum>
     </property>
    </widget>
+   <widget class="QSpinBox" name="offsetValSuper">
+    <property name="geometry">
+     <rect>
+      <x>20</x>
+      <y>80</y>
+      <width>61</width>
+      <height>22</height>
+     </rect>
+    </property>
+    <property name="maximum">
+     <number>1000</number>
+    </property>
+    <property name="singleStep">
+     <number>5</number>
+    </property>
+    <property name="value">
+     <number>50</number>
+    </property>
+   </widget>
+  </widget>
+  <widget class="QPushButton" name="zoomInButton">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="geometry">
+    <rect>
+     <x>40</x>
+     <y>410</y>
+     <width>61</width>
+     <height>23</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>Zoom In</string>
+   </property>
+  </widget>
+  <widget class="QPushButton" name="zoomOutButton">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="geometry">
+    <rect>
+     <x>140</x>
+     <y>410</y>
+     <width>61</width>
+     <height>23</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>Zoom Out</string>
+   </property>
+  </widget>
+  <widget class="QPushButton" name="panButton">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="geometry">
+    <rect>
+     <x>240</x>
+     <y>410</y>
+     <width>61</width>
+     <height>23</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>Pan</string>
+   </property>
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+  </widget>
+  <widget class="QPushButton" name="offsetButton">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="geometry">
+    <rect>
+     <x>340</x>
+     <y>410</y>
+     <width>61</width>
+     <height>23</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>Offset</string>
+   </property>
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
   </widget>
   <zorder>groupBoxCyan</zorder>
   <zorder>label_5</zorder>
@@ -863,7 +1010,14 @@
   <zorder>groupBoxRed</zorder>
   <zorder>groupBox</zorder>
   <zorder>groupBoxSuper</zorder>
+  <zorder>zoomInButton</zorder>
+  <zorder>zoomOutButton</zorder>
+  <zorder>panButton</zorder>
+  <zorder>offsetButton</zorder>
+  <zorder>checkBox</zorder>
  </widget>
- <resources/>
+ <resources>
+  <include location="resources.qrc"/>
+ </resources>
  <connections/>
 </ui>

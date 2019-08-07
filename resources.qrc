@@ -1,0 +1,7 @@
+<RCC>
+  <qresource prefix="/Anaglyph">
+    <file>Icons/loading.png</file>
+    <file>Icons/greenCheck.png</file>
+    <file>Icons/redCross.png</file>
+  </qresource>
+</RCC>

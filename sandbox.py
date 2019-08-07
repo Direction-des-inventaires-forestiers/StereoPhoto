@@ -1,8 +1,25 @@
-import cv2
+import cv2, os
 import numpy as np
 import math, time
-from PIL import Image
+from PIL import Image, ImageOps
 Image.MAX_IMAGE_PIXELS = 1000000000 
+
+s = time.time()
+img = Image.open("//ulysse/LIDAR/Developpement/Programmation/FP/Stereoscopie/Photos_stereo/Paire_1/Q18066_406_RGB.tif")
+img = img.rotate(270, expand=1)
+img = img.transpose(Image.FLIP_LEFT_RIGHT)
+#j = ImageOps.mirror(i)
+img.save("a.jpg")
+#picArray = np.array(img)
+#picArray = np.rot90(picArray,2)
+#im = Image.fromarray(picArray)
+print(time.time()-s )
+
+#a = img.transpose(Image.ROTATE_90)
+#a.show()
+#f = Image.open("a.jpg")
+#os.remove("a.jpg")
+#f.show()
 
 
 
@@ -54,3 +71,42 @@ original, pyramid = tuple(pyramid_gaussian(image, max_layer=1, downscale=16, mul
 f = (pyramid*255 / np.max(pyramid)).astype('uint8')
 im = Image.fromarray(f)
 im.show()"""
+
+"""
+void QGraphicsView::mouseMoveEvent(QMouseEvent *event)
+{
+    Q_D(QGraphicsView);
+    if (d->dragMode == QGraphicsView::ScrollHandDrag) {
+        if (d->handScrolling) {
+            QScrollBar *hBar = horizontalScrollBar();
+            QScrollBar *vBar = verticalScrollBar();
+            QPoint delta = event->pos() - d->lastMouseEvent.pos();
+            hBar->setValue(hBar->value() + (isRightToLeft() ? delta.x() : -delta.x()));
+            vBar->setValue(vBar->value() - delta.y());
+            // Detect how much we've scrolled to disambiguate scrolling from
+            // clicking.
+            ++d->handScrollMotions;
+        }
+    }
+    d->mouseMoveEventHandler(event);
+}"""
+
+"""
+if hasattr(self.leftPic, "n_frames"): #and format == tif??
+    for i in range(self.leftPic.n_frames):
+        self.leftPic.seek(i)
+        if self.leftPic.size < (100,100) :
+            self.leftPic.seek(i-1)
+            break
+
+    self.demoLeftPic = self.leftPic
+    self.leftPic.seek(0)
+
+print(img.n_frames)
+for i in range(img.n_frames) :
+img.seek(3)
+a = img 
+a = np.asarray(img)
+a.show()
+print(img.size)
+print(a.shape)"""
