@@ -1,4 +1,4 @@
-from PIL import Image, ImageDraw, ImageOps
+from PIL import Image, ImageDraw
 import numpy as np
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
@@ -11,11 +11,16 @@ import sys, os, time, math
 #Permet l'ouverture avec PIL de fichier énorme!
 Image.MAX_IMAGE_PIXELS = 1000000000 
 
+#Cyan = Left = Gauche
+#Rouge = Right = Droite
+#Éventuellement enlever tout code de couleur pour garder gauche et droite
+
 class app(QApplication):
 
     #Initialisation de l'application, des variables
     #Connection entre les boutons du menu d'options (mOpt) et leur fonction attitrée
     #On fait apparaître le menu des options seul
+    #Les écrans où l'on veut que les fênetres s'ouvrent sont choisi ici 
     def __init__(self, argv):
         QApplication.__init__(self,argv)
 
@@ -24,10 +29,10 @@ class app(QApplication):
 
         self.screenRight = QApplication.desktop().screenGeometry(self.intRightScreen)
         self.screenLeft = QApplication.desktop().screenGeometry(self.intLeftScreen)
-        
+
         self.temp = "temp.jpg"
-        self.demoLeft = "demoLeft.jpg"
-        self.demoRight = "demoRigh.jpg"
+        self.demoLeftExist = False
+        self.demoRightExist = False
         self.redOrientation = 0
         self.cyanOrientation = 0
         self.redMiroir = 0
@@ -43,10 +48,8 @@ class app(QApplication):
         self.offsetValSuper = 50
         self.redName = False
         self.cyanName = False
-        self.nbZoom = 0
         self.anaglyphActivate = False
-        self.pan = False
-        self.n = 0
+
         self.optWindow = optionWindow()
 
         self.optWindow.ui.boxMiroirRed.currentIndexChanged.connect(self.mMiroirRed)
@@ -103,22 +106,14 @@ class app(QApplication):
     #Fonction appelée lors de la fermeture du mOpt
     #Si l'on ferme le mOpt toute l'application ferme au complet, soit les deux fenêtres avec les images
     def optWindowClose(self):
-        try :
-            os.remove(self.demoLeft)
-        except :
-            pass
-        try :
-            os.remove(self.demoRight)
-        except :
-            pass
-        try :
+        if self.demoLeftExist :
+            os.remove("demoLeft.jpg")
+        if self.demoRightExist :
+            os.remove("demoRight.jpg")
+        if hasattr(self, "graphWindowLeft"):
             del self.graphWindowLeft
-        except :
-            pass
-        try :
+        if hasattr(self, "graphWindowRight"):
             del self.graphWindowRight
-        except :
-            pass
     
     #Fonction qui permet un traitement en couleur ou en noir et blanc sur les photos superposées 
     def setSuper(self):
@@ -128,14 +123,12 @@ class app(QApplication):
             QMessageBox.information(self.optWindow, "Taille Différente", "Les images importées ne sont pas de la même taille. \nChoisir deux images de taille similaire ")
             return 1
 
-        
         if self.optWindow.ui.radioCouleur.isChecked() :
             img_right_splited = self.rightPic.split()
             img_left_splited = self.offLeftPic.split()
             img_anaglyph_color = Image.merge('RGB', (img_left_splited[0], img_right_splited[1], img_right_splited[2]))
             img_anaglyph_color.save(self.temp)
             self.currentSuperPic = img_anaglyph_color 
-
         
         else : 
             img_right_grey = self.rightPic.convert('L')
@@ -151,158 +144,66 @@ class app(QApplication):
         os.remove(self.temp)
         return 0
 
+    #Fonction qui réalise le traitement des photos miniatures et affiche 
+    # la nouvelle version de l'image sur le mOpt
+    # PIL est utilisé pour le traitement.
+    def processSmallPicture(self, picture, rotation, miroir):
+        
+        if rotation == 0 and miroir == 0 :
+            picture.save(self.temp)
 
-    #Fonction de traitement d'image pour modifier l'orientation
-    #Quatre modes sont possible, soit paysage, portrait, paysage inversé et portrait inversé
-    #La fonction nécessite un certain temps de calcul donc l'image ne doit pas être trop grosse
-    def mOrientationRed(self, value):
-        if value == 0 :
-            self.mRedPicMiroir.save(self.temp)
-            self.mRedPicOrientation = self.demoLeftPic
-
-        elif value == 3 :
-            a = np.array(self.demoLeftPic)
-            a = np.rot90(a)
-            self.mRedPicOrientation = Image.fromarray(a)
-            a = np.array(self.mRedPicMiroir)
-            a = np.rot90(a)
-            im = Image.fromarray(a)
-            im.save(self.temp)
-
-        elif value == 2 :
-            a = np.array(self.demoLeftPic)
-            a = np.rot90(a,2)
-            self.mRedPicOrientation = Image.fromarray(a)
-            a = np.array(self.mRedPicMiroir)
-            a = np.rot90(a,2)
-            im = Image.fromarray(a)
-            im.save(self.temp)
-
-        elif value == 1 :
-            a = np.array(self.demoLeftPic)
-            a = np.rot90(a,3)
-            self.mRedPicOrientation = Image.fromarray(a)
-            a = np.array(self.mRedPicMiroir)
-            a = np.rot90(a,3)
-            im = Image.fromarray(a)
-            im.save(self.temp)
+        else :
+            pic = picture
+            if rotation == 3 :
+                pic = pic.rotate(90, expand=1)
+            elif rotation == 2 :
+                pic = pic.rotate(180, expand=0)
+            elif rotation == 1 :
+                pic = pic.rotate(270, expand=1)
+            
+            if miroir == 1 :
+                pic = pic.transpose(Image.FLIP_LEFT_RIGHT)
+            elif miroir == 2 :
+                pic = pic.transpose(Image.FLIP_TOP_BOTTOM)
+            pic.save(self.temp)
 
         scene = QGraphicsScene()
         a = QImage(self.temp)
-        scene.addPixmap(QPixmap.fromImage(a))
-        self.optWindow.ui.graphicsViewRed.setScene(scene)
-        self.optWindow.ui.graphicsViewRed.fitInView(self.optWindow.ui.graphicsViewRed.sceneRect(), Qt.KeepAspectRatio)
+
+        if picture == self.demoLeftPic :
+            scene.addPixmap(QPixmap.fromImage(a))
+            self.optWindow.ui.graphicsViewRed.setScene(scene)
+            self.optWindow.ui.graphicsViewRed.fitInView(self.optWindow.ui.graphicsViewRed.sceneRect(), Qt.KeepAspectRatio)
+        
+        else :
+            self.cyanScene = scene.addPixmap(QPixmap.fromImage(a))
+            self.optWindow.ui.graphicsViewCyan.setScene(scene)
+            self.optWindow.ui.graphicsViewCyan.fitInView(self.optWindow.ui.graphicsViewCyan.sceneRect(), Qt.KeepAspectRatio)
+
         os.remove(self.temp)
+    
+    #Fonction de traitement d'image pour modifier l'orientation
+    #Les angles de rotation possible sont 0, 90, 180 et 270
+    def mOrientationRed(self, value):
         self.redOrientation = value
+        self.processSmallPicture(self.demoLeftPic, self.redOrientation, self.redMiroir)
 
     
     #Idem à mOrientationRed
     def mOrientationCyan(self, value):
-        if value == 0 :
-            self.mCyanPicMiroir.save(self.temp)
-            self.mCyanPicOrientation = self.demoRightPic
-
-        elif value == 3 :
-            a = np.array(self.demoRightPic)
-            a = np.rot90(a)
-            self.mCyanPicOrientation = Image.fromarray(a)
-            a = np.array(self.mCyanPicMiroir)
-            a = np.rot90(a)
-            im = Image.fromarray(a)
-            im.save(self.temp)
-
-        elif value == 2 :
-            a = np.array(self.demoRightPic)
-            a = np.rot90(a,2)
-            self.mCyanPicOrientation = Image.fromarray(a)
-            a = np.array(self.mCyanPicMiroir)
-            a = np.rot90(a,2)
-            im = Image.fromarray(a)
-            im.save(self.temp)
-
-        elif value == 1 :
-            a = np.array(self.demoRightPic)
-            a = np.rot90(a,3)
-            self.mCyanPicOrientation = Image.fromarray(a)
-            a = np.array(self.mCyanPicMiroir)
-            a = np.rot90(a,3)
-            im = Image.fromarray(a)
-            im.save(self.temp)
-
-        scene = QGraphicsScene()
-        a = QImage(self.temp)
-        self.cyanScene = scene.addPixmap(QPixmap.fromImage(a))
-        self.optWindow.ui.graphicsViewCyan.setScene(scene)
-        self.optWindow.ui.graphicsViewCyan.fitInView(self.optWindow.ui.graphicsViewCyan.sceneRect(), Qt.KeepAspectRatio)
-        os.remove(self.temp)
         self.cyanOrientation = value
+        self.processSmallPicture(self.demoRightPic, self.cyanOrientation, self.cyanMiroir)
         
-
     #Fonction de traitement d'image pour ajouter un effet mirroir à l'image
     #Deux modes sont possible, soit un effet mirroir à l'horizontal et un à la verticale
-    #La fonction nécessite un certain temps de calcul donc l'image ne doit pas être trop grosse
     def mMiroirRed(self, value):
-        if value == 0:
-            self.mRedPicOrientation.save(self.temp)
-            self.mRedPicMiroir = self.demoLeftPic
-        
-        elif value == 1 :
-            a = np.array(self.demoLeftPic)
-            a = np.fliplr(a)
-            self.mRedPicMiroir = Image.fromarray(a)
-            a = np.array(self.mRedPicOrientation)
-            a = np.fliplr(a)
-            im = Image.fromarray(a)
-            im.save(self.temp)
-        
-        elif value == 2 :
-            a = np.array(self.demoLeftPic)
-            a = np.flipud(a)
-            self.mRedPicMiroir = Image.fromarray(a)
-            a = np.array(self.mRedPicOrientation)
-            a = np.flipud(a)
-            im = Image.fromarray(a)
-            im.save(self.temp)
-        
-        scene = QGraphicsScene()
-        a = QImage(self.temp)
-        scene.addPixmap(QPixmap.fromImage(a))
-        self.optWindow.ui.graphicsViewRed.setScene(scene)
-        self.optWindow.ui.graphicsViewRed.fitInView(self.optWindow.ui.graphicsViewRed.sceneRect(), Qt.KeepAspectRatio)
-        os.remove(self.temp)
         self.redMiroir = value
+        self.processSmallPicture(self.demoLeftPic, self.redOrientation, self.redMiroir)
         
     #Idem à mMiroirRed
     def mMiroirCyan(self,value):
-        if value == 0:
-            self.mCyanPicOrientation.save(self.temp)
-            self.mCyanPicMiroir = self.demoRightPic
-        
-        elif value == 1 :
-            a = np.array(self.demoRightPic)
-            a = np.fliplr(a)
-            self.mCyanPicMiroir = Image.fromarray(a)
-            a = np.array(self.mCyanPicOrientation)
-            a = np.fliplr(a)
-            im = Image.fromarray(a)
-            im.save(self.temp)
-        
-        elif value == 2 :
-            a = np.array(self.demoRightPic)
-            a = np.flipud(a)
-            self.mCyanPicMiroir = Image.fromarray(a)
-            a = np.array(self.mCyanPicOrientation)
-            a = np.flipud(a)
-            im = Image.fromarray(a)
-            im.save(self.temp)
-        
-        scene = QGraphicsScene()
-        a = QImage(self.temp)
-        self.cyanScene = scene.addPixmap(QPixmap.fromImage(a))
-        self.optWindow.ui.graphicsViewCyan.setScene(scene)
-        self.optWindow.ui.graphicsViewCyan.fitInView(self.optWindow.ui.graphicsViewCyan.sceneRect(), Qt.KeepAspectRatio)
-        os.remove(self.temp)
         self.cyanMiroir = value
+        self.processSmallPicture(self.demoRightPic, self.cyanOrientation, self.cyanMiroir)
 
     #Les 8 fonctions suivantes sont des fonctions de déplacement des images
     #Il est possible de déplacer la photo d'une valeur de offsetVal vers
@@ -360,22 +261,18 @@ class app(QApplication):
 
     #Fonction réaliser lorsqu'une photo est importée 
     #Elle permet de rendre le panneau de fonctionnalité accessible à l'utilisateur 
-    #pour le traitement d'image ainsi que le repositionnement 
-    #L'image est affiché sur une nouvelle fenêtre qui ne peut être que part 
-    #la fermeture du mOpt 
+    #pour le traitement d'image ainsi que le bouton d'importation
+    #L'image est affiché en petit format pour permettre une visualisation du 
+    #résultat qui sera produit suite à l'importation  
     #Si une nouvelle photo est importée, l'ancienne est fermée 
-    #L'image est aussi enregistré en différent format plus petit que l'orginal 
+    #Si la photo est un fichier tif avec plusieurs versions de l'image, 
+    #on récupère une version plus petite plutot que la produire, le résultat est donc 
+    #instantané
     def mNewRedPic(self) : 
 
-        self.optWindow.ui.boxOrientationRed.currentIndexChanged.disconnect(self.mOrientationRed)
         self.optWindow.ui.boxOrientationRed.setCurrentIndex(0)
-        self.optWindow.ui.boxOrientationRed.currentIndexChanged.connect(self.mOrientationRed)
-        self.optWindow.ui.boxMiroirRed.currentIndexChanged.disconnect(self.mMiroirRed)
         self.optWindow.ui.boxMiroirRed.setCurrentIndex(0)
-        self.optWindow.ui.boxMiroirRed.currentIndexChanged.connect(self.mMiroirRed)
         
-        self.redOrientation = 0
-        self.redMiroir = 0
         self.redOffsetX = 0
         self.redOffsetY = 0
         self.superOffsetX = 0
@@ -398,8 +295,9 @@ class app(QApplication):
                 self.leftPic.seek(i)
                 if self.leftPic.size < (100,100) :
                     self.leftPic.seek(i-1)
-                    self.leftPic.save(self.demoLeft)
-                    self.demoLeftPic = Image.open(self.demoLeft)
+                    self.leftPic.save("demoLeft.jpg")
+                    self.demoLeftPic = Image.open("demoLeft.jpg")
+                    self.demoLeftExist = True
                     self.leftPic.seek(0)
                     break
 
@@ -411,8 +309,6 @@ class app(QApplication):
         draw = ImageDraw.Draw(self.demoLeftPic)
         draw.ellipse((20,20,60,60), fill="red", outline="white")
         self.demoLeftPic.save(self.temp)
-        self.mRedPicOrientation = self.demoLeftPic
-        self.mRedPicMiroir = self.demoLeftPic
 
         sceneRed = QGraphicsScene()
         img = QImage(self.temp)
@@ -430,8 +326,9 @@ class app(QApplication):
         
         self.graphWindowLeft = graphicsWindow("Image Gauche")
         self.graphWindowLeft.setWindowState(Qt.WindowMaximized)
-        rect = QRect(0,0,self.screenLeft.width(),self.screenLeft.height()-40)
+        rect = QRect(0,0,self.screenLeft.width(),self.screenLeft.height())
         self.graphWindowLeft.ui.graphicsView.setGeometry(rect)
+        self.graphWindowLeft.move(QPoint(self.screenLeft.x(), self.screenLeft.y()))
         self.offLeftPic = self.leftPic
 
         fname = self.optWindow.ui.importLineRed.text()
@@ -442,12 +339,8 @@ class app(QApplication):
     #Idem à mNewRedPic
     def mNewCyanPic(self):
         
-        self.optWindow.ui.boxOrientationCyan.currentIndexChanged.disconnect(self.mOrientationCyan)
         self.optWindow.ui.boxOrientationCyan.setCurrentIndex(0)
-        self.optWindow.ui.boxOrientationCyan.currentIndexChanged.connect(self.mOrientationCyan)
-        self.optWindow.ui.boxMiroirCyan.currentIndexChanged.disconnect(self.mMiroirCyan)
         self.optWindow.ui.boxMiroirCyan.setCurrentIndex(0)
-        self.optWindow.ui.boxMiroirCyan.currentIndexChanged.connect(self.mMiroirCyan)
 
         self.cyanOrientation = 0
         self.cyanMiroir = 0
@@ -475,8 +368,9 @@ class app(QApplication):
                 self.rightPic.seek(i)
                 if self.rightPic.size < (100,100) :
                     self.rightPic.seek(i-1)
-                    self.rightPic.save(self.demoRight)
-                    self.demoRightPic = Image.open(self.demoRight)
+                    self.rightPic.save("demoRight.jpg")
+                    self.demoRightPic = Image.open("demoRight.jpg")
+                    self.demoRightExist = True 
                     self.rightPic.seek(0)
                     break
 
@@ -488,8 +382,6 @@ class app(QApplication):
         draw = ImageDraw.Draw(self.demoRightPic)
         draw.ellipse((20,20,60,60), fill="red", outline="white")
         self.demoRightPic.save(self.temp)
-        self.mCyanPicOrientation = self.demoRightPic
-        self.mCyanPicMiroir = self.demoRightPic
 
         sceneCyan = QGraphicsScene()
         img = QImage(self.temp)
@@ -508,8 +400,9 @@ class app(QApplication):
 
         self.graphWindowRight = graphicsWindow("Image Droite")
         self.graphWindowRight.setWindowState(Qt.WindowMaximized)
-        rect = QRect(0,0,self.screenRight.width(),self.screenRight.height()-40)
+        rect = QRect(0,0,self.screenRight.width(),self.screenRight.height())
         self.graphWindowRight.ui.graphicsView.setGeometry(rect)
+        self.graphWindowRight.move(QPoint(self.screenRight.x(), self.screenRight.y()))
 
 
     #Fonction qui affiche les bonnes fenêtres selon la requête de l'utilisateur, soit 
@@ -541,7 +434,6 @@ class app(QApplication):
                 self.enableOptionImage(False)
                 self.optWindow.ui.groupBoxSuper.setEnabled(False)
 
-
         else : 
             
             if self.anaglyphActivate == True : 
@@ -560,7 +452,7 @@ class app(QApplication):
             
 
     #Fonction permettant l'enregistrement de la photo superposer. La photo enregistrée prend en considération
-    #le offset qui a pu être réalisé 
+    #le offset qui a pu être réalisé, le chemin proposé est celui de la photo de gauche
     def saveSuper(self) :
         path = self.path + "/Anaglyph"
         fname = QFileDialog.getSaveFileName(self.graphWindowRight, "Save your anaglyph picture", path, "Image (*.jpg)")[0]
@@ -644,7 +536,11 @@ class app(QApplication):
         #self.graphWindowRight.ui.graphicsView.fitInView(rect,Qt.KeepAspectRatio)
         #self.graphWindowLeft.ui.graphicsView.fitInView(rect,Qt.KeepAspectRatio)
 
-
+    #Fonction pour permettre l'imporation de l'image sur le graphicsView
+    #L'importation est généré par un thread pour permettre à l'application de rouler
+    #correctement et ainsi continuer à répondre
+    #Le thread est nécessaire puisqu'il réalise le traitement qui est lourd lorsque les 
+    #fichiers importés sont gros
     def mImportRed(self):
         self.optWindow.ui.importDoneRed.setStyleSheet("image: url(:/Anaglyph/Icons/loading.png);")
     
@@ -652,7 +548,7 @@ class app(QApplication):
         self.tRed.finished.connect(self.threadRed)
         self.tRed.start()
        
-
+    #Idem à mImportRed
     def mImportCyan(self):
         self.optWindow.ui.importDoneCyan.setStyleSheet("image: url(:/Anaglyph/Icons/loading.png);")
     
@@ -660,8 +556,9 @@ class app(QApplication):
         self.tCyan.finished.connect(self.threadCyan)
         self.tCyan.start()
 
-    #Fonction d'affichage d'une photo et ajustement pour que la photo soit affichée complètement
-    #Apparition d'une nouvelle fenêtre qui ne peut être fermé que part la fermeture du mOpt
+    #Fonction d'affichage d'une photo et connection vers les fonctions de souris liées
+    #aux images. La scene est crée avec une grande taille pour permettre un pan "sans fin"
+    #ce qui évite de perdre le décalage existant entre les photos 
     def threadRed(self):
         scene = QGraphicsScene() 
         scene.setSceneRect(-100000,-100000,200000,200000)
@@ -675,16 +572,17 @@ class app(QApplication):
         self.redSizeY = self.leftPic.size[1]
         self.graphWindowLeft.ui.graphicsView.setScene(scene)
         self.redViewScene = self.graphWindowLeft.ui.graphicsView.scene()
-        self.graphWindowLeft.move(QPoint(self.screenLeft.x(), self.screenLeft.y()))
         os.remove("tempLeft.jpg")
         self.graphWindowLeft.ui.graphicsView.mouseMoveEvent = self.mMoveEvent
         self.graphWindowLeft.ui.graphicsView.mousePressEvent = self.mPressEvent
+        self.graphWindowLeft.ui.graphicsView.wheelEvent = self.wheelEvent
         self.graphWindowLeft.ui.graphicsView.show()
         self.optWindow.ui.importDoneRed.setStyleSheet("image: url(:/Anaglyph/Icons/greenCheck.png);")
         self.redName = True 
         if self.cyanName == True :
             self.optWindow.ui.affichageButton.setEnabled(True)
 
+    #idem a threadRed
     def threadCyan(self):
         scene = QGraphicsScene()
         scene.setSceneRect(-100000,-100000,200000,200000)
@@ -698,22 +596,25 @@ class app(QApplication):
         self.cyanSizeY = self.rightPic.size[1]
         self.graphWindowRight.ui.graphicsView.setScene(scene)
         self.cyanViewScene = self.graphWindowRight.ui.graphicsView.scene()
-        self.graphWindowRight.move(QPoint(self.screenRight.x(), self.screenRight.y()))
         os.remove("tempRight.jpg")
         self.graphWindowRight.ui.graphicsView.mouseMoveEvent = self.mMoveEvent
         self.graphWindowRight.ui.graphicsView.mousePressEvent = self.mPressEvent
+        self.graphWindowRight.ui.graphicsView.wheelEvent = self.wheelEvent
         self.graphWindowRight.ui.graphicsView.show()
         self.optWindow.ui.importDoneCyan.setStyleSheet("image: url(:/Anaglyph/Icons/greenCheck.png);")
         self.cyanName = True 
         if self.redName == True :
             self.optWindow.ui.affichageButton.setEnabled(True)
-        
+    
+    #Désactive le offset pour activer le pan     
     def panClick(self):
         self.optWindow.ui.offsetButton.setChecked(False)
 
+    #Désactive le pan pour activer le offset
     def offsetClick(self):
         self.optWindow.ui.panButton.setChecked(False)
 
+    #Fonction qui réalise le pan et le offset selon le bouton sélectionné 
     def mMoveEvent(self, ev):
         if self.optWindow.ui.panButton.isChecked() :
             redView = self.graphWindowLeft.ui.graphicsView
@@ -735,9 +636,31 @@ class app(QApplication):
             cyanView.verticalScrollBar().setValue(cyanView.verticalScrollBar().value() + delta.y())
             self.panPosition = ev.pos()
 
+    #Fonction réalisé lors du click sur l'image, elle prend la première position de la souris
     def mPressEvent(self, ev):
         if self.optWindow.ui.panButton.isChecked() or self.optWindow.ui.offsetButton.isChecked() :
             self.panPosition = ev.pos()
+
+    #Fonction pour zoom In/Out sur les photos avec la souris, elle zoom dans la 
+    #direction de la souris 
+    def wheelEvent(self, event):
+        oldPos = self.graphWindowLeft.ui.graphicsView.mapToScene(event.pos())
+
+        factor = 1.41 ** (event.angleDelta().y() / 240.0)
+        if factor > 1 : 
+            self.mZoomIn()
+        else :
+            self.mZoomOut()
+
+        newPos = self.graphWindowLeft.ui.graphicsView.mapToScene(event.pos())
+        delta = newPos- oldPos
+
+        self.graphWindowRight.ui.graphicsView.setTransformationAnchor(QGraphicsView.NoAnchor)
+        self.graphWindowLeft.ui.graphicsView.setTransformationAnchor(QGraphicsView.NoAnchor)
+        self.graphWindowRight.ui.graphicsView.translate(-delta.x(), delta.y())
+        self.graphWindowLeft.ui.graphicsView.translate(delta.x(), delta.y())
+        self.graphWindowRight.ui.graphicsView.setTransformationAnchor(QGraphicsView.AnchorViewCenter)
+        self.graphWindowLeft.ui.graphicsView.setTransformationAnchor(QGraphicsView.AnchorViewCenter)
 
 if __name__ == "__main__":
     app = app(sys.argv)

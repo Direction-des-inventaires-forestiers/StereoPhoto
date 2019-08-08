@@ -4,7 +4,7 @@ from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 import sys, os, time, math
 
-
+#Thread réalisant le traitement et le chargement d'une photo pour permettre à l'application de resté active. 
 class threadPicture(QThread):
 
     def __init__(self, picture, rotation, miroir, path):
