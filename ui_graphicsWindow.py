@@ -21,6 +21,9 @@ class Ui_graphicsWindow(object):
         self.graphicsView.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
         self.graphicsView.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
         self.graphicsView.setObjectName("graphicsView")
+        self.widget = QtWidgets.QWidget(self.centralwidget)
+        self.widget.setGeometry(QtCore.QRect(170, 110, 1000, 1200))
+        self.widget.setObjectName("widget")
         graphicsWindow.setCentralWidget(self.centralwidget)
         self.menubar = QtWidgets.QMenuBar(graphicsWindow)
         self.menubar.setGeometry(QtCore.QRect(0, 0, 800, 21))
@@ -29,7 +32,7 @@ class Ui_graphicsWindow(object):
         self.statusbar = QtWidgets.QStatusBar(graphicsWindow)
         self.statusbar.setObjectName("statusbar")
         graphicsWindow.setStatusBar(self.statusbar)
-
+ 
         self.retranslateUi(graphicsWindow, nom)
         QtCore.QMetaObject.connectSlotsByName(graphicsWindow)
 
@@ -42,6 +45,35 @@ class graphicsWindow(QtWidgets.QMainWindow):
         QtWidgets.QMainWindow.__init__(self)
         self.ui = Ui_graphicsWindow()
         self.ui.setupUi(self, nom)
+        self.ctrlClick = False
+        self.myRect = QtCore.QRect()
+        self.myPen = QtGui.QPen()
+        self.rayon = 100
+        self.ui.widget.paintEvent = self.draw
         #self.setWindowFlags(Qt.Window | Qt.WindowTitleHint | Qt.CustomizeWindowHint | Qt.WindowMaximizeButtonHint | Qt.WindowMinimizeButtonHint)
+
+    def keyPressEvent(self, event):
+        if event.key() == QtCore.Qt.Key_Control:
+            self.ctrlClick = True
+
+    def keyReleaseEvent(self, event):
+        self.ctrlClick = False
+
+    
+    def cursorRectInit(self, x, y):
+        r = self.rayon
+        self.myRect = QtCore.QRect((x/2) - r, (y/2) - r, 2*r, 2*r)
+
+
+    
+    def draw(self, event):
+        p = QtGui.QPainter()
+        p.begin(self.ui.widget)
+        pen = QtGui.QPen(QtGui.QColor(255, 0, 0),6, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin)
+        rect = self.myRect
+        p.setPen(pen)
+        p.setRenderHint(QtGui.QPainter.Antialiasing)
+        p.drawEllipse(rect)
+        p.end()
 
 

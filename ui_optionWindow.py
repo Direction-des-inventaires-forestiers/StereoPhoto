@@ -396,6 +396,7 @@ class optionWindow(QtWidgets.QMainWindow):
         self.ui.setupUi(self)
         self.ui.importToolCyan.clicked.connect(self.showImportCyan)
         self.ui.importToolRed.clicked.connect(self.showImportRed)
+        self.ctrlClick = False
 
     def showImportCyan(self) :
         fname = QtWidgets.QFileDialog.getOpenFileName(self, 'Import picture', os.path.dirname(os.path.abspath(__file__)),"Image (*.png, *.jpg, *.tif)")[0]
@@ -409,6 +410,15 @@ class optionWindow(QtWidgets.QMainWindow):
             
     def closeEvent(self,event):
         self.closeWindow.emit()
+
+    def keyPressEvent(self, event):
+        if event.key() == QtCore.Qt.Key_Control:
+            self.ctrlClick = True
+
+    def keyReleaseEvent(self, event):
+        self.ctrlClick = False
+
+
 
 
 

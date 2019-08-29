@@ -2,18 +2,25 @@ import cv2, os
 import numpy as np
 import math, time
 from PIL import Image, ImageOps
-Image.MAX_IMAGE_PIXELS = 1000000000 
+from PyQt5.QtWidgets import *
+from PyQt5.QtCore import *
+from PyQt5.QtGui import *
 
-s = time.time()
-img = Image.open("//ulysse/LIDAR/Developpement/Programmation/FP/Stereoscopie/Photos_stereo/Paire_1/Q18066_406_RGB.tif")
-img = img.rotate(270, expand=1)
-img = img.transpose(Image.FLIP_LEFT_RIGHT)
+#print(pen.)
+
+#Image.MAX_IMAGE_PIXELS = 1000000000 
+
+#s = time.time()
+#img = Image.open("//ulysse/LIDAR/Developpement/Programmation/FP/Stereoscopie/Photos_stereo/Paire_1/Q18066_406_RGB.tif")
+#a = img.histogram()
+#img = img.rotate(270, expand=1)
+#img = img.transpose(Image.FLIP_LEFT_RIGHT)
 #j = ImageOps.mirror(i)
-img.save("a.jpg")
+#img.save("a.jpg")
 #picArray = np.array(img)
 #picArray = np.rot90(picArray,2)
 #im = Image.fromarray(picArray)
-print(time.time()-s )
+#print(time.time()-s )
 
 #a = img.transpose(Image.ROTATE_90)
 #a.show()

@@ -6,6 +6,7 @@ from PyQt5.QtGui import *
 from ui_optionWindow import optionWindow
 from ui_graphicsWindow import graphicsWindow 
 from loadingPicture import threadPicture
+from metadata import distance, coord
 import sys, os, time, math
 
 #Permet l'ouverture avec PIL de fichier énorme!
@@ -24,8 +25,8 @@ class app(QApplication):
     def __init__(self, argv):
         QApplication.__init__(self,argv)
 
-        self.intRightScreen = 1
-        self.intLeftScreen = 2
+        self.intRightScreen = 3
+        self.intLeftScreen = 1
 
         self.screenRight = QApplication.desktop().screenGeometry(self.intRightScreen)
         self.screenLeft = QApplication.desktop().screenGeometry(self.intLeftScreen)
@@ -49,6 +50,9 @@ class app(QApplication):
         self.redName = False
         self.cyanName = False
         self.anaglyphActivate = False
+        self.distance = 0
+        self.leftCoord = (0,0)
+        self.rightCoord =  (0,0)
 
         self.optWindow = optionWindow()
 
@@ -111,9 +115,9 @@ class app(QApplication):
         if self.demoRightExist :
             os.remove("demoRight.jpg")
         if hasattr(self, "graphWindowLeft"):
-            del self.graphWindowLeft
+            self.graphWindowLeft.close()
         if hasattr(self, "graphWindowRight"):
-            del self.graphWindowRight
+            self.graphWindowRight.close()
     
     #Fonction qui permet un traitement en couleur ou en noir et blanc sur les photos superposées 
     def setSuper(self):
@@ -299,12 +303,18 @@ class app(QApplication):
                     self.demoLeftPic = Image.open("demoLeft.jpg")
                     self.demoLeftExist = True
                     self.leftPic.seek(0)
+                    self.distance = distance("tif")
+                    self.leftCoord = coord("439")
                     break
 
         elif self.leftPic.size[0] > self.leftPic.size[1] :
             self.demoLeftPic = self.leftPic.resize((300,200))
+            self.distance = distance("a")
+            self.leftCoord = coord("a")
         else :
-            self.demoLeftPic = self.leftPic.resize((200,300))   
+            self.demoLeftPic = self.leftPic.resize((200,300))
+            self.distance = distance("a")
+            self.leftCoord = coord("a")
 
         draw = ImageDraw.Draw(self.demoLeftPic)
         draw.ellipse((20,20,60,60), fill="red", outline="white")
@@ -328,6 +338,8 @@ class app(QApplication):
         self.graphWindowLeft.setWindowState(Qt.WindowMaximized)
         rect = QRect(0,0,self.screenLeft.width(),self.screenLeft.height())
         self.graphWindowLeft.ui.graphicsView.setGeometry(rect)
+        self.graphWindowLeft.ui.widget.setGeometry(rect)
+        self.graphWindowLeft.cursorRectInit(rect.width(), rect.height())
         self.graphWindowLeft.move(QPoint(self.screenLeft.x(), self.screenLeft.y()))
         self.offLeftPic = self.leftPic
 
@@ -372,12 +384,15 @@ class app(QApplication):
                     self.demoRightPic = Image.open("demoRight.jpg")
                     self.demoRightExist = True 
                     self.rightPic.seek(0)
+                    self.rightCoord = coord("440")
                     break
 
         elif self.rightPic.size[0] > self.rightPic.size[1] :
             self.demoRightPic = self.rightPic.resize((300,200))
+            self.rightCoord = coord("a")
         else :
             self.demoRightPic = self.rightPic.resize((200,300))
+            self.rightCoord = coord("a")
        
         draw = ImageDraw.Draw(self.demoRightPic)
         draw.ellipse((20,20,60,60), fill="red", outline="white")
@@ -402,6 +417,8 @@ class app(QApplication):
         self.graphWindowRight.setWindowState(Qt.WindowMaximized)
         rect = QRect(0,0,self.screenRight.width(),self.screenRight.height())
         self.graphWindowRight.ui.graphicsView.setGeometry(rect)
+        self.graphWindowRight.ui.widget.setGeometry(rect)
+        self.graphWindowRight.cursorRectInit(rect.width(), rect.height())
         self.graphWindowRight.move(QPoint(self.screenRight.x(), self.screenRight.y()))
 
 
@@ -445,11 +462,41 @@ class app(QApplication):
             self.graphWindowRight.show()
             self.graphWindowLeft.ui.graphicsView.fitInView(self.redRect, Qt.KeepAspectRatio)
             self.graphWindowRight.ui.graphicsView.fitInView(self.cyanRect, Qt.KeepAspectRatio)
+            self.redScene.setOffset(0, 0)
             self.optWindow.activateWindow()
             self.enableOptionImage(True)
             self.optWindow.ui.groupBoxSuper.setEnabled(False)
+
+            ######################
+            #painter = QPainter(self.graphWindowLeft)
+            #pen = QPen(QColor(255, 0, 0),16, Qt.SolidLine)
+            #rect = QRect(0,0,1800,1200)
+            #rectF = QRectF(0,0,1800,1200)
+            #painter.setPen(pen)
+            #painter.drawRect(rect)
+            #self.graphWindowLeft.painter.drawEllipse(rect)
+
+            #item1 = QGraphicsLineItem(500,500,600,600)
+            #item2 = QGraphicsLineItem(600,500,500,600)
+            #item1.setPen(pen); item2.setPen(pen)
+            #a.addItem(item1)
+            #a.addItem(item2)
+
+
+            #i = QGraphicsEllipseItem(0,0,1800,1200)
+            #i.setBrush(QBrush(Qt.blue))
+            #a =self.graphWindowLeft.ui.graphicsView.scene()
+            #print(a)
+            #a.addItem(i)
+            ########################
             
             
+
+    def draw(self, p, r):
+        pen = QPen(QColor(255, 0, 0),16, Qt.SolidLine)
+        rect = QRect(0,0,1800,1200)
+        p.setPen(pen)
+        p.drawRect(rect)
 
     #Fonction permettant l'enregistrement de la photo superposer. La photo enregistrée prend en considération
     #le offset qui a pu être réalisé, le chemin proposé est celui de la photo de gauche
@@ -543,6 +590,7 @@ class app(QApplication):
     #fichiers importés sont gros
     def mImportRed(self):
         self.optWindow.ui.importDoneRed.setStyleSheet("image: url(:/Anaglyph/Icons/loading.png);")
+        self.optWindow.ui.importButtonRed.setEnabled(False)
     
         self.tRed = threadPicture(self.leftPic, self.redOrientation, self.redMiroir, "tempLeft.jpg")
         self.tRed.finished.connect(self.threadRed)
@@ -551,6 +599,7 @@ class app(QApplication):
     #Idem à mImportRed
     def mImportCyan(self):
         self.optWindow.ui.importDoneCyan.setStyleSheet("image: url(:/Anaglyph/Icons/loading.png);")
+        self.optWindow.ui.importButtonCyan.setEnabled(False)
     
         self.tCyan = threadPicture(self.rightPic, self.cyanOrientation, self.cyanMiroir, "tempRight.jpg")
         self.tCyan.finished.connect(self.threadCyan)
@@ -561,23 +610,31 @@ class app(QApplication):
     #ce qui évite de perdre le décalage existant entre les photos 
     def threadRed(self):
         scene = QGraphicsScene() 
+
+        ##########################
         scene.setSceneRect(-100000,-100000,200000,200000)
+        #scene.setSceneRect(0,0,5000,5000)
+        ##########################
+        #scene.drawForeground = self.draw
         self.redScene = scene.addPixmap(self.tRed.pix)
+        
+        del self.tRed
         if self.redOrientation == 0 or self.redOrientation == 2 :
-            self.redRect = QRectF(0,0,self.leftPic.size[0], self.leftPic.size[1])
+            self.redRect = QRectF(0+self.leftCoord[0] ,0+self.leftCoord[1], self.leftPic.size[0], self.leftPic.size[1]-self.distance)
         else :
-            self. redRect =  QRectF(0,0,self.leftPic.size[1], self.leftPic.size[0])
+            self.redRect =  QRectF(0+self.leftCoord[0] ,0+self.leftCoord[1], self.leftPic.size[1]-self.distance, self.leftPic.size[0])
         self.graphWindowLeft.ui.graphicsView.fitInView(self.redRect, Qt.KeepAspectRatio)
         self.redSizeX = self.leftPic.size[0]
         self.redSizeY = self.leftPic.size[1]
         self.graphWindowLeft.ui.graphicsView.setScene(scene)
         self.redViewScene = self.graphWindowLeft.ui.graphicsView.scene()
         os.remove("tempLeft.jpg")
-        self.graphWindowLeft.ui.graphicsView.mouseMoveEvent = self.mMoveEvent
-        self.graphWindowLeft.ui.graphicsView.mousePressEvent = self.mPressEvent
-        self.graphWindowLeft.ui.graphicsView.wheelEvent = self.wheelEvent
+        self.graphWindowLeft.ui.widget.mouseMoveEvent = self.mMoveEvent
+        self.graphWindowLeft.ui.widget.mousePressEvent = self.mPressEvent
+        self.graphWindowLeft.ui.widget.wheelEvent = self.wheelEvent
         self.graphWindowLeft.ui.graphicsView.show()
         self.optWindow.ui.importDoneRed.setStyleSheet("image: url(:/Anaglyph/Icons/greenCheck.png);")
+        self.optWindow.ui.importButtonRed.setEnabled(True)
         self.redName = True 
         if self.cyanName == True :
             self.optWindow.ui.affichageButton.setEnabled(True)
@@ -587,21 +644,23 @@ class app(QApplication):
         scene = QGraphicsScene()
         scene.setSceneRect(-100000,-100000,200000,200000)
         self.cyanScene = scene.addPixmap(self.tCyan.pix)
+        del self.tCyan
         if self.cyanOrientation == 0 or self.cyanOrientation == 2 :
-            self.cyanRect = QRectF(0,0,self.rightPic.size[0], self.rightPic.size[1])
+            self.cyanRect = QRectF(0+self.rightCoord[0],0+self.rightCoord[1],self.rightPic.size[0], self.rightPic.size[1]-self.distance)
         else : 
-            self.cyanRect = QRectF(0,0,self.rightPic.size[1], self.rightPic.size[0])
+            self.cyanRect = QRectF(0+self.rightCoord[0],0+self.rightCoord[1],self.rightPic.size[1]-self.distance, self.rightPic.size[0])
         self.graphWindowRight.ui.graphicsView.fitInView(self.cyanRect, Qt.KeepAspectRatio)
         self.cyanSizeX = self.rightPic.size[0]
         self.cyanSizeY = self.rightPic.size[1]
         self.graphWindowRight.ui.graphicsView.setScene(scene)
         self.cyanViewScene = self.graphWindowRight.ui.graphicsView.scene()
         os.remove("tempRight.jpg")
-        self.graphWindowRight.ui.graphicsView.mouseMoveEvent = self.mMoveEvent
-        self.graphWindowRight.ui.graphicsView.mousePressEvent = self.mPressEvent
-        self.graphWindowRight.ui.graphicsView.wheelEvent = self.wheelEvent
+        self.graphWindowRight.ui.widget.mouseMoveEvent = self.mMoveEvent
+        self.graphWindowRight.ui.widget.mousePressEvent = self.mPressEvent
+        self.graphWindowRight.ui.widget.wheelEvent = self.wheelEvent
         self.graphWindowRight.ui.graphicsView.show()
         self.optWindow.ui.importDoneCyan.setStyleSheet("image: url(:/Anaglyph/Icons/greenCheck.png);")
+        self.optWindow.ui.importButtonCyan.setEnabled(True)
         self.cyanName = True 
         if self.redName == True :
             self.optWindow.ui.affichageButton.setEnabled(True)
@@ -644,23 +703,35 @@ class app(QApplication):
     #Fonction pour zoom In/Out sur les photos avec la souris, elle zoom dans la 
     #direction de la souris 
     def wheelEvent(self, event):
-        oldPos = self.graphWindowLeft.ui.graphicsView.mapToScene(event.pos())
-
         factor = 1.41 ** (event.angleDelta().y() / 240.0)
-        if factor > 1 : 
-            self.mZoomIn()
-        else :
-            self.mZoomOut()
+        redView = self.graphWindowLeft.ui.graphicsView
+        cyanView = self.graphWindowRight.ui.graphicsView
+        
+        if self.optWindow.ctrlClick or self.graphWindowLeft.ctrlClick or self.graphWindowRight.ctrlClick :
+            oldPos = self.graphWindowLeft.ui.graphicsView.mapToScene(event.pos())
+            if factor > 1 : 
+                self.mZoomIn()
+            else :
+                self.mZoomOut()
 
-        newPos = self.graphWindowLeft.ui.graphicsView.mapToScene(event.pos())
-        delta = newPos- oldPos
+            newPos = self.graphWindowLeft.ui.graphicsView.mapToScene(event.pos())
+            delta = newPos- oldPos
 
-        self.graphWindowRight.ui.graphicsView.setTransformationAnchor(QGraphicsView.NoAnchor)
-        self.graphWindowLeft.ui.graphicsView.setTransformationAnchor(QGraphicsView.NoAnchor)
-        self.graphWindowRight.ui.graphicsView.translate(-delta.x(), delta.y())
-        self.graphWindowLeft.ui.graphicsView.translate(delta.x(), delta.y())
-        self.graphWindowRight.ui.graphicsView.setTransformationAnchor(QGraphicsView.AnchorViewCenter)
-        self.graphWindowLeft.ui.graphicsView.setTransformationAnchor(QGraphicsView.AnchorViewCenter)
+            self.graphWindowRight.ui.graphicsView.setTransformationAnchor(QGraphicsView.NoAnchor)
+            self.graphWindowLeft.ui.graphicsView.setTransformationAnchor(QGraphicsView.NoAnchor)
+            self.graphWindowRight.ui.graphicsView.translate(-delta.x(), delta.y())
+            self.graphWindowLeft.ui.graphicsView.translate(delta.x(), delta.y())
+            self.graphWindowRight.ui.graphicsView.setTransformationAnchor(QGraphicsView.AnchorViewCenter)
+            self.graphWindowLeft.ui.graphicsView.setTransformationAnchor(QGraphicsView.AnchorViewCenter)
+            
+        else : 
+            if factor > 1 : 
+                redView.horizontalScrollBar().setValue(redView.horizontalScrollBar().value() - 3)
+                cyanView.horizontalScrollBar().setValue(cyanView.horizontalScrollBar().value() - 3)
+            else :
+                redView.horizontalScrollBar().setValue(redView.horizontalScrollBar().value() + 3)
+                cyanView.horizontalScrollBar().setValue(cyanView.horizontalScrollBar().value() + 3)
+
 
 if __name__ == "__main__":
     app = app(sys.argv)
