@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>436</width>
-    <height>700</height>
+    <height>524</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -59,7 +59,7 @@
      <x>10</x>
      <y>30</y>
      <width>201</width>
-     <height>371</height>
+     <height>271</height>
     </rect>
    </property>
    <property name="title">
@@ -187,105 +187,6 @@
      </property>
     </item>
    </widget>
-   <widget class="QToolButton" name="leftRed">
-    <property name="enabled">
-     <bool>false</bool>
-    </property>
-    <property name="geometry">
-     <rect>
-      <x>80</x>
-      <y>320</y>
-      <width>21</width>
-      <height>21</height>
-     </rect>
-    </property>
-    <property name="arrowType">
-     <enum>Qt::LeftArrow</enum>
-    </property>
-   </widget>
-   <widget class="QToolButton" name="downRed">
-    <property name="enabled">
-     <bool>false</bool>
-    </property>
-    <property name="geometry">
-     <rect>
-      <x>100</x>
-      <y>340</y>
-      <width>21</width>
-      <height>21</height>
-     </rect>
-    </property>
-    <property name="layoutDirection">
-     <enum>Qt::LeftToRight</enum>
-    </property>
-    <property name="arrowType">
-     <enum>Qt::DownArrow</enum>
-    </property>
-   </widget>
-   <widget class="QToolButton" name="upRed">
-    <property name="enabled">
-     <bool>false</bool>
-    </property>
-    <property name="geometry">
-     <rect>
-      <x>100</x>
-      <y>300</y>
-      <width>21</width>
-      <height>21</height>
-     </rect>
-    </property>
-    <property name="layoutDirection">
-     <enum>Qt::LeftToRight</enum>
-    </property>
-    <property name="arrowType">
-     <enum>Qt::UpArrow</enum>
-    </property>
-   </widget>
-   <widget class="QToolButton" name="rightRed">
-    <property name="enabled">
-     <bool>false</bool>
-    </property>
-    <property name="geometry">
-     <rect>
-      <x>120</x>
-      <y>320</y>
-      <width>21</width>
-      <height>21</height>
-     </rect>
-    </property>
-    <property name="arrowType">
-     <enum>Qt::RightArrow</enum>
-    </property>
-   </widget>
-   <widget class="QPushButton" name="origineRed">
-    <property name="enabled">
-     <bool>false</bool>
-    </property>
-    <property name="geometry">
-     <rect>
-      <x>150</x>
-      <y>320</y>
-      <width>43</width>
-      <height>21</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Origine</string>
-    </property>
-   </widget>
-   <widget class="Line" name="lineRed">
-    <property name="geometry">
-     <rect>
-      <x>10</x>
-      <y>250</y>
-      <width>181</width>
-      <height>20</height>
-     </rect>
-    </property>
-    <property name="orientation">
-     <enum>Qt::Horizontal</enum>
-    </property>
-   </widget>
    <widget class="QPushButton" name="importButtonRed">
     <property name="enabled">
      <bool>false</bool>
@@ -318,51 +219,6 @@
      <enum>Qt::ScrollBarAlwaysOff</enum>
     </property>
    </widget>
-   <widget class="QSpinBox" name="offsetValRed">
-    <property name="enabled">
-     <bool>false</bool>
-    </property>
-    <property name="geometry">
-     <rect>
-      <x>11</x>
-      <y>320</y>
-      <width>61</width>
-      <height>22</height>
-     </rect>
-    </property>
-    <property name="maximum">
-     <number>1000</number>
-    </property>
-    <property name="singleStep">
-     <number>5</number>
-    </property>
-    <property name="value">
-     <number>50</number>
-    </property>
-   </widget>
-   <widget class="QLabel" name="label_7">
-    <property name="enabled">
-     <bool>false</bool>
-    </property>
-    <property name="geometry">
-     <rect>
-      <x>70</x>
-      <y>270</y>
-      <width>91</width>
-      <height>16</height>
-     </rect>
-    </property>
-    <property name="font">
-     <font>
-      <pointsize>10</pointsize>
-      <weight>75</weight>
-      <bold>true</bold>
-     </font>
-    </property>
-    <property name="text">
-     <string>Décalage</string>
-    </property>
-   </widget>
    <widget class="QLabel" name="importDoneRed">
     <property name="geometry">
      <rect>
@@ -386,7 +242,7 @@
      <x>220</x>
      <y>30</y>
      <width>201</width>
-     <height>371</height>
+     <height>271</height>
     </rect>
    </property>
    <property name="title">
@@ -437,22 +293,6 @@
      <string>Effet miroir</string>
     </property>
    </widget>
-   <widget class="QToolButton" name="rightCyan">
-    <property name="enabled">
-     <bool>false</bool>
-    </property>
-    <property name="geometry">
-     <rect>
-      <x>120</x>
-      <y>320</y>
-      <width>21</width>
-      <height>21</height>
-     </rect>
-    </property>
-    <property name="arrowType">
-     <enum>Qt::RightArrow</enum>
-    </property>
-   </widget>
    <widget class="QLabel" name="label_3">
     <property name="enabled">
      <bool>false</bool>
@@ -469,41 +309,6 @@
      <string>Rotation</string>
     </property>
    </widget>
-   <widget class="QToolButton" name="upCyan">
-    <property name="enabled">
-     <bool>false</bool>
-    </property>
-    <property name="geometry">
-     <rect>
-      <x>100</x>
-      <y>300</y>
-      <width>21</width>
-      <height>21</height>
-     </rect>
-    </property>
-    <property name="layoutDirection">
-     <enum>Qt::LeftToRight</enum>
-    </property>
-    <property name="arrowType">
-     <enum>Qt::UpArrow</enum>
-    </property>
-   </widget>
-   <widget class="QToolButton" name="leftCyan">
-    <property name="enabled">
-     <bool>false</bool>
-    </property>
-    <property name="geometry">
-     <rect>
-      <x>80</x>
-      <y>320</y>
-      <width>21</width>
-      <height>21</height>
-     </rect>
-    </property>
-    <property name="arrowType">
-     <enum>Qt::LeftArrow</enum>
-    </property>
-   </widget>
    <widget class="QComboBox" name="boxMiroirCyan">
     <property name="enabled">
      <bool>false</bool>
@@ -515,6 +320,9 @@
       <width>101</width>
       <height>22</height>
      </rect>
+    </property>
+    <property name="currentIndex">
+     <number>0</number>
     </property>
     <item>
      <property name="text">
@@ -531,25 +339,6 @@
       <string>Vertical</string>
      </property>
     </item>
-   </widget>
-   <widget class="QToolButton" name="downCyan">
-    <property name="enabled">
-     <bool>false</bool>
-    </property>
-    <property name="geometry">
-     <rect>
-      <x>100</x>
-      <y>340</y>
-      <width>21</width>
-      <height>21</height>
-     </rect>
-    </property>
-    <property name="layoutDirection">
-     <enum>Qt::LeftToRight</enum>
-    </property>
-    <property name="arrowType">
-     <enum>Qt::DownArrow</enum>
-    </property>
    </widget>
    <widget class="QComboBox" name="boxOrientationCyan">
     <property name="enabled">
@@ -584,35 +373,6 @@
      </property>
     </item>
    </widget>
-   <widget class="QPushButton" name="origineCyan">
-    <property name="enabled">
-     <bool>false</bool>
-    </property>
-    <property name="geometry">
-     <rect>
-      <x>150</x>
-      <y>320</y>
-      <width>43</width>
-      <height>21</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Origine</string>
-    </property>
-   </widget>
-   <widget class="Line" name="lineCyan">
-    <property name="geometry">
-     <rect>
-      <x>10</x>
-      <y>250</y>
-      <width>181</width>
-      <height>20</height>
-     </rect>
-    </property>
-    <property name="orientation">
-     <enum>Qt::Horizontal</enum>
-    </property>
-   </widget>
    <widget class="QPushButton" name="importButtonCyan">
     <property name="enabled">
      <bool>false</bool>
@@ -645,51 +405,6 @@
      <enum>Qt::ScrollBarAlwaysOff</enum>
     </property>
    </widget>
-   <widget class="QSpinBox" name="offsetValCyan">
-    <property name="enabled">
-     <bool>false</bool>
-    </property>
-    <property name="geometry">
-     <rect>
-      <x>10</x>
-      <y>320</y>
-      <width>61</width>
-      <height>21</height>
-     </rect>
-    </property>
-    <property name="maximum">
-     <number>1000</number>
-    </property>
-    <property name="singleStep">
-     <number>5</number>
-    </property>
-    <property name="value">
-     <number>50</number>
-    </property>
-   </widget>
-   <widget class="QLabel" name="label_8">
-    <property name="enabled">
-     <bool>false</bool>
-    </property>
-    <property name="geometry">
-     <rect>
-      <x>70</x>
-      <y>270</y>
-      <width>61</width>
-      <height>16</height>
-     </rect>
-    </property>
-    <property name="font">
-     <font>
-      <pointsize>10</pointsize>
-      <weight>75</weight>
-      <bold>true</bold>
-     </font>
-    </property>
-    <property name="text">
-     <string>Décalage</string>
-    </property>
-   </widget>
    <widget class="QLabel" name="importDoneCyan">
     <property name="geometry">
      <rect>
@@ -711,7 +426,7 @@
    <property name="geometry">
     <rect>
      <x>180</x>
-     <y>450</y>
+     <y>340</y>
      <width>101</width>
      <height>16</height>
     </rect>
@@ -731,7 +446,7 @@
    <property name="geometry">
     <rect>
      <x>90</x>
-     <y>620</y>
+     <y>430</y>
      <width>261</width>
      <height>71</height>
     </rect>
@@ -792,9 +507,9 @@
    <property name="geometry">
     <rect>
      <x>90</x>
-     <y>470</y>
+     <y>360</y>
      <width>261</width>
-     <height>142</height>
+     <height>51</height>
     </rect>
    </property>
    <property name="title">
@@ -842,128 +557,6 @@
      <string>Enregistrer</string>
     </property>
    </widget>
-   <widget class="QPushButton" name="origineSuper">
-    <property name="geometry">
-     <rect>
-      <x>180</x>
-      <y>80</y>
-      <width>43</width>
-      <height>21</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Origine</string>
-    </property>
-   </widget>
-   <widget class="QToolButton" name="leftSuper">
-    <property name="geometry">
-     <rect>
-      <x>100</x>
-      <y>80</y>
-      <width>21</width>
-      <height>21</height>
-     </rect>
-    </property>
-    <property name="arrowType">
-     <enum>Qt::LeftArrow</enum>
-    </property>
-   </widget>
-   <widget class="QToolButton" name="upSuper">
-    <property name="geometry">
-     <rect>
-      <x>120</x>
-      <y>60</y>
-      <width>21</width>
-      <height>21</height>
-     </rect>
-    </property>
-    <property name="layoutDirection">
-     <enum>Qt::LeftToRight</enum>
-    </property>
-    <property name="arrowType">
-     <enum>Qt::UpArrow</enum>
-    </property>
-   </widget>
-   <widget class="QToolButton" name="downSuper">
-    <property name="geometry">
-     <rect>
-      <x>120</x>
-      <y>100</y>
-      <width>21</width>
-      <height>21</height>
-     </rect>
-    </property>
-    <property name="layoutDirection">
-     <enum>Qt::LeftToRight</enum>
-    </property>
-    <property name="arrowType">
-     <enum>Qt::DownArrow</enum>
-    </property>
-   </widget>
-   <widget class="QToolButton" name="rightSuper">
-    <property name="geometry">
-     <rect>
-      <x>140</x>
-      <y>80</y>
-      <width>21</width>
-      <height>21</height>
-     </rect>
-    </property>
-    <property name="arrowType">
-     <enum>Qt::RightArrow</enum>
-    </property>
-   </widget>
-   <widget class="QSpinBox" name="offsetValSuper">
-    <property name="geometry">
-     <rect>
-      <x>20</x>
-      <y>80</y>
-      <width>61</width>
-      <height>22</height>
-     </rect>
-    </property>
-    <property name="maximum">
-     <number>1000</number>
-    </property>
-    <property name="singleStep">
-     <number>5</number>
-    </property>
-    <property name="value">
-     <number>50</number>
-    </property>
-   </widget>
-  </widget>
-  <widget class="QPushButton" name="zoomInButton">
-   <property name="enabled">
-    <bool>false</bool>
-   </property>
-   <property name="geometry">
-    <rect>
-     <x>40</x>
-     <y>410</y>
-     <width>61</width>
-     <height>23</height>
-    </rect>
-   </property>
-   <property name="text">
-    <string>Zoom In</string>
-   </property>
-  </widget>
-  <widget class="QPushButton" name="zoomOutButton">
-   <property name="enabled">
-    <bool>false</bool>
-   </property>
-   <property name="geometry">
-    <rect>
-     <x>140</x>
-     <y>410</y>
-     <width>61</width>
-     <height>23</height>
-    </rect>
-   </property>
-   <property name="text">
-    <string>Zoom Out</string>
-   </property>
   </widget>
   <widget class="QPushButton" name="panButton">
    <property name="enabled">
@@ -971,8 +564,8 @@
    </property>
    <property name="geometry">
     <rect>
-     <x>240</x>
-     <y>410</y>
+     <x>140</x>
+     <y>310</y>
      <width>61</width>
      <height>23</height>
     </rect>
@@ -990,8 +583,8 @@
    </property>
    <property name="geometry">
     <rect>
-     <x>340</x>
-     <y>410</y>
+     <x>230</x>
+     <y>310</y>
      <width>61</width>
      <height>23</height>
     </rect>
@@ -1010,11 +603,8 @@
   <zorder>groupBoxRed</zorder>
   <zorder>groupBox</zorder>
   <zorder>groupBoxSuper</zorder>
-  <zorder>zoomInButton</zorder>
-  <zorder>zoomOutButton</zorder>
   <zorder>panButton</zorder>
   <zorder>offsetButton</zorder>
-  <zorder>checkBox</zorder>
  </widget>
  <resources>
   <include location="resources.qrc"/>

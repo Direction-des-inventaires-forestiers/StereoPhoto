@@ -48,7 +48,7 @@ class graphicsWindow(QtWidgets.QMainWindow):
         self.ctrlClick = False
         self.myRect = QtCore.QRect()
         self.myPen = QtGui.QPen()
-        self.rayon = 100
+        self.rayon = 40
         self.ui.widget.paintEvent = self.draw
         #self.setWindowFlags(Qt.Window | Qt.WindowTitleHint | Qt.CustomizeWindowHint | Qt.WindowMaximizeButtonHint | Qt.WindowMinimizeButtonHint)
 
@@ -62,14 +62,15 @@ class graphicsWindow(QtWidgets.QMainWindow):
     
     def cursorRectInit(self, x, y):
         r = self.rayon
-        self.myRect = QtCore.QRect((x/2) - r, (y/2) - r, 2*r, 2*r)
+        self.myRect = QtCore.QRect(int(x/2) - r, int(y/2) - r, 2*r, 2*r)
+        self.ui.widget.update()
 
 
     
     def draw(self, event):
         p = QtGui.QPainter()
         p.begin(self.ui.widget)
-        pen = QtGui.QPen(QtGui.QColor(255, 0, 0),6, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin)
+        pen = QtGui.QPen(QtGui.QColor(153, 20, 107),3, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin)
         rect = self.myRect
         p.setPen(pen)
         p.setRenderHint(QtGui.QPainter.Antialiasing)

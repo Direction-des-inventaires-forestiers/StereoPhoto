@@ -2,16 +2,23 @@ import cv2, os
 import numpy as np
 import math, time
 from PIL import Image, ImageOps
-from PyQt5.QtWidgets import *
-from PyQt5.QtCore import *
-from PyQt5.QtGui import *
+#from PyQt5.QtWidgets import *
+#from PyQt5.QtCore import *
+#from PyQt5.QtGui import *
 
 #print(pen.)
 
-#Image.MAX_IMAGE_PIXELS = 1000000000 
+Image.MAX_IMAGE_PIXELS = 1000000000 
+
+a = [300,400,500,600,700,800,900,1200]
+b = [4488,4579,4673,4774,4876,4984,5096,5466]
+c = [2901,3029,3168,3321,3490,3679,3884,4675]
+
 
 #s = time.time()
-#img = Image.open("//ulysse/LIDAR/Developpement/Programmation/FP/Stereoscopie/Photos_stereo/Paire_1/Q18066_406_RGB.tif")
+img = Image.open("//ulysse/LIDAR/Developpement/Programmation/FP/Stereoscopie/Photos_stereo/Paire_1/Q18066_406_RGB.tif")
+a = img.size[0]
+print(a)
 #a = img.histogram()
 #img = img.rotate(270, expand=1)
 #img = img.transpose(Image.FLIP_LEFT_RIGHT)
@@ -27,6 +34,24 @@ from PyQt5.QtGui import *
 #f = Image.open("a.jpg")
 #os.remove("a.jpg")
 #f.show()
+
+#path = "//smullin/lidar/PUBLIC/11M/11M01NE/MNT_11M01NE.tif"
+#img = Image.open(path)
+#a = np.array(img)
+
+
+#path = "//ulysse/LIDAR/Developpement/Programmation/FP/Stereoscopie/Photos_stereo/Paire_1/Q18066_406_RGB.par"
+#f = open(path, encoding = 'ANSI')
+#s = f.read() 
+#v1 = s.find("$XYZ00")
+#v2 = s.find("\n", v1)
+#xyz = s[v1:v2]
+
+#v1 = s.find("$PARAFFINE00")
+#v2 = s.find("\n", v1)
+#affine = s[v1:v2]
+
+
 
 
 
