@@ -1,7 +1,8 @@
 import cv2, os
 import numpy as np
 import math, time
-from PIL import Image, ImageOps
+from pynput import mouse
+from PIL import Image, ImageOps, ImageEnhance
 #from PyQt5.QtWidgets import *
 #from PyQt5.QtCore import *
 #from PyQt5.QtGui import *
@@ -10,15 +11,71 @@ from PIL import Image, ImageOps
 
 Image.MAX_IMAGE_PIXELS = 1000000000 
 
-a = [300,400,500,600,700,800,900,1200]
-b = [4488,4579,4673,4774,4876,4984,5096,5466]
-c = [2901,3029,3168,3321,3490,3679,3884,4675]
+def colorEqualization(value):
+    oldMin = 50
+    oldMax = 100
+    newMin = 0 
+    newMax = 255
+    v = ((value-oldMin)*(newMax-newMin))/(oldMax - oldMin) + newMin
+    return round(v)
 
+
+def on_move(x, y):
+    print('Pointer moved to {0}'.format(
+        (x, y)))
+
+def on_click(x, y, button, pressed):
+    print('{0} at {1}'.format(
+        'Pressed' if pressed else 'Released',
+        (x, y)))
+    if not pressed:
+        # Stop listener
+        return False
+
+def on_scroll(x, y, dx, dy):
+    print('Scrolled {0} at {1}'.format(
+        'down' if dy < 0 else 'up',
+        (x, y)))
+
+# Collect events until released
+with mouse.Listener(
+        on_move=on_move,
+        on_click=on_click,
+        on_scroll=on_scroll) as listener:
+    listener.join()
+
+# ...or, in a non-blocking fashion:
+listener = mouse.Listener(
+    on_move=on_move,
+    on_click=on_click,
+    on_scroll=on_scroll)
+listener.start() 
 
 #s = time.time()
-img = Image.open("//ulysse/LIDAR/Developpement/Programmation/FP/Stereoscopie/Photos_stereo/Paire_1/Q18066_406_RGB.tif")
-a = img.size[0]
-print(a)
+#path = "//ulysse/LIDAR/Developpement/Programmation/FP/Stereoscopie/Photos_stereo/Paire_1/Q18066_484_RGB.tif"
+#img = Image.open("//ulysse/LIDAR/Developpement/Programmation/FP/Anaglyph/Photo/Camion_L.jpg")
+#img = Image.open(path)
+#img.seek(2)
+#b = img.split()
+#r = b[0].point(colorEqualization)
+#g = b[1].point(colorEqualization)
+#b = b[2].point(colorEqualization)
+#c = Image.merge("RGB", (r,g,b))
+#c.show()
+
+#a = ImageEnhance.Brightness(img)
+#b = ImageEnhance.Contrast(img)
+#c = ImageEnhance.Color(img)
+#c.enhance(0.5).show()
+#a.enhance(1.5)
+#c.enhance(0.5).show()
+
+
+
+
+#a = img.histogram()
+#a = img.size[0]
+#print(a)
 #a = img.histogram()
 #img = img.rotate(270, expand=1)
 #img = img.transpose(Image.FLIP_LEFT_RIGHT)
@@ -27,7 +84,7 @@ print(a)
 #picArray = np.array(img)
 #picArray = np.rot90(picArray,2)
 #im = Image.fromarray(picArray)
-#print(time.time()-s )
+#print(time.time()-s)
 
 #a = img.transpose(Image.ROTATE_90)
 #a.show()
@@ -88,6 +145,9 @@ def createPyramid(self, path):
         listPic.append(b)
 
     return nbPyramid, gaussian_pyramid, listPic
+
+
+
 
 
 """import numpy as np

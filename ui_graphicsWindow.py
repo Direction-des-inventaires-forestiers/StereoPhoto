@@ -20,6 +20,7 @@ class Ui_graphicsWindow(object):
         self.graphicsView.setGeometry(QtCore.QRect(0, 0, 791, 551))
         self.graphicsView.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
         self.graphicsView.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        self.graphicsView.setBackgroundBrush(QtGui.QBrush(QtGui.QColor(182,182,182)))
         self.graphicsView.setObjectName("graphicsView")
         self.widget = QtWidgets.QWidget(self.centralwidget)
         self.widget.setGeometry(QtCore.QRect(170, 110, 1000, 1200))

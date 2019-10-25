@@ -42,8 +42,7 @@ class app(QApplication):
 
         self.redName = False 
         self.cyanName = False 
-        self.anaglyphActivate = False #??
-        
+        self.anaglyphActivate = False 
 
         self.Z = 300
 
@@ -500,6 +499,7 @@ class app(QApplication):
 
     #Fonction qui réalise le pan et le offset selon le bouton sélectionné 
     def mMoveEvent(self, ev):
+        print("a")
         if self.optWindow.ui.panButton.isChecked() :
             redView = self.graphWindowLeft.ui.graphicsView
             cyanView = self.graphWindowRight.ui.graphicsView

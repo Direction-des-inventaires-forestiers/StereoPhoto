@@ -564,7 +564,7 @@
    </property>
    <property name="geometry">
     <rect>
-     <x>140</x>
+     <x>100</x>
      <y>310</y>
      <width>61</width>
      <height>23</height>
@@ -583,7 +583,7 @@
    </property>
    <property name="geometry">
     <rect>
-     <x>230</x>
+     <x>185</x>
      <y>310</y>
      <width>61</width>
      <height>23</height>
@@ -591,6 +591,22 @@
    </property>
    <property name="text">
     <string>Offset</string>
+   </property>
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+  </widget>
+  <widget class="QPushButton" name="drawButton">
+   <property name="geometry">
+    <rect>
+     <x>270</x>
+     <y>310</y>
+     <width>61</width>
+     <height>23</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>Draw</string>
    </property>
    <property name="checkable">
     <bool>true</bool>
@@ -605,6 +621,7 @@
   <zorder>groupBoxSuper</zorder>
   <zorder>panButton</zorder>
   <zorder>offsetButton</zorder>
+  <zorder>drawButton</zorder>
  </widget>
  <resources>
   <include location="resources.qrc"/>

@@ -23,11 +23,23 @@
       <height>551</height>
      </rect>
     </property>
+    <property name="autoFillBackground">
+     <bool>false</bool>
+    </property>
     <property name="verticalScrollBarPolicy">
      <enum>Qt::ScrollBarAlwaysOff</enum>
     </property>
     <property name="horizontalScrollBarPolicy">
      <enum>Qt::ScrollBarAlwaysOff</enum>
+    </property>
+    <property name="backgroundBrush">
+     <brush brushstyle="SolidPattern">
+      <color alpha="255">
+       <red>182</red>
+       <green>182</green>
+       <blue>182</blue>
+      </color>
+     </brush>
     </property>
    </widget>
    <widget class="QWidget" name="widget" native="true">
