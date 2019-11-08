@@ -1,7 +1,10 @@
 *.db
 *.spec
+*.tif
 /.vscode/
 /__pycache__/
 /build/
 /dist/
 /Photo/*.tif
+/Rehaussement/.vscode/
+/Rehaussement/__pycache__/

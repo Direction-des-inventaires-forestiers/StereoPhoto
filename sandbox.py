@@ -3,13 +3,42 @@ import numpy as np
 import math, time
 from pynput import mouse
 from PIL import Image, ImageOps, ImageEnhance
+import gdal
+import libtiff
 #from PyQt5.QtWidgets import *
 #from PyQt5.QtCore import *
 #from PyQt5.QtGui import *
 
 #print(pen.)
 
+
 Image.MAX_IMAGE_PIXELS = 1000000000 
+
+a = Image.open("c.tif")
+b = Image.open("//ulysse/LIDAR/Developpement/Programmation/FP/Stereoscopie/Photos_stereo/Serie_3/008_0913_0370_NIR.tif")
+
+
+
+c = np.zeros((17110,11310), dtype=np.uint8)
+d = np.zeros((8555,5655), dtype=np.uint8)
+e = np.zeros((4278,2828), dtype=np.uint8)
+f = np.zeros((2139,1414), dtype=np.uint8)
+g = np.zeros((1070,707), dtype=np.uint8)
+h = np.zeros((535,354), dtype=np.uint8)
+
+driver = gdal.GetDriverByName("GTiff")
+fileout = driver.Create("e.tif" ,11310,17110,1,gdal.GDT_Byte, ["COMPRESS=JPEG"])
+fileout.GetRasterBand(1).WriteArray(c)
+fileout.FlushCache()
+fileout = None
+
+#loop this
+fileout = driver.Create("e.tif",d.shape[1],d.shape[0],1,gdal.GDT_Byte, options=["APPEND_SUBDATASET=YES", "COMPRESS=JPEG"])
+fileout.GetRasterBand(1).WriteArray(d)
+fileout.FlushCache()
+fileout = None
+
+
 
 def colorEqualization(value):
     oldMin = 50
@@ -38,18 +67,18 @@ def on_scroll(x, y, dx, dy):
         (x, y)))
 
 # Collect events until released
-with mouse.Listener(
-        on_move=on_move,
-        on_click=on_click,
-        on_scroll=on_scroll) as listener:
-    listener.join()
+#with mouse.Listener(
+#        on_move=on_move,
+#        on_click=on_click,
+#        on_scroll=on_scroll) as listener:
+#    listener.join()
 
 # ...or, in a non-blocking fashion:
-listener = mouse.Listener(
-    on_move=on_move,
-    on_click=on_click,
-    on_scroll=on_scroll)
-listener.start() 
+#listener = mouse.Listener(
+#    on_move=on_move,
+#    on_click=on_click,
+#    on_scroll=on_scroll)
+#listener.start() 
 
 #s = time.time()
 #path = "//ulysse/LIDAR/Developpement/Programmation/FP/Stereoscopie/Photos_stereo/Paire_1/Q18066_484_RGB.tif"
@@ -127,6 +156,7 @@ def createPyramid(self, path):
     layer = img.copy()
     gaussian_pyramid = [cv2.cvtColor(layer,cv2.COLOR_BGR2RGB)]
     for i in range(nbPyramid):
+        
         layer = cv2.pyrDown(layer)
         gaussian_pyramid.append(cv2.cvtColor(layer,cv2.COLOR_BGR2RGB))
 

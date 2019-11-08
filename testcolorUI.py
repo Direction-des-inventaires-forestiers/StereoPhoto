@@ -53,13 +53,14 @@ class app(QApplication):
         self.colorWindow.ui.spinBoxBlue.valueChanged.connect(self.enhancePicture) 
         self.colorWindow.ui.checkBoxMinMax.stateChanged.connect(self.enhancePicture)
         
+        self.colorWindow.ui.buttonBoxReset.clicked.connect(self.reset)
+
         self.colorWindow.ui.graphicsView.show()
         self.colorWindow.show()
 
         self.colorWindow.ui.graphicsView.fitInView(self.colorWindow.ui.graphicsView.sceneRect(), Qt.KeepAspectRatio)
         
     def enhancePicture(self):
-        print(self.colorWindow.ui.checkBoxMinMax.checkState())
         p = ImageEnhance.Contrast(self.picture).enhance(self.colorWindow.ui.spinBoxContrast.value() + 1)
         p = ImageEnhance.Brightness(p).enhance(self.colorWindow.ui.spinBoxLuminosite.value() + 1)
         p = ImageEnhance.Color(p).enhance(self.colorWindow.ui.spinBoxSaturation.value() + 1)
@@ -78,8 +79,6 @@ class app(QApplication):
             b = s[2].point(self.blueEnhance)
         p = Image.merge("RGB", (r,g,b))
 
-
-
         p.save(self.temp)
         scene = QGraphicsScene()
         a = QImage(self.temp)
@@ -88,6 +87,38 @@ class app(QApplication):
         os.remove(self.temp)
 
 
+    def reset(self) : 
+
+        self.colorWindow.ui.spinBoxContrast.valueChanged.disconnect(self.enhancePicture)
+        self.colorWindow.ui.spinBoxLuminosite.valueChanged.disconnect(self.enhancePicture)   
+        self.colorWindow.ui.spinBoxSaturation.valueChanged.disconnect(self.enhancePicture)   
+        self.colorWindow.ui.spinBoxNettete.valueChanged.disconnect(self.enhancePicture)  
+        self.colorWindow.ui.spinBoxRed.valueChanged.disconnect(self.enhancePicture) 
+        self.colorWindow.ui.spinBoxGreen.valueChanged.disconnect(self.enhancePicture) 
+        self.colorWindow.ui.spinBoxBlue.valueChanged.disconnect(self.enhancePicture) 
+        self.colorWindow.ui.checkBoxMinMax.stateChanged.disconnect(self.enhancePicture)
+
+        self.colorWindow.ui.spinBoxContrast.setValue(0)
+        self.colorWindow.ui.spinBoxLuminosite.setValue(0)   
+        self.colorWindow.ui.spinBoxSaturation.setValue(0)   
+        self.colorWindow.ui.spinBoxNettete.setValue(0)  
+        self.colorWindow.ui.spinBoxRed.setValue(0) 
+        self.colorWindow.ui.spinBoxGreen.setValue(0) 
+        self.colorWindow.ui.spinBoxBlue.setValue(0) 
+        self.colorWindow.ui.checkBoxMinMax.setCheckState(0)
+
+        self.enhancePicture()
+        
+        self.colorWindow.ui.spinBoxContrast.valueChanged.connect(self.enhancePicture)
+        self.colorWindow.ui.spinBoxLuminosite.valueChanged.connect(self.enhancePicture)   
+        self.colorWindow.ui.spinBoxSaturation.valueChanged.connect(self.enhancePicture)   
+        self.colorWindow.ui.spinBoxNettete.valueChanged.connect(self.enhancePicture)  
+        self.colorWindow.ui.spinBoxRed.valueChanged.connect(self.enhancePicture) 
+        self.colorWindow.ui.spinBoxGreen.valueChanged.connect(self.enhancePicture) 
+        self.colorWindow.ui.spinBoxBlue.valueChanged.connect(self.enhancePicture) 
+        self.colorWindow.ui.checkBoxMinMax.stateChanged.connect(self.enhancePicture)
+
+        
 
     def redEnhance(self, value):
         return value + self.colorWindow.ui.spinBoxRed.value()
