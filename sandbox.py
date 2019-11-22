@@ -14,29 +14,42 @@ import libtiff
 
 Image.MAX_IMAGE_PIXELS = 1000000000 
 
-a = Image.open("c.tif")
-b = Image.open("//ulysse/LIDAR/Developpement/Programmation/FP/Stereoscopie/Photos_stereo/Serie_3/008_0913_0370_NIR.tif")
+a = ["1","2","3"]
+b = ["e","f","1"]
+
+for i in range(len(b)) :
+    u = 2
+    while(b[i] in a):
+        b[i] = str(u)
+        u += 1
+        print("t")
+print(b)
+#a = Image.open("c.tif")
+#b = Image.open("//ulysse/LIDAR/Developpement/Programmation/FP/Stereoscopie/Photos_stereo/Serie_3/008_0913_0370_NIR.tif")
+
+#z = b.split()
 
 
+#c = np.zeros((17110,11310), dtype=np.uint8)
 
-c = np.zeros((17110,11310), dtype=np.uint8)
-d = np.zeros((8555,5655), dtype=np.uint8)
-e = np.zeros((4278,2828), dtype=np.uint8)
-f = np.zeros((2139,1414), dtype=np.uint8)
-g = np.zeros((1070,707), dtype=np.uint8)
-h = np.zeros((535,354), dtype=np.uint8)
 
-driver = gdal.GetDriverByName("GTiff")
-fileout = driver.Create("e.tif" ,11310,17110,1,gdal.GDT_Byte, ["COMPRESS=JPEG"])
-fileout.GetRasterBand(1).WriteArray(c)
-fileout.FlushCache()
-fileout = None
+#driver = gdal.GetDriverByName("GTiff")
+#fileout = driver.Create("w.tif",11310,17110,1,gdal.GDT_Byte, ["COMPRESS=JPEG", "TILED=YES", "PHOTOMETRIC=YCBCR" , "JPEG_QUALITY=90"])
+#fileout = driver.Create("y.tif",b.size[0],b.size[1],3,gdal.GDT_Byte, ["COMPRESS=JPEG", "TILED=YES" , "JPEG_QUALITY=90"])
+#fileout.GetRasterBand(1).WriteArray(np.array(z[0], dtype=np.uint8))
+#fileout.GetRasterBand(2).WriteArray(np.array(z[1], dtype=np.uint8))
+#fileout.GetRasterBand(3).WriteArray(np.array(z[2], dtype=np.uint8))
+#fileout.BuildOverviews("AVERAGE", [2,4,8])
+
+
+#fileout.FlushCache()
+#fileout = None
 
 #loop this
-fileout = driver.Create("e.tif",d.shape[1],d.shape[0],1,gdal.GDT_Byte, options=["APPEND_SUBDATASET=YES", "COMPRESS=JPEG"])
-fileout.GetRasterBand(1).WriteArray(d)
-fileout.FlushCache()
-fileout = None
+#fileout = driver.Create("e.tif",d.shape[1],d.shape[0],1,gdal.GDT_Byte, options=["APPEND_SUBDATASET=YES", "COMPRESS=JPEG"])
+#fileout.GetRasterBand(1).WriteArray(d)
+#fileout.FlushCache()
+#fileout = None
 
 
 

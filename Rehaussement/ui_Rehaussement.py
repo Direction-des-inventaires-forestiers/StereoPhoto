@@ -13,7 +13,7 @@ import resources
 class Ui_colorWindow(object):
     def setupUi(self, colorWindow):
         colorWindow.setObjectName("colorWindow")
-        colorWindow.resize(1070, 703)
+        colorWindow.resize(1070, 750)
         self.centralwidget = QtWidgets.QWidget(colorWindow)
         self.centralwidget.setObjectName("centralwidget")
         self.graphicsView = QtWidgets.QGraphicsView(self.centralwidget)
@@ -105,16 +105,17 @@ class Ui_colorWindow(object):
         font.setPointSize(12)
         self.label_9.setFont(font)
         self.label_9.setObjectName("label_9")
-        self.saveAll = QtWidgets.QPushButton(self.centralwidget)
-        self.saveAll.setGeometry(QtCore.QRect(880, 630, 91, 23))
-        self.saveAll.setEnabled(False)
-        self.saveAll.setObjectName("saveAll")
+        self.saveButton = QtWidgets.QPushButton(self.centralwidget)
+        self.saveButton.setEnabled(False)
+        self.saveButton.setGeometry(QtCore.QRect(880, 630, 91, 23))
+        self.saveButton.setObjectName("saveButton")
         self.tableView = QtWidgets.QTableView(self.centralwidget)
         self.tableView.setGeometry(QtCore.QRect(740, 130, 311, 481))
-        self.tableView.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        self.tableView.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
+        self.tableView.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
         self.tableView.setAutoScroll(False)
         self.tableView.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
-        self.tableView.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
+        self.tableView.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectItems)
         self.tableView.setObjectName("tableView")
         self.tableView.horizontalHeader().setVisible(False)
         self.tableView.verticalHeader().setVisible(False)
@@ -124,19 +125,17 @@ class Ui_colorWindow(object):
         font.setPointSize(12)
         self.label_8.setFont(font)
         self.label_8.setObjectName("label_8")
-        self.saveSelection = QtWidgets.QPushButton(self.centralwidget)
-        self.saveSelection.setGeometry(QtCore.QRect(720, 630, 141, 23))
-        self.saveSelection.setEnabled(False)
-        self.saveSelection.setObjectName("saveSelection")
-        self.saveCurrent = QtWidgets.QPushButton(self.centralwidget)
-        self.saveCurrent.setGeometry(QtCore.QRect(550, 630, 151, 23))
-        self.saveCurrent.setEnabled(False)
-        self.saveCurrent.setObjectName("saveCurrent")
         self.saveImage = QtWidgets.QLabel(self.centralwidget)
         self.saveImage.setGeometry(QtCore.QRect(990, 625, 21, 31))
         self.saveImage.setStyleSheet("image: url(:/Rehaussement/Icons/redCross.png);")
         self.saveImage.setText("")
         self.saveImage.setObjectName("saveImage")
+        self.checkBoxSave = QtWidgets.QCheckBox(self.centralwidget)
+        self.checkBoxSave.setEnabled(True)
+        self.checkBoxSave.setGeometry(QtCore.QRect(1035, 110, 16, 17))
+        self.checkBoxSave.setText("")
+        self.checkBoxSave.setObjectName("checkBoxSave")
+        self.checkBoxSave.setVisible(False)
         colorWindow.setCentralWidget(self.centralwidget)
         self.menubar = QtWidgets.QMenuBar(colorWindow)
         self.menubar.setGeometry(QtCore.QRect(0, 0, 1070, 21))
@@ -162,10 +161,8 @@ class Ui_colorWindow(object):
         self.label_7.setText(_translate("colorWindow", "Bleu"))
         self.toolButton.setText(_translate("colorWindow", "..."))
         self.label_9.setText(_translate("colorWindow", "Importation du dossier de photos"))
-        self.saveAll.setText(_translate("colorWindow", "Enregistrer Tout"))
+        self.saveButton.setText(_translate("colorWindow", "Enregistrer"))
         self.label_8.setText(_translate("colorWindow", "Liste des photos dans le dossier"))
-        self.saveSelection.setText(_translate("colorWindow", "Enregistrer une sélection"))
-        self.saveCurrent.setText(_translate("colorWindow", "Enregistrer l\'image en cours"))
 
 
 class dropedit(QtWidgets.QGroupBox):   
@@ -178,6 +175,8 @@ class dropedit(QtWidgets.QGroupBox):
         event.accept()
         
     def dropEvent(self, event):
+        a = event.mimeData().urls()
+        print(a)
         fileURL = event.mimeData().urls()[0].toString()
         try :
             fileName = fileURL.split('file:///')[1]
@@ -188,19 +187,54 @@ class dropedit(QtWidgets.QGroupBox):
                 child.setText(fileName)
 
 
-class tableModel(QtCore.QAbstractListModel):
+class tableModel(QtCore.QAbstractTableModel):
     def __init__(self, data):
         super(tableModel,self).__init__()
         self.data = data
+        self.currentSelect = (0,0)
 
     def rowCount(self, parent=QtCore.QModelIndex()): 
         return len(self.data) 
+
+    def columnCount(self, parent=QtCore.QModelIndex()):
+        return 2
+
+    def flags(self, index):
+        if index.isValid() and index.column() == 1 : 
+            return QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsUserCheckable       
+        else : 
+            return QtCore.Qt.ItemFlags(QtCore.QAbstractTableModel.flags(self, index))
+
  
     def data(self, index, role): 
-        if index.isValid() and role == QtCore.Qt.DisplayRole:
-            return QtCore.QVariant(self.data[index.row()])
+        if index.isValid(): #and role == QtCore.Qt.DisplayRole:
+            if index.column() == 0 and role == QtCore.Qt.DisplayRole:
+                return QtCore.QVariant(self.data[index.row()][0])
+            if index.column() == 1 and role == QtCore.Qt.CheckStateRole:
+                if self.data[index.row()][1].isChecked() :
+                    return QtCore.Qt.Checked
+                else : 
+                    return QtCore.Qt.Unchecked
+            if role == QtCore.Qt.BackgroundRole and (index.row(), index.column()) == self.currentSelect:
+                return QtGui.QBrush(QtGui.QColor(30,144,255))
+            if role == QtCore.Qt.BackgroundRole and (index.row(), index.column()) != self.currentSelect:
+                return QtGui.QBrush(QtGui.QColor(255,255,255))
+
         else: 
             return QtCore.QVariant()
+
+    
+    def setData(self, index, value, role): 
+        if index.isValid():
+            if index.column() == 1 and role == QtCore.Qt.CheckStateRole:
+                if value == 0 :
+                    self.data[index.row()][1].setChecked(False)
+                if value == 2 : 
+                    self.data[index.row()][1].setChecked(True)
+            self.dataChanged.emit(index, index)
+            return True
+        return False
+    
 
 class colorWindow(QtWidgets.QMainWindow): 
 

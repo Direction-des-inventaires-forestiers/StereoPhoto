@@ -8,3 +8,6 @@
 /Photo/*.tif
 /Rehaussement/.vscode/
 /Rehaussement/__pycache__/
+/Rehaussement/build/
+/Rehaussement/dist/
+

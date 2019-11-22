@@ -8,6 +8,9 @@ import sys, os, time, gdal
 
 Image.MAX_IMAGE_PIXELS = 1000000000 
 
+#from win32com.shell import shell, shellcon
+#file to save current project shell.SHGetFolderPath(0, shellcon.CSIDL_APPDATA, None, 0) + "\\appRehaussement"
+
 acceptType = ["jpg", "jpeg", "tiff", "tif", "bmp", "png"]
 
 class app(QApplication):
@@ -23,9 +26,17 @@ class app(QApplication):
         self.switchActivate = False
         self.threadInProcess = False
 
-        self.colorWindow.ui.saveAll.clicked.connect(self.saveAllPicture)
+        self.colorWindow.ui.saveButton.clicked.connect(self.saveSelectPicture)
+        self.colorWindow.ui.toolButton.clicked.connect(self.showDialog)
         
+ 
+    def showDialog(self) : 
+        path = os.path.dirname(os.path.abspath(__file__))
+        fname = QFileDialog.getExistingDirectory(self.colorWindow, 'Ouvrir le dossier',path)
+        if fname:
+            self.colorWindow.ui.lineEdit.setText(fname)
 
+    
     def importFile(self):
         success = True
         self.colorWindow.ui.statusbar.clearMessage()
@@ -65,28 +76,38 @@ class app(QApplication):
                     self.setConnection(False)
                     self.firstPicture = True
                 self.resetBox()
-                self.colorWindow.ui.tableView.selectionModel().currentRowChanged.disconnect(self.switchPicture)
+                self.colorWindow.ui.tableView.selectionModel().currentChanged.disconnect(self.switchPicture)
                 model = tableModel([])
+                self.colorWindow.ui.checkBoxSave.setVisible(False)
                 self.colorWindow.ui.tableView.setModel(model)
                 scene = QGraphicsScene()
                 self.colorWindow.ui.graphicsView.setScene(scene)
                 self.switchActivate = False
-            self.saveButtonState(False)
+            self.colorWindow.ui.saveButton.setEnabled(False)
             return
     
         self.listPicture.sort()
-        model = tableModel(self.listPicture)
+
+        data = []
+        for i in self.listPicture:
+            data.append([i, QCheckBox("")])
+        
+
+        self.colorWindow.ui.checkBoxSave.setVisible(True)
+        self.colorWindow.ui.checkBoxSave.setCheckState(False)
+        self.colorWindow.ui.checkBoxSave.stateChanged.connect(self.selectAll)
+        model = tableModel(data)
         self.colorWindow.ui.tableView.setModel(model)
-        self.colorWindow.ui.tableView.setColumnWidth(0,310)
-        self.colorWindow.ui.tableView.selectRow(0)
-        self.colorWindow.ui.tableView.selectionModel().currentRowChanged.connect(self.switchPicture)
+        self.colorWindow.ui.tableView.setColumnWidth(0,290)
+        self.colorWindow.ui.tableView.setColumnWidth(1,20)
+        self.colorWindow.ui.tableView.selectionModel().currentChanged.connect(self.switchPicture)
+        self.colorWindow.ui.tableView.selectionModel().select(self.colorWindow.ui.tableView.model().index(0,0), QItemSelectionModel.Select)
         self.switchActivate = True
         self.resetBox()
 
         if not self.threadInProcess : 
-            self.saveButtonState(True)
-            
-
+            self.colorWindow.ui.saveButton.setEnabled(True)
+    
         currentPath = self.path + "/" + self.listPicture[0]
         self.loadPicture(currentPath)
 
@@ -130,14 +151,18 @@ class app(QApplication):
             self.reset()
 
     def switchPicture(self, value) :
-        self.colorWindow.ui.tableView.selectionModel().currentRowChanged.disconnect(self.switchPicture)
-        currentPath = self.path + "/" + self.listPicture[value.row()]
-        self.loadPicture(currentPath)
-        self.enhancePicture()
-        self.colorWindow.ui.tableView.selectRow(value.row())
-        self.colorWindow.ui.tableView.selectionModel().currentRowChanged.connect(self.switchPicture)
-        
 
+        if value.column() == 0 :
+            self.colorWindow.ui.tableView.selectionModel().currentChanged.disconnect(self.switchPicture)
+            currentPath = self.path + "/" + self.listPicture[value.row()]
+            self.loadPicture(currentPath)
+            self.enhancePicture()
+            lastSelect = self.colorWindow.ui.tableView.model().currentSelect
+            self.colorWindow.ui.tableView.model().currentSelect = (value.row(), value.column())
+            ind = self.colorWindow.ui.tableView.model().index(lastSelect[0],lastSelect[1])
+            self.colorWindow.ui.tableView.model().dataChanged.emit(ind, ind)
+            self.colorWindow.ui.tableView.selectionModel().currentChanged.connect(self.switchPicture)
+        
     def enhancePicture(self):
         p = self.picture
 
@@ -269,14 +294,8 @@ class app(QApplication):
         self.colorWindow.ui.spinBoxGreen.setValue(0) 
         self.colorWindow.ui.spinBoxBlue.setValue(0) 
         self.colorWindow.ui.checkBoxMinMax.setCheckState(0)
-
-    def saveButtonState(self, state): 
-        self.colorWindow.ui.saveAll.setEnabled(state)
-        self.colorWindow.ui.saveCurrent.setEnabled(state)
-        self.colorWindow.ui.saveSelection.setEnabled(state)
     
-    def saveAllPicture(self) : 
-
+    def getBoxValues(self): 
         con = self.colorWindow.ui.spinBoxContrast.value()
         lum = self.colorWindow.ui.spinBoxLuminosite.value()   
         sat = self.colorWindow.ui.spinBoxSaturation.value()   
@@ -286,32 +305,87 @@ class app(QApplication):
         blu = self.colorWindow.ui.spinBoxBlue.value() 
         bmm = self.colorWindow.ui.checkBoxMinMax.checkState()
 
-        listParam = [con, lum, sat, net, red, gre, blu, bmm]
-        self.t = threadSave(self.path, self.listPicture, listParam)
-        self.nbPicture = len(self.listPicture)
-        self.threadPath = self.path
-        self.t.iterationDone.connect(self.iterationOnSaving)
-        self.t.finished.connect(self.threadingDone)
-        self.colorWindow.ui.saveImage.setStyleSheet("image: url(:/Rehaussement/Icons/loading.png);")
-        self.saveButtonState(False)
-        self.threadInProcess = True
-        self.t.start()
+        self.listParam = [con, lum, sat, net, red, gre, blu, bmm]
 
-        #Bouton Save Current ---> Idée sauvegarder sélection ouvrir une fenetre avec des checkboxs pour choisir les photos que l'on désire 
+
+    def selectAll(self,value) : 
+        for i in range(len(self.listPicture)) : 
+            ind = self.colorWindow.ui.tableView.model().index(i,1)
+            self.colorWindow.ui.tableView.model().setData(ind, value, Qt.CheckStateRole)
+
+
+    def startThread(self, listPic) : 
+
+        fname = QFileDialog.getExistingDirectory(self.colorWindow, 'Choisir le dossier d\'enregistrement' ,self.path)
         
+        f = []
+
+        if fname :
+            for (dirpath, dirnames, filenames) in os.walk(fname):
+                f.extend(filenames)
+                break
+            listSaveName = []
+            for i in listPic : 
+                name = i
+                val = 2
+                while name in f :
+                    name  = i.split(".")[0] + "_(" +str(val) +")." + i.split(".")[-1]
+                    val += 1
+                listSaveName.append(name)
+            
+
+            self.getBoxValues()
+            self.nbPicture = len(listPic)
+
+            if hasattr(self.colorWindow.ui, "progressBar"):
+                self.colorWindow.ui.progressBar.close()
+                del self.colorWindow.ui.progressBar
+            
+            STRbar = " Photos traitées 0/" + str(self.nbPicture) + " "
+            self.colorWindow.ui.progressBar = QProgressBar(self.colorWindow.ui.centralwidget)
+            self.colorWindow.ui.progressBar.setGeometry(QRect(550, 660, 461, 23))
+            self.colorWindow.ui.progressBar.setObjectName("progressBar")
+            self.colorWindow.ui.progressBar.setFormat(STRbar)
+            self.colorWindow.ui.progressBar.setMaximum(self.nbPicture)
+            self.colorWindow.ui.progressBar.setValue(0)
+            self.colorWindow.ui.progressBar.show()
+
+            self.t = threadSave(self.path, listPic, self.listParam, fname, listSaveName)
+            self.threadPath = self.path
+            self.t.iterationDone.connect(self.iterationOnSaving)
+            self.t.finished.connect(self.threadingDone)
+            self.colorWindow.ui.saveImage.setStyleSheet("image: url(:/Rehaussement/Icons/loading.png);")
+            self.colorWindow.ui.saveButton.setEnabled(False)
+            self.threadInProcess = True
+            self.t.start()
+
+        
+    def saveSelectPicture(self):
+        data = self.colorWindow.ui.tableView.model().data
+        newList = []
+        for d in data :
+            if d[1].checkState() == Qt.Checked :
+                newList.append(d[0])
+        if newList :
+            self.startThread(newList)
+
+
     def iterationOnSaving(self):
-        print("A picture was saved")
-        #Afficher nombre de photo traiter sur nombre total (rafraichir la string)
+        v = self.colorWindow.ui.progressBar.value()
+        v += 1 
+        STRbar = " Photos traitées " + str(v)  + "/" + str(self.nbPicture) + " "
+        self.colorWindow.ui.progressBar.setValue(v)
+        self.colorWindow.ui.progressBar.setFormat(STRbar)
 
     @pyqtSlot()
     def go2Cross(self):
         self.colorWindow.ui.saveImage.setStyleSheet("image: url(:/Rehaussement/Icons/redCross.png);")
-
+        
     def threadingDone(self):
         self.colorWindow.ui.saveImage.setStyleSheet("image: url(:/Rehaussement/Icons/greenCheck.png);")
         self.threadInProcess = False
         if self.colorWindow.ui.lineEdit.text() != "":
-            self.saveButtonState(True)
+            self.colorWindow.ui.saveButton.setEnabled(True)
             if self.threadPath != self.path :
                 QTimer.singleShot(5000, self.go2Cross)
         else : 
@@ -321,29 +395,18 @@ class app(QApplication):
 
 class threadSave(QThread):
     iterationDone = pyqtSignal()
-    def __init__(self, path, listPicture, listParam):
+    def __init__(self, path, listPicture, listParam, savePathDir, listSaveName):
         QThread.__init__(self)
         self.path = path
         self.listPicture = listPicture
         self.listParam = listParam
+        self.savePathDir = savePathDir
+        self.listSaveName = listSaveName
 
     def run(self):
 
-        newDir = self.path + "/Photo_Rehausser"
-        currentDir = newDir
-        i = 2
-        while(1): 
-            try : 
-                os.mkdir(newDir)
-                newDir += "/"
-                break
-            except : 
-                s = "_version" + str(i)
-                newDir = currentDir + s
-                i += 1 
-
-        for pic in self.listPicture : 
-            currentPath = self.path + "/" + pic
+        for pic in range(len(self.listPicture)) : 
+            currentPath = self.path + "/" + self.listPicture[pic]
             myImage = Image.open(currentPath)
             self.pixValue = []
             if self.listParam[-1] == Qt.Checked : 
@@ -361,29 +424,29 @@ class threadSave(QThread):
                             break
             
             if hasattr(myImage, "n_frames") :
-                firstPicture = True
-                for i in range(myImage.n_frames) : 
-                    myImage.seek(i)
-                    toSave = self.enhance(myImage)
-                    
-                    newPath = newDir + pic
-                    
-                    driver = gdal.GetDriverByName("GTiff")
-                    if firstPicture :
-                        fileout = driver.Create(newPath, myImage.size[0], myImage.size[1], 3 ,gdal.GDT_Byte, ["COMPRESS=JPEG", "PHOTOMETRIC=YCBCR"])
-                        firstPicture = False
-                    else : 
-                        fileout = driver.Create(newPath, myImage.size[0], myImage.size[1], 3 ,gdal.GDT_Byte, ["APPEND_SUBDATASET=YES", "COMPRESS=JPEG", "PHOTOMETRIC=YCBCR"])
-                    fileout.GetRasterBand(1).WriteArray(np.array(toSave[0], dtype=np.uint8))
-                    fileout.GetRasterBand(2).WriteArray(np.array(toSave[1], dtype=np.uint8))
-                    fileout.GetRasterBand(3).WriteArray(np.array(toSave[2], dtype=np.uint8))
-                    fileout.FlushCache()
-                    fileout = None
+
+                toSave = self.enhance(myImage)
+                tab = []
+                for i in range(1, myImage.n_frames):
+                    tab.append(2**i)
+
+                newPath = self.savePathDir + "/" + self.listSaveName[pic]
+                
+                driver = gdal.GetDriverByName("GTiff")
+                
+                fileout = driver.Create(newPath, myImage.size[0], myImage.size[1], 3 ,gdal.GDT_Byte, ["COMPRESS=JPEG", "PHOTOMETRIC=YCBCR", "TILED=YES" , "JPEG_QUALITY=90"])
+                fileout.GetRasterBand(1).WriteArray(np.array(toSave[0], dtype=np.uint8))
+                fileout.GetRasterBand(2).WriteArray(np.array(toSave[1], dtype=np.uint8))
+                fileout.GetRasterBand(3).WriteArray(np.array(toSave[2], dtype=np.uint8))
+                fileout.BuildOverviews("AVERAGE", tab)
+                fileout.FlushCache()
+                fileout = None
                 self.iterationDone.emit()
  
             else : 
                 toSave = self.enhance(myImage)
-                newPath = newDir + pic
+
+                newPath = self.savePathDir + "/" + self.listSaveName[pic]
                 img = Image.merge("RGB", (toSave[0],toSave[1],toSave[2]))
                 img.save(newPath)
                 self.iterationDone.emit()

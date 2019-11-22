@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>1070</width>
-    <height>703</height>
+    <height>750</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -328,7 +328,7 @@
      </property>
     </widget>
    </widget>
-   <widget class="QPushButton" name="saveAll">
+   <widget class="QPushButton" name="saveButton">
     <property name="enabled">
      <bool>false</bool>
     </property>
@@ -341,7 +341,7 @@
      </rect>
     </property>
     <property name="text">
-     <string>Enregistrer Tout</string>
+     <string>Enregistrer</string>
     </property>
    </widget>
    <widget class="QTableView" name="tableView">
@@ -354,6 +354,9 @@
      </rect>
     </property>
     <property name="verticalScrollBarPolicy">
+     <enum>Qt::ScrollBarAsNeeded</enum>
+    </property>
+    <property name="horizontalScrollBarPolicy">
      <enum>Qt::ScrollBarAlwaysOff</enum>
     </property>
     <property name="autoScroll">
@@ -363,7 +366,7 @@
      <enum>QAbstractItemView::SingleSelection</enum>
     </property>
     <property name="selectionBehavior">
-     <enum>QAbstractItemView::SelectRows</enum>
+     <enum>QAbstractItemView::SelectItems</enum>
     </property>
     <attribute name="horizontalHeaderVisible">
      <bool>false</bool>
@@ -390,38 +393,6 @@
      <string>Liste des photos dans le dossier</string>
     </property>
    </widget>
-   <widget class="QPushButton" name="saveSelection">
-    <property name="enabled">
-     <bool>false</bool>
-    </property>
-    <property name="geometry">
-     <rect>
-      <x>720</x>
-      <y>630</y>
-      <width>141</width>
-      <height>23</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Enregistrer une sélection</string>
-    </property>
-   </widget>
-   <widget class="QPushButton" name="saveCurrent">
-    <property name="enabled">
-     <bool>false</bool>
-    </property>
-    <property name="geometry">
-     <rect>
-      <x>550</x>
-      <y>630</y>
-      <width>151</width>
-      <height>23</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Enregistrer l'image en cours</string>
-    </property>
-   </widget>
    <widget class="QLabel" name="saveImage">
     <property name="geometry">
      <rect>
@@ -433,6 +404,22 @@
     </property>
     <property name="styleSheet">
      <string notr="true">image: url(:/Rehaussement/Icons/redCross.png);</string>
+    </property>
+    <property name="text">
+     <string/>
+    </property>
+   </widget>
+   <widget class="QCheckBox" name="checkBoxSave">
+    <property name="enabled">
+     <bool>true</bool>
+    </property>
+    <property name="geometry">
+     <rect>
+      <x>1035</x>
+      <y>110</y>
+      <width>16</width>
+      <height>17</height>
+     </rect>
     </property>
     <property name="text">
      <string/>
