@@ -122,19 +122,6 @@ class app(QApplication):
         else :
             self.picture = self.picture.resize((700,1000))
 
-        h = self.picture.histogram()
-        a = sum(h)
-        cutValue = [round(a*0.05/3), round(a*0.95/3), round(a*1.05/3), round(a*1.95/3), round(a*2.05/3), round(a*2.95/3)]
-        self.pixValue = []
-        b = 0
-        c = 0
-        for i in range(len(h)):
-            b += h[i] 
-            if b > cutValue[c] : 
-                self.pixValue.append(i)
-                c += 1
-                if c == 6 :
-                    break
         self.picture.save(self.temp)
         scene = QGraphicsScene()
         a = QImage(self.temp)
@@ -150,6 +137,45 @@ class app(QApplication):
             self.firstPicture = False
             self.reset()
 
+    def calculHistogram(self, red, green, blue):
+
+        redHis = red.histogram()
+        redSum = sum(redHis)
+        greenHis = green.histogram()
+        greenSum = sum(greenHis)
+        blueHis = blue.histogram()
+        blueSum = sum(blueHis)
+        cutValue = [round(redSum*0.05), round(redSum*0.95), round(greenSum*0.05), round(greenSum*0.95), round(blueSum*0.05), round(blueSum*0.95)]
+        self.pixValue = []
+        buff = 0
+        count = 0
+        for i in range(len(redHis)):
+            buff += redHis[i] 
+            if buff > cutValue[count] : 
+                self.pixValue.append(i)
+                count += 1
+                if count == 2 :
+                    break
+        
+        buff = 0
+        for i in range(len(greenHis)):
+            buff += greenHis[i] 
+            if buff > cutValue[count] : 
+                self.pixValue.append(i)
+                count += 1
+                if count == 4 :
+                    break
+        
+        buff = 0
+        for i in range(len(blueHis)):
+            buff += blueHis[i] 
+            if buff > cutValue[count] : 
+                self.pixValue.append(i)
+                count += 1
+                if count == 6 :
+                    break
+        
+    
     def switchPicture(self, value) :
 
         if value.column() == 0 :
@@ -167,51 +193,67 @@ class app(QApplication):
         p = self.picture
 
         if self.colorWindow.ui.spinBoxContrast.value() != 0 :
-            p = ImageEnhance.Contrast(p).enhance(self.colorWindow.ui.spinBoxContrast.value() + 1)
+            value = self.colorWindow.ui.spinBoxContrast.value()
+            if value > 0:
+                if value < 50 :
+                    p = ImageEnhance.Contrast(p).enhance(1 + (0.02*value))
+                elif value < 80:
+                    p = ImageEnhance.Contrast(p).enhance(2 + (0.1*(value-50)))
+                else :
+                    p = ImageEnhance.Contrast(p).enhance(5 + (value-80))
 
-        if self.colorWindow.ui.spinBoxLuminosite.value() != 0 :
-            p = ImageEnhance.Brightness(p).enhance(self.colorWindow.ui.spinBoxLuminosite.value() + 1)
+            else : 
+                p = ImageEnhance.Contrast(p).enhance(1 +(value/100))
 
-        if self.colorWindow.ui.spinBoxSaturation.value() != 0 :    
-            p = ImageEnhance.Color(p).enhance(self.colorWindow.ui.spinBoxSaturation.value() + 1)
+        if self.colorWindow.ui.spinBoxSaturation.value() != 0 :
+            value = self.colorWindow.ui.spinBoxSaturation.value()
+            if value > 0 :
+                p = ImageEnhance.Color(p).enhance(1 + (0.05 * value))
+            else :
+                p = ImageEnhance.Color(p).enhance(1 + int(value/100))
 
         if self.colorWindow.ui.spinBoxNettete.value() != 0 :
-            p = ImageEnhance.Sharpness(p).enhance(self.colorWindow.ui.spinBoxNettete.value() + 1)
+            p = ImageEnhance.Sharpness(p).enhance(self.colorWindow.ui.spinBoxNettete.value()/10 + 1)
         
         s = p.split()
 
         if self.colorWindow.ui.checkBoxMinMax.checkState() == Qt.Checked : 
-            mr = s[0].point(self.redEqualization)
-            mg = s[1].point(self.greenEqualization)
-            mb = s[2].point(self.blueEqualization)
 
-            if self.colorWindow.ui.spinBoxRed.value() != 0 :
-                r = mr.point(self.redEnhance)
+            if self.colorWindow.ui.spinBoxRed.value() != 0 or self.colorWindow.ui.spinBoxLuminosite.value() != 0 :
+                mr = s[0].point(self.redEnhance)
             else :
-                r = mr
+                mr = s[0]
 
-            if self.colorWindow.ui.spinBoxGreen.value() != 0 :
-                g = mg.point(self.greenEnhance)
+            if self.colorWindow.ui.spinBoxGreen.value() != 0 or self.colorWindow.ui.spinBoxLuminosite.value() != 0 :
+                mg = s[1].point(self.greenEnhance)
             else : 
-                g = mg
+                mg = s[1]
 
-            if self.colorWindow.ui.spinBoxBlue.value() != 0 :
-                b = mb.point(self.blueEnhance)
+            if self.colorWindow.ui.spinBoxBlue.value() != 0 or self.colorWindow.ui.spinBoxLuminosite.value() != 0 :
+                mb = s[2].point(self.blueEnhance)
             else :
-                b = mb    
+
+                mb = s[2]
+
+            self.calculHistogram(mr,mg,mb)
+
+            r = mr.point(self.redEqualization)
+            g = mg.point(self.greenEqualization)
+            b = mb.point(self.blueEqualization)
+
         
         else :
-            if self.colorWindow.ui.spinBoxRed.value() != 0 :
+            if self.colorWindow.ui.spinBoxRed.value() != 0 or self.colorWindow.ui.spinBoxLuminosite.value() != 0 :
                 r = s[0].point(self.redEnhance)
             else :
                 r = s[0]
 
-            if self.colorWindow.ui.spinBoxGreen.value() != 0 :
+            if self.colorWindow.ui.spinBoxGreen.value() != 0 or self.colorWindow.ui.spinBoxLuminosite.value() != 0 :
                 g = s[1].point(self.greenEnhance)
             else : 
                 g = s[1]
 
-            if self.colorWindow.ui.spinBoxBlue.value() != 0 :
+            if self.colorWindow.ui.spinBoxBlue.value() != 0 or self.colorWindow.ui.spinBoxLuminosite.value() != 0 :
                 b = s[2].point(self.blueEnhance)
             else :
                 b = s[2]
@@ -232,13 +274,22 @@ class app(QApplication):
         self.setConnection(True)
 
     def redEnhance(self, value):
-        return value + self.colorWindow.ui.spinBoxRed.value()
+        if self.colorWindow.ui.spinBoxRed.value() > 0 :
+            return int(value * (1 + (self.colorWindow.ui.spinBoxRed.value()/100))) + int(128*self.colorWindow.ui.spinBoxLuminosite.value()/100)
+        else :
+            return int(value * (1 - (0.5*(self.colorWindow.ui.spinBoxRed.value()/-100)))) + int(128*self.colorWindow.ui.spinBoxLuminosite.value()/100)
     
     def greenEnhance(self, value):
-        return value + self.colorWindow.ui.spinBoxGreen.value()
+        if self.colorWindow.ui.spinBoxGreen.value() > 0 :
+            return int(value * (1 + (self.colorWindow.ui.spinBoxGreen.value()/100))) + int(128*self.colorWindow.ui.spinBoxLuminosite.value()/100)
+        else :
+            return int(value * (1 - (0.5*(self.colorWindow.ui.spinBoxGreen.value()/-100)))) + int(128*self.colorWindow.ui.spinBoxLuminosite.value()/100)
 
     def blueEnhance(self, value):
-        return value + self.colorWindow.ui.spinBoxBlue.value()
+        if self.colorWindow.ui.spinBoxBlue.value() > 0 :
+            return int(value * (1 + (self.colorWindow.ui.spinBoxBlue.value()/100))) + int(128*self.colorWindow.ui.spinBoxLuminosite.value()/100)
+        else :
+            return int(value * (1 - (0.5*(self.colorWindow.ui.spinBoxBlue.value()/-100)))) + int(128*self.colorWindow.ui.spinBoxLuminosite.value()/100)
 
     def redEqualization(self,value):
         oldMin = self.pixValue[0]
@@ -249,16 +300,16 @@ class app(QApplication):
         return round(v)
 
     def greenEqualization(self,value):
-        oldMin = self.pixValue[2] - 256
-        oldMax = self.pixValue[3] - 256
+        oldMin = self.pixValue[2] 
+        oldMax = self.pixValue[3]
         newMin = 0 
         newMax = 255
         v = ((value-oldMin)*(newMax-newMin))/(oldMax - oldMin) + newMin
         return round(v)
 
     def blueEqualization(self,value):
-        oldMin = self.pixValue[4] - 512
-        oldMax = self.pixValue[5] - 512
+        oldMin = self.pixValue[4] 
+        oldMax = self.pixValue[5] 
         newMin = 0 
         newMax = 255
         v = ((value-oldMin)*(newMax-newMin))/(oldMax - oldMin) + newMin
@@ -409,20 +460,6 @@ class threadSave(QThread):
             currentPath = self.path + "/" + self.listPicture[pic]
             myImage = Image.open(currentPath)
             self.pixValue = []
-            if self.listParam[-1] == Qt.Checked : 
-                h = myImage.histogram()
-                a = sum(h)
-                cutValue = [round(a*0.05/3), round(a*0.95/3), round(a*1.05/3), round(a*1.95/3), round(a*2.05/3), round(a*2.95/3)]
-                b = 0
-                c = 0
-                for i in range(len(h)):
-                    b += h[i] 
-                    if b > cutValue[c] : 
-                        self.pixValue.append(i)
-                        c += 1
-                        if c == 6 :
-                            break
-            
             if hasattr(myImage, "n_frames") :
 
                 toSave = self.enhance(myImage)
@@ -455,52 +492,70 @@ class threadSave(QThread):
 
     def enhance(self, img):
         p = img
-        if self.listParam[0] != 0 :
-            p = ImageEnhance.Contrast(p).enhance(self.listParam[0] + 1)
 
-        if self.listParam[1] != 0 :
-            p = ImageEnhance.Brightness(p).enhance(self.listParam[1] + 1)
+        if  self.listParam[0] != 0 :
+            value =  self.listParam[0]
+            if value > 0:
+                if value < 50 :
+                    p = ImageEnhance.Contrast(p).enhance(1 + (0.02*value))
+                elif value < 80:
+                    p = ImageEnhance.Contrast(p).enhance(2 + (0.1*(value-50)))
+                else :
+                    p = ImageEnhance.Contrast(p).enhance(5 + (value-80))
+
+            else : 
+                p = ImageEnhance.Contrast(p).enhance(1 +(value/100))
+
 
         if self.listParam[2] != 0 :    
-            p = ImageEnhance.Color(p).enhance(self.listParam[2] + 1)
+            value = self.listParam[2]
+            if value > 0 :
+                p = ImageEnhance.Color(p).enhance(1 + (0.05 * value))
+            else :
+                p = ImageEnhance.Color(p).enhance(1 + int(value/100))
 
         if self.listParam[3] != 0 :
-            p = ImageEnhance.Sharpness(p).enhance(self.listParam[3] + 1)
+            p = ImageEnhance.Sharpness(p).enhance(self.listParam[3]/10 + 1)
         
         s = p.split()
         
-        if len(self.pixValue) == 6 : 
-            mr = s[0].point(self.redEqualization)
-            mg = s[1].point(self.greenEqualization)
-            mb = s[2].point(self.blueEqualization)
+        if self.listParam[7] == Qt.Checked : 
 
-            if self.listParam[4] != 0 :
-                r = mr.point(self.redEnhance)
+            if self.listParam[4] != 0 or self.listParam[1] != 0 :
+                mr = s[0].point(self.redEnhance)
             else :
-                r = mr
+                mr = s[0]
 
-            if self.listParam[5] != 0 :
-                g = mg.point(self.greenEnhance)
+            if self.listParam[5] != 0 or self.listParam[1] != 0 :
+                mg = s[1].point(self.greenEnhance)
             else : 
-                g = mg
+                mg = s[1]
 
-            if self.listParam[6] != 0 :
-                b = mb.point(self.blueEnhance)
+            if self.listParam[6] != 0 or self.listParam[1] != 0 :
+                mb = s[2].point(self.blueEnhance)
             else :
-                b = mb    
+
+                mb = s[2]
+                
+            self.calculHistogram(mr,mg,mb)
+
+            r = mr.point(self.redEqualization)
+            g = mg.point(self.greenEqualization)
+            b = mb.point(self.blueEqualization)
+
         
         else :
-            if self.listParam[4] != 0 :
+            if self.listParam[4] != 0 or self.listParam[1] != 0 :
                 r = s[0].point(self.redEnhance)
             else :
                 r = s[0]
 
-            if self.listParam[5] != 0 :
+            if self.listParam[5] != 0 or self.listParam[1] != 0 :
                 g = s[1].point(self.greenEnhance)
             else : 
                 g = s[1]
 
-            if self.listParam[6] != 0 :
+            if self.listParam[6] != 0 or self.listParam[1] != 0 :
                 b = s[2].point(self.blueEnhance)
             else :
                 b = s[2]
@@ -509,13 +564,23 @@ class threadSave(QThread):
         return ret
     
     def redEnhance(self, value):
-        return value + self.listParam[4]
+        if self.listParam[4] > 0 :
+            return int(value * (1 + (self.listParam[4]/100))) + int(128*self.listParam[1]/100)
+        else :
+            return int(value * (1 - (0.5*(self.listParam[4]/-100)))) + int(128*self.listParam[1]/100)
     
     def greenEnhance(self, value):
-        return value + self.listParam[5]
+        if self.listParam[5] > 0 :
+            return int(value * (1 + (self.listParam[5]/100))) + int(128*self.listParam[1]/100)
+        else :
+            return int(value * (1 - (0.5*(self.listParam[5]/-100)))) + int(128*self.listParam[1]/100)
 
     def blueEnhance(self, value):
-        return value + self.listParam[6]
+        if self.listParam[6] > 0 :
+            return int(value * (1 + (self.listParam[6]/100))) + int(128*self.listParam[1]/100)
+        else :
+            return int(value * (1 - (0.5*(self.listParam[6]/-100)))) + int(128*self.listParam[1]/100)
+
 
     def redEqualization(self,value):
         oldMin = self.pixValue[0]
@@ -526,20 +591,59 @@ class threadSave(QThread):
         return round(v)
 
     def greenEqualization(self,value):
-        oldMin = self.pixValue[2] - 256
-        oldMax = self.pixValue[3] - 256
+        oldMin = self.pixValue[2]
+        oldMax = self.pixValue[3]
         newMin = 0 
         newMax = 255
         v = ((value-oldMin)*(newMax-newMin))/(oldMax - oldMin) + newMin
         return round(v)
 
     def blueEqualization(self,value):
-        oldMin = self.pixValue[4] - 512
-        oldMax = self.pixValue[5] - 512
+        oldMin = self.pixValue[4]
+        oldMax = self.pixValue[5] 
         newMin = 0 
         newMax = 255
         v = ((value-oldMin)*(newMax-newMin))/(oldMax - oldMin) + newMin
         return round(v)
+
+
+    def calculHistogram(self, red, green, blue):
+
+        redHis = red.histogram()
+        redSum = sum(redHis)
+        greenHis = green.histogram()
+        greenSum = sum(greenHis)
+        blueHis = blue.histogram()
+        blueSum = sum(blueHis)
+        cutValue = [round(redSum*0.05), round(redSum*0.95), round(greenSum*0.05), round(greenSum*0.95), round(blueSum*0.05), round(blueSum*0.95)]
+        self.pixValue = []
+        buff = 0
+        count = 0
+        for i in range(len(redHis)):
+            buff += redHis[i] 
+            if buff > cutValue[count] : 
+                self.pixValue.append(i)
+                count += 1
+                if count == 2 :
+                    break
+        
+        buff = 0
+        for i in range(len(greenHis)):
+            buff += greenHis[i] 
+            if buff > cutValue[count] : 
+                self.pixValue.append(i)
+                count += 1
+                if count == 4 :
+                    break
+        
+        buff = 0
+        for i in range(len(blueHis)):
+            buff += blueHis[i] 
+            if buff > cutValue[count] : 
+                self.pixValue.append(i)
+                count += 1
+                if count == 6 :
+                    break
 
 
 if __name__ == "__main__":
