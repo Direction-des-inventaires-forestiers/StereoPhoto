@@ -19,6 +19,8 @@ class Ui_colorWindow(object):
         self.graphicsView = QtWidgets.QGraphicsView(self.centralwidget)
         self.graphicsView.setGeometry(QtCore.QRect(150, 100, 551, 511))
         self.graphicsView.setObjectName("graphicsView")
+        self.graphicsView.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        self.graphicsView.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
         self.label = QtWidgets.QLabel(self.centralwidget)
         self.label.setGeometry(QtCore.QRect(50, 120, 61, 16))
         self.label.setObjectName("label")
@@ -28,24 +30,6 @@ class Ui_colorWindow(object):
         self.label_3 = QtWidgets.QLabel(self.centralwidget)
         self.label_3.setGeometry(QtCore.QRect(50, 220, 61, 16))
         self.label_3.setObjectName("label_3")
-        self.spinBoxContrast = QtWidgets.QSpinBox(self.centralwidget)
-        self.spinBoxContrast.setGeometry(QtCore.QRect(50, 140, 62, 22))
-        self.spinBoxContrast.setMinimum(-100)
-        self.spinBoxContrast.setMaximum(100)
-        self.spinBoxContrast.setSingleStep(5)
-        self.spinBoxContrast.setObjectName("spinBoxContrast")
-        self.spinBoxLuminosite = QtWidgets.QSpinBox(self.centralwidget)
-        self.spinBoxLuminosite.setGeometry(QtCore.QRect(50, 190, 62, 22))
-        self.spinBoxLuminosite.setMinimum(-100)
-        self.spinBoxLuminosite.setMaximum(100)
-        self.spinBoxLuminosite.setSingleStep(5)
-        self.spinBoxLuminosite.setObjectName("spinBoxLuminosite")
-        self.spinBoxSaturation = QtWidgets.QSpinBox(self.centralwidget)
-        self.spinBoxSaturation.setGeometry(QtCore.QRect(50, 240, 62, 22))
-        self.spinBoxSaturation.setMinimum(-100)
-        self.spinBoxSaturation.setMaximum(100)
-        self.spinBoxSaturation.setSingleStep(5)
-        self.spinBoxSaturation.setObjectName("spinBoxSaturation")
         self.spinBoxRed = QtWidgets.QSpinBox(self.centralwidget)
         self.spinBoxRed.setGeometry(QtCore.QRect(50, 370, 61, 22))
         self.spinBoxRed.setMinimum(-100)
@@ -64,14 +48,8 @@ class Ui_colorWindow(object):
         self.spinBoxBlue.setMaximum(100)
         self.spinBoxBlue.setSingleStep(5)
         self.spinBoxBlue.setObjectName("spinBoxBlue")
-        self.spinBoxNettete = QtWidgets.QSpinBox(self.centralwidget)
-        self.spinBoxNettete.setGeometry(QtCore.QRect(50, 300, 62, 22))
-        self.spinBoxNettete.setMinimum(0)
-        self.spinBoxNettete.setMaximum(100)
-        self.spinBoxNettete.setSingleStep(5)
-        self.spinBoxNettete.setObjectName("spinBoxNettete")
         self.label_4 = QtWidgets.QLabel(self.centralwidget)
-        self.label_4.setGeometry(QtCore.QRect(50, 280, 47, 13))
+        self.label_4.setGeometry(QtCore.QRect(50, 270, 47, 13))
         self.label_4.setObjectName("label_4")
         self.checkBoxMinMax = QtWidgets.QCheckBox(self.centralwidget)
         self.checkBoxMinMax.setGeometry(QtCore.QRect(50, 530, 70, 17))
@@ -136,6 +114,58 @@ class Ui_colorWindow(object):
         self.checkBoxSave.setText("")
         self.checkBoxSave.setObjectName("checkBoxSave")
         self.checkBoxSave.setVisible(False)
+        self.spinBoxContrast = QtWidgets.QSpinBox(self.centralwidget)
+        self.spinBoxContrast.setGeometry(QtCore.QRect(50, 140, 62, 22))
+        self.spinBoxContrast.setMinimum(-100)
+        self.spinBoxContrast.setMaximum(100)
+        self.spinBoxContrast.setSingleStep(5)
+        self.spinBoxContrast.setObjectName("spinBoxContrast")
+        self.spinBoxLuminosite = QtWidgets.QSpinBox(self.centralwidget)
+        self.spinBoxLuminosite.setGeometry(QtCore.QRect(50, 190, 62, 22))
+        self.spinBoxLuminosite.setMinimum(-100)
+        self.spinBoxLuminosite.setMaximum(100)
+        self.spinBoxLuminosite.setSingleStep(5)
+        self.spinBoxLuminosite.setObjectName("spinBoxLuminosite")
+        self.spinBoxSaturation = QtWidgets.QSpinBox(self.centralwidget)
+        self.spinBoxSaturation.setGeometry(QtCore.QRect(50, 240, 62, 22))
+        self.spinBoxSaturation.setMinimum(-100)
+        self.spinBoxSaturation.setMaximum(100)
+        self.spinBoxSaturation.setSingleStep(5)
+        self.spinBoxSaturation.setObjectName("spinBoxSaturation")
+        self.spinBoxNettete = QtWidgets.QSpinBox(self.centralwidget)
+        self.spinBoxNettete.setGeometry(QtCore.QRect(50, 290, 62, 22))
+        self.spinBoxNettete.setMinimum(-100)
+        self.spinBoxNettete.setMaximum(100)
+        self.spinBoxNettete.setSingleStep(5)
+        self.spinBoxNettete.setObjectName("spinBoxNettete")
+        self.zoomInButton = QtWidgets.QPushButton(self.centralwidget)
+        self.zoomInButton.setGeometry(QtCore.QRect(160, 620, 30, 30))
+        self.zoomInButton.setStyleSheet("background-color:rgba(200, 200, 200);")
+        icon = QtGui.QIcon()
+        icon.addPixmap(QtGui.QPixmap(":/Rehaussement/Icons/zoomIn.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        self.zoomInButton.setIcon(icon)
+        self.zoomInButton.setIconSize(QtCore.QSize(30, 30))
+        self.zoomInButton.setObjectName("zoomInButton")
+        self.zoomInButton.setEnabled(False)
+        self.zoomOutButton = QtWidgets.QPushButton(self.centralwidget)
+        self.zoomOutButton.setGeometry(QtCore.QRect(200, 620, 30, 30))
+        self.zoomOutButton.setStyleSheet("background-color:rgba(200, 200, 200);")
+        icon1 = QtGui.QIcon()
+        icon1.addPixmap(QtGui.QPixmap(":/Rehaussement/Icons/zoomOut.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        self.zoomOutButton.setIcon(icon1)
+        self.zoomOutButton.setIconSize(QtCore.QSize(30, 30))
+        self.zoomOutButton.setObjectName("zoomOutButton")
+        self.zoomOutButton.setEnabled(False)
+        self.zoomPanButton = QtWidgets.QPushButton(self.centralwidget)
+        self.zoomPanButton.setGeometry(QtCore.QRect(240, 620, 30, 30))
+        self.zoomPanButton.setStyleSheet("background-color:rgba(200, 200, 200);")
+        icon2 = QtGui.QIcon()
+        icon2.addPixmap(QtGui.QPixmap(":/Rehaussement/Icons/panOption.png"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        self.zoomPanButton.setIcon(icon2)
+        self.zoomPanButton.setIconSize(QtCore.QSize(30, 30))
+        self.zoomPanButton.setObjectName("zoomPanButton")
+        self.zoomPanButton.setEnabled(False)
+        self.zoomPanButton.setCheckable(True)
         colorWindow.setCentralWidget(self.centralwidget)
         self.menubar = QtWidgets.QMenuBar(colorWindow)
         self.menubar.setGeometry(QtCore.QRect(0, 0, 1070, 21))
@@ -234,11 +264,59 @@ class tableModel(QtCore.QAbstractTableModel):
             self.dataChanged.emit(index, index)
             return True
         return False
-    
+
 
 class colorWindow(QtWidgets.QMainWindow): 
-
     def __init__(self):
         QtWidgets.QMainWindow.__init__(self)
         self.ui = Ui_colorWindow()
+        self.initSize = self.size()
         self.ui.setupUi(self)
+
+    
+    #Revoir cette méthode, semble inversé le state un fois lancé, jamais State maximized quand on le max seulement quand on réduit ---> à décalage!
+    def resizeEvent(self, event) :
+        #print(self.windowState().__int__())
+        if self.windowState() == QtCore.Qt.WindowMaximized:
+            if event.size().width() > 1070 :
+
+                #Taille original 1070,750
+                difX = event.size().width() - event.oldSize().width()
+                self.pixelX = difX
+                difY = event.size().height() - event.oldSize().height()
+                self.pixelY = difY
+
+                #Augmenter 1er param pour déplacer au centre de la fenetre vers la droite
+                self.ui.label_9.setGeometry(QtCore.QRect(420+difX/2, 10, 251, 21))
+                self.ui.lineEdit.setGeometry(QtCore.QRect(200+difX/2, 40, 661, 20))
+                self.ui.toolButton.setGeometry(QtCore.QRect(860+difX/2, 40, 25, 19))
+
+                #augmenter 3e param pour augmenter la taille vers la droite
+                self.ui.groupBox.setGeometry(QtCore.QRect(20, 10, 1041+difX, 71))
+
+                #Augmenter 1er param pour déplacer vers la droite
+                self.ui.label_8.setGeometry(QtCore.QRect(780+difX, 100, 231, 21))
+                self.ui.checkBoxSave.setGeometry(QtCore.QRect(1035+difX, 110, 16, 17))
+
+                #Augmenter 2e param pour déplacer vers le bas
+                self.ui.zoomPanButton.setGeometry(QtCore.QRect(240, 620+difY, 30, 30))
+                self.ui.zoomInButton.setGeometry(QtCore.QRect(160, 620+difY, 30, 30))
+                self.ui.zoomOutButton.setGeometry(QtCore.QRect(200, 620+difY, 30, 30))
+
+                #Augmenter 1er et 2e param pour déplacer vers droite et bas
+                self.ui.saveImage.setGeometry(QtCore.QRect(990+difX, 625+difY, 21, 31))
+                self.ui.saveButton.setGeometry(QtCore.QRect(880+difX, 630+difY, 91, 23))
+
+                #Augmenter 1er et 4e param pour déplacer vers la droite et augmenter la taille vers le bas
+                self.ui.tableView.setGeometry(QtCore.QRect(740+difX, 130, 311, 481+difY))
+
+                #Augmenter 3e et 4e param pour augmenter la taille vers la droite et vers le bas
+                self.ui.graphicsView.setGeometry(QtCore.QRect(150, 100, 551+difX, 511+difY))
+
+
+
+
+
+
+                
+        

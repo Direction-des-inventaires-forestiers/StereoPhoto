@@ -1,3 +1,15 @@
+'''
+Cette version de l'application de rehaussement est concu pour fonctionner indépendamment 
+L'application permet de rehaussser des photos de plusieurs formats (jpeg et TIF principalement) 
+Il est possible de modifier le constraste, la saturation, la luminosité et le netteté
+Il est aussi possible de d'ajouter du rouge, du vert ou du bleu dans l'image. 
+Le bouton Min/Max permet de couper les valeurs RGB en dessous de 5% et au dessus de 95% de l'histogramme
+Il est possible d'enregistrer les photos dans leur format original 
+
+En développement 
+    Zoom et Pan avec ajustement de la qualité du TIF
+    Rehaussement en fonction de la vue courrante seulement
+'''
 from PIL import Image, ImageDraw, ImageEnhance
 import numpy as np
 from PyQt5.QtWidgets import *
@@ -25,18 +37,67 @@ class app(QApplication):
         self.firstPicture = True
         self.switchActivate = False
         self.threadInProcess = False
+        self.isTIF = False
 
         self.colorWindow.ui.saveButton.clicked.connect(self.saveSelectPicture)
         self.colorWindow.ui.toolButton.clicked.connect(self.showDialog)
-        
- 
+        self.colorWindow.ui.zoomInButton.clicked.connect(self.zoomIn)
+        self.colorWindow.ui.zoomOutButton.clicked.connect(self.zoomOut)
+        self.colorWindow.ui.zoomPanButton.clicked.connect(self.seekNewQuality)
+        self.colorWindow.setWindowState(Qt.WindowMaximized)
+
+    
+    ### En cours de développement
+    #La modification du nombre de pixel est linéairement dépendante du factor de zoom
+    #le point max se trouve à être la taille du graphics view -- changer les valeurs en arg
+    def zoomIn(self, pressed):
+
+        ZoomInFactor = 1.1874
+        self.colorWindow.ui.graphicsView.scale(ZoomInFactor, ZoomInFactor)
+        self.pointZero = self.colorWindow.ui.graphicsView.mapToScene(QPoint(0,0))
+        self.pointMax = self.colorWindow.ui.graphicsView.mapToScene(QPoint(1401,899))
+        a=1
+
+    def zoomOut(self, pressed):
+
+        ZoomOutFactor = 0.8421
+        self.colorWindow.ui.graphicsView.scale(ZoomOutFactor,ZoomOutFactor)
+        self.pointZero = self.colorWindow.ui.graphicsView.mapToScene(QPoint(0,0))
+        self.pointMax = self.colorWindow.ui.graphicsView.mapToScene(QPoint(1401,899))
+        a =1 
+
+    
+    def seekNewQuality(self):
+        topX = round(self.pointZero.x()*4)
+        topY = round(self.pointZero.y()*4)
+        lowX = round(self.pointMax.x()*4)
+        lowY = round(self.pointMax.y()*4)
+        self.picture.seek(1)
+        cropPicture = self.picture.crop((topX, topY, lowX, lowY))
+
+        cropPicture.save(self.temp)
+        scene = QGraphicsScene()
+        a = QImage(self.temp)
+        b = QPixmap.fromImage(a)
+        d = self.colorWindow.ui.graphicsView.scene().addPixmap(b)
+        d.setScale(0.25)
+        d.setOffset(topX, topY)
+        #self.colorWindow.ui.graphicsView.scene().addPixmap(QPixmap.fromImage(a))
+        #self.colorWindow.ui.graphicsView.setScene(scene)
+        os.remove(self.temp)
+        self.picture.seek(3)
+
+        #self.colorWindow.ui.graphicsView.fitInView(self.colorWindow.ui.graphicsView.sceneRect(), Qt.KeepAspectRatio)
+    #######
+
+    #Fonction qui permet de sélectionner le dossier à importer 
     def showDialog(self) : 
         path = os.path.dirname(os.path.abspath(__file__))
         fname = QFileDialog.getExistingDirectory(self.colorWindow, 'Ouvrir le dossier',path)
         if fname:
             self.colorWindow.ui.lineEdit.setText(fname)
 
-    
+    #Fonction pour trier si le fichier à afficher est compatible avec l'application
     def importFile(self):
         success = True
         self.colorWindow.ui.statusbar.clearMessage()
@@ -111,16 +172,21 @@ class app(QApplication):
         currentPath = self.path + "/" + self.listPicture[0]
         self.loadPicture(currentPath)
 
+    #Fonction pour charger l'image afin de la visualiser
     def loadPicture(self, path) : 
         self.picture = Image.open(path)
+        self.originalPicture = Image.open(path)
 
         if hasattr(self.picture, "n_frames") and self.picture.n_frames > 4:
-            self.picture.seek(4)
+            self.picture.seek(3)
+            self.isTIF = True
 
         elif self.picture.size[0] > self.picture.size[1] :
             self.picture = self.picture.resize((1000,700))
+            self.isTIF = False
         else :
             self.picture = self.picture.resize((700,1000))
+            self.isTIF = False
 
         self.picture.save(self.temp)
         scene = QGraphicsScene()
@@ -130,6 +196,7 @@ class app(QApplication):
         os.remove(self.temp)
 
         self.colorWindow.ui.graphicsView.fitInView(self.colorWindow.ui.graphicsView.sceneRect(), Qt.KeepAspectRatio)
+        self.currentBRect = self.colorWindow.ui.graphicsView.mapToScene(self.colorWindow.ui.graphicsView.sceneRect().toRect()).boundingRect()
 
         if self.firstPicture : 
             self.setConnection(True)
@@ -137,7 +204,8 @@ class app(QApplication):
             self.firstPicture = False
             self.reset()
 
-    def calculHistogram(self, red, green, blue):
+    #Calcul de l'histogramme et repérage des valeur min et max dans les trois couleurs
+    def calculHistogram(self, red, green, blue, minP=0.05, maxP=0.95):
 
         redHis = red.histogram()
         redSum = sum(redHis)
@@ -145,7 +213,7 @@ class app(QApplication):
         greenSum = sum(greenHis)
         blueHis = blue.histogram()
         blueSum = sum(blueHis)
-        cutValue = [round(redSum*0.05), round(redSum*0.95), round(greenSum*0.05), round(greenSum*0.95), round(blueSum*0.05), round(blueSum*0.95)]
+        cutValue = [round(redSum*minP), round(redSum*maxP), round(greenSum*minP), round(greenSum*maxP), round(blueSum*minP), round(blueSum*maxP)]
         self.pixValue = []
         buff = 0
         count = 0
@@ -175,7 +243,7 @@ class app(QApplication):
                 if count == 6 :
                     break
         
-    
+    #Permet de changer la photo couramment affiché
     def switchPicture(self, value) :
 
         if value.column() == 0 :
@@ -189,6 +257,7 @@ class app(QApplication):
             self.colorWindow.ui.tableView.model().dataChanged.emit(ind, ind)
             self.colorWindow.ui.tableView.selectionModel().currentChanged.connect(self.switchPicture)
         
+    #Fonction de rehaussement d'image, utilise PIL et permet de la modification sur les couches RGB
     def enhancePicture(self):
         p = self.picture
 
@@ -267,30 +336,35 @@ class app(QApplication):
         self.colorWindow.ui.graphicsView.setScene(scene)
         os.remove(self.temp)
 
+    #Remet la photo à son affichage d'origine
     def reset(self) : 
         self.setConnection(False)
         self.resetBox()
         self.enhancePicture()
         self.setConnection(True)
 
+    #Modification de la couche Rouge, considère aussi la luminosité
     def redEnhance(self, value):
         if self.colorWindow.ui.spinBoxRed.value() > 0 :
             return int(value * (1 + (self.colorWindow.ui.spinBoxRed.value()/100))) + int(128*self.colorWindow.ui.spinBoxLuminosite.value()/100)
         else :
             return int(value * (1 - (0.5*(self.colorWindow.ui.spinBoxRed.value()/-100)))) + int(128*self.colorWindow.ui.spinBoxLuminosite.value()/100)
     
+    #Modification de la couche Verte, considère aussi la luminosité
     def greenEnhance(self, value):
         if self.colorWindow.ui.spinBoxGreen.value() > 0 :
             return int(value * (1 + (self.colorWindow.ui.spinBoxGreen.value()/100))) + int(128*self.colorWindow.ui.spinBoxLuminosite.value()/100)
         else :
             return int(value * (1 - (0.5*(self.colorWindow.ui.spinBoxGreen.value()/-100)))) + int(128*self.colorWindow.ui.spinBoxLuminosite.value()/100)
 
+    #Modification de la couche Bleue, considère aussi la luminosité
     def blueEnhance(self, value):
         if self.colorWindow.ui.spinBoxBlue.value() > 0 :
             return int(value * (1 + (self.colorWindow.ui.spinBoxBlue.value()/100))) + int(128*self.colorWindow.ui.spinBoxLuminosite.value()/100)
         else :
             return int(value * (1 - (0.5*(self.colorWindow.ui.spinBoxBlue.value()/-100)))) + int(128*self.colorWindow.ui.spinBoxLuminosite.value()/100)
 
+    #Modification de la couche Rouge selon le Min Max
     def redEqualization(self,value):
         oldMin = self.pixValue[0]
         oldMax = self.pixValue[1]
@@ -299,6 +373,7 @@ class app(QApplication):
         v = ((value-oldMin)*(newMax-newMin))/(oldMax - oldMin) + newMin
         return round(v)
 
+    #Modification de la couche Verte selon le Min Max
     def greenEqualization(self,value):
         oldMin = self.pixValue[2] 
         oldMax = self.pixValue[3]
@@ -307,6 +382,7 @@ class app(QApplication):
         v = ((value-oldMin)*(newMax-newMin))/(oldMax - oldMin) + newMin
         return round(v)
 
+    #Modification de la couche Bleue selon le Min Max
     def blueEqualization(self,value):
         oldMin = self.pixValue[4] 
         oldMax = self.pixValue[5] 
@@ -315,7 +391,13 @@ class app(QApplication):
         v = ((value-oldMin)*(newMax-newMin))/(oldMax - oldMin) + newMin
         return round(v)
 
+    #Active/Desactive les connections des différents objets (boutons) de l'application
     def setConnection(self, enable) : 
+
+        self.colorWindow.ui.zoomInButton.setEnabled(enable)
+        self.colorWindow.ui.zoomOutButton.setEnabled(enable)
+        self.colorWindow.ui.zoomPanButton.setEnabled(enable)
+
         if enable : 
             self.colorWindow.ui.spinBoxContrast.valueChanged.connect(self.enhancePicture)
             self.colorWindow.ui.spinBoxLuminosite.valueChanged.connect(self.enhancePicture)
@@ -325,6 +407,7 @@ class app(QApplication):
             self.colorWindow.ui.spinBoxGreen.valueChanged.connect(self.enhancePicture)
             self.colorWindow.ui.spinBoxBlue.valueChanged.connect(self.enhancePicture)
             self.colorWindow.ui.checkBoxMinMax.stateChanged.connect(self.enhancePicture)
+            
 
         else : 
             self.colorWindow.ui.spinBoxContrast.valueChanged.disconnect(self.enhancePicture)
@@ -336,6 +419,7 @@ class app(QApplication):
             self.colorWindow.ui.spinBoxBlue.valueChanged.disconnect(self.enhancePicture) 
             self.colorWindow.ui.checkBoxMinMax.stateChanged.disconnect(self.enhancePicture)
 
+    #Permet de mettre les paramètres de rehaussement à leur origine
     def resetBox(self) : 
         self.colorWindow.ui.spinBoxContrast.setValue(0)
         self.colorWindow.ui.spinBoxLuminosite.setValue(0)   
@@ -346,6 +430,7 @@ class app(QApplication):
         self.colorWindow.ui.spinBoxBlue.setValue(0) 
         self.colorWindow.ui.checkBoxMinMax.setCheckState(0)
     
+    #Retourne les valeurs des paramètres de rehaussement dans une liste
     def getBoxValues(self): 
         con = self.colorWindow.ui.spinBoxContrast.value()
         lum = self.colorWindow.ui.spinBoxLuminosite.value()   
@@ -359,12 +444,14 @@ class app(QApplication):
         self.listParam = [con, lum, sat, net, red, gre, blu, bmm]
 
 
+    #Permet de reproduire l'état du checkbox unique sur toutes les photos de la liste
     def selectAll(self,value) : 
         for i in range(len(self.listPicture)) : 
             ind = self.colorWindow.ui.tableView.model().index(i,1)
             self.colorWindow.ui.tableView.model().setData(ind, value, Qt.CheckStateRole)
 
 
+    #Démarre l'enregistrement des photos sélectionnées 
     def startThread(self, listPic) : 
 
         fname = QFileDialog.getExistingDirectory(self.colorWindow, 'Choisir le dossier d\'enregistrement' ,self.path)
@@ -394,7 +481,7 @@ class app(QApplication):
             
             STRbar = " Photos traitées 0/" + str(self.nbPicture) + " "
             self.colorWindow.ui.progressBar = QProgressBar(self.colorWindow.ui.centralwidget)
-            self.colorWindow.ui.progressBar.setGeometry(QRect(550, 660, 461, 23))
+            self.colorWindow.ui.progressBar.setGeometry(QRect(550+self.colorWindow.pixelX, 660+self.colorWindow.pixelY, 461, 23))
             self.colorWindow.ui.progressBar.setObjectName("progressBar")
             self.colorWindow.ui.progressBar.setFormat(STRbar)
             self.colorWindow.ui.progressBar.setMaximum(self.nbPicture)
@@ -411,6 +498,7 @@ class app(QApplication):
             self.t.start()
 
         
+    #Place dans une liste les images sélectionnées et lance leur enregistrement
     def saveSelectPicture(self):
         data = self.colorWindow.ui.tableView.model().data
         newList = []
@@ -421,6 +509,7 @@ class app(QApplication):
             self.startThread(newList)
 
 
+    #Permet de mettre à jour la barre de progrès lorsqu'une photo termine d'être enregistré
     def iterationOnSaving(self):
         v = self.colorWindow.ui.progressBar.value()
         v += 1 
@@ -428,10 +517,13 @@ class app(QApplication):
         self.colorWindow.ui.progressBar.setValue(v)
         self.colorWindow.ui.progressBar.setFormat(STRbar)
 
+    #Transforme l'état de l'enregistrement vers la croix rouge
+    #Slot signigie qu'il est appeler par un object QT
     @pyqtSlot()
     def go2Cross(self):
         self.colorWindow.ui.saveImage.setStyleSheet("image: url(:/Rehaussement/Icons/redCross.png);")
         
+    #Fonction appelée à la fin du thread lorsque l'enregistrement se termine
     def threadingDone(self):
         self.colorWindow.ui.saveImage.setStyleSheet("image: url(:/Rehaussement/Icons/greenCheck.png);")
         self.threadInProcess = False
@@ -443,7 +535,9 @@ class app(QApplication):
             QTimer.singleShot(5000, self.go2Cross)
 
 
-
+#Permet l'enregistrement des photos
+#L'idée du thread est de pouvoir continuer à utiliser l'application lorsque l'enregistrement s'execute
+#La majorité des fonctions sont identiques à celle dans la classe de l'application seul les noms des variables sont différents
 class threadSave(QThread):
     iterationDone = pyqtSignal()
     def __init__(self, path, listPicture, listParam, savePathDir, listSaveName):
