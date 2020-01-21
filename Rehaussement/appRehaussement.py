@@ -9,6 +9,9 @@ Il est possible d'enregistrer les photos dans leur format original
 En développement 
     Zoom et Pan avec ajustement de la qualité du TIF
     Rehaussement en fonction de la vue courrante seulement
+
+Optimisation futur 
+    Découpage de l'image original en petit rectangle
 '''
 from PIL import Image, ImageDraw, ImageEnhance
 import numpy as np
@@ -43,36 +46,70 @@ class app(QApplication):
         self.colorWindow.ui.toolButton.clicked.connect(self.showDialog)
         self.colorWindow.ui.zoomInButton.clicked.connect(self.zoomIn)
         self.colorWindow.ui.zoomOutButton.clicked.connect(self.zoomOut)
-        self.colorWindow.ui.zoomPanButton.clicked.connect(self.seekNewQuality)
+        self.colorWindow.ui.zoomPanButton.clicked.connect(self.enablePan)
         self.colorWindow.setWindowState(Qt.WindowMaximized)
 
     
     ### En cours de développement
+
     #La modification du nombre de pixel est linéairement dépendante du factor de zoom
     #le point max se trouve à être la taille du graphics view -- changer les valeurs en arg
     def zoomIn(self, pressed):
+
+        self.zoomState += 1
+
+        #if zoomState == 4, 8 , 10 ... ou autre valeur à trouver 
+        #En fonction de la taille de l'image initiale --> vertical vs horizontal surtout
+        #image.seek(current - 1 ) --> voir seekNewQuality si le fichier est un TIF
+
 
         ZoomInFactor = 1.1874
         self.colorWindow.ui.graphicsView.scale(ZoomInFactor, ZoomInFactor)
         self.pointZero = self.colorWindow.ui.graphicsView.mapToScene(QPoint(0,0))
         self.pointMax = self.colorWindow.ui.graphicsView.mapToScene(QPoint(1401,899))
-        a=1
+        
+        #Bloquer pour ne pas répété inutilement
+        #if self.zoomState == 6 and self.isTIF :
+            #self.seekNewQuality(2, 2, 0.5)
+        
+        if self.zoomState == 10 and self.isTIF :
+            self.seekNewQuality(4, 1, 0.25)
+
 
     def zoomOut(self, pressed):
 
-        ZoomOutFactor = 0.8421
-        self.colorWindow.ui.graphicsView.scale(ZoomOutFactor,ZoomOutFactor)
-        self.pointZero = self.colorWindow.ui.graphicsView.mapToScene(QPoint(0,0))
-        self.pointMax = self.colorWindow.ui.graphicsView.mapToScene(QPoint(1401,899))
-        a =1 
+        self.zoomState -= 1
+
+        if self.zoomState > -2 :
+            ZoomOutFactor = 0.8421
+            self.colorWindow.ui.graphicsView.scale(ZoomOutFactor,ZoomOutFactor)
+            self.pointZero = self.colorWindow.ui.graphicsView.mapToScene(QPoint(0,0))
+            self.pointMax = self.colorWindow.ui.graphicsView.mapToScene(QPoint(1401,899))
+            a=1
+
+        else : 
+            self.zoomState = -1 
+
+    def enablePan(self, pressed):
+        if pressed :
+            self.colorWindow.ui.graphicsView.setDragMode(QGraphicsView.ScrollHandDrag)
+        else :
+            self.colorWindow.ui.graphicsView.setDragMode(QGraphicsView.NoDrag)
+        
 
     
-    def seekNewQuality(self):
-        topX = round(self.pointZero.x()*4)
-        topY = round(self.pointZero.y()*4)
-        lowX = round(self.pointMax.x()*4)
-        lowY = round(self.pointMax.y()*4)
-        self.picture.seek(1)
+    def seekNewQuality(self, multiFactor, seekFactor, scaleFactor):
+
+        self.picture.seek(seekFactor)
+        topX = round(self.pointZero.x()*multiFactor) if round(self.pointZero.x()*multiFactor) >= 0 else 0
+        topY = round(self.pointZero.y()*multiFactor) if round(self.pointZero.y()*multiFactor) >= 0 else 0
+        lowX = round(self.pointMax.x()*multiFactor)  if round(self.pointMax.x()*multiFactor) <= self.picture.size[0] else self.picture.size[0]
+        lowY = round(self.pointMax.y()*multiFactor)  if round(self.pointMax.y()*multiFactor) <= self.picture.size[1] else self.picture.size[1]
+        sizePixelX = abs(lowX - topX)
+        sizePixelY = abs(lowY - topY)
+        #self.picture.seek(seekFactor)
+        maxX = 750 #via self.picture.size
+        maxY = 500
         cropPicture = self.picture.crop((topX, topY, lowX, lowY))
 
         cropPicture.save(self.temp)
@@ -80,14 +117,43 @@ class app(QApplication):
         a = QImage(self.temp)
         b = QPixmap.fromImage(a)
         d = self.colorWindow.ui.graphicsView.scene().addPixmap(b)
-        d.setScale(0.25)
+        d.setScale(scaleFactor)
         d.setOffset(topX, topY)
+
+        #Découpage de 4 rectangles qui seront ensuite découpé en plus petit rectangle 
+        #Version 1 placer les 5 rectangles sans rien optimisé
+        #Version 2 placer les sous-rectangles en fonction de leur proximité
+        #Version 3 placer les sous-rectangles via un thread
+        
+        #Version 4 offrir le seek(0) 
+        
+        #Check taille restante à gauche 
+        # If > 0  et pour chaque tranche de maxX couper à chaque maxY 
+        # on obtient nos rectangles --> voir comment on gère le système de rectangle (nouvelle classe??)
+
+        #Check taille restante à droite considérant lowX
+        # If > 0  et pour chaque tranche de maxX couper à chaque maxY
+
+        #check taille restante en haut considérant tous les points
+        #If > 0 et pour chaque trande de maxY couper à chaque maxX
+
+
         #self.colorWindow.ui.graphicsView.scene().addPixmap(QPixmap.fromImage(a))
         #self.colorWindow.ui.graphicsView.setScene(scene)
         os.remove(self.temp)
         self.picture.seek(3)
 
         #self.colorWindow.ui.graphicsView.fitInView(self.colorWindow.ui.graphicsView.sceneRect(), Qt.KeepAspectRatio)
+
+    ####gestion des régions externes à la current view
+    #Recevoir la taille du seek courrant ainsi que la fenêtre du current view
+    
+    #Séparer en rectangle de taille raisonnable les portions de l'image non optimisé 
+    #Identifier la distance entre chaque rectangle et le rectangle initial
+    #Charger les rectangles de meilleurs qualités en fonction de la plus courte distance 
+
+    #Thread!!! pour avoir de la fluidité 
+
     #######
 
     #Fonction qui permet de sélectionner le dossier à importer 
@@ -197,6 +263,7 @@ class app(QApplication):
 
         self.colorWindow.ui.graphicsView.fitInView(self.colorWindow.ui.graphicsView.sceneRect(), Qt.KeepAspectRatio)
         self.currentBRect = self.colorWindow.ui.graphicsView.mapToScene(self.colorWindow.ui.graphicsView.sceneRect().toRect()).boundingRect()
+        self.zoomState = 0
 
         if self.firstPicture : 
             self.setConnection(True)
@@ -565,6 +632,11 @@ class threadSave(QThread):
                 
                 driver = gdal.GetDriverByName("GTiff")
                 
+
+                #Cette méthode d'enregistrement cause une perte de réponse de l'application 
+                #l'application ne répond plus, il est donc impossible de faire du traitement d'image pendant l'enregistrement 
+                #Peut être une cause déjà trouver en ligne --> à rechercher 
+                #Regarder les lignes de codes qui cause le problème --> seul test tout était en commentaire
                 fileout = driver.Create(newPath, myImage.size[0], myImage.size[1], 3 ,gdal.GDT_Byte, ["COMPRESS=JPEG", "PHOTOMETRIC=YCBCR", "TILED=YES" , "JPEG_QUALITY=90"])
                 fileout.GetRasterBand(1).WriteArray(np.array(toSave[0], dtype=np.uint8))
                 fileout.GetRasterBand(2).WriteArray(np.array(toSave[1], dtype=np.uint8))
@@ -572,6 +644,7 @@ class threadSave(QThread):
                 fileout.BuildOverviews("AVERAGE", tab)
                 fileout.FlushCache()
                 fileout = None
+
                 self.iterationDone.emit()
  
             else : 
