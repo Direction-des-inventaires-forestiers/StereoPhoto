@@ -269,9 +269,76 @@ def createPyramid(self, path):
         listPic.append(b)
 
     return nbPyramid, gaussian_pyramid, listPic
+ 
+ 
+def seekNewQuality(self, multiFactor, seekFactor, scaleFactor):
 
+        self.picture.seek(seekFactor)
+        topX = round(self.pointZero.x()*multiFactor) if round(self.pointZero.x()*multiFactor) >= 0 else 0
+        topY = round(self.pointZero.y()*multiFactor) if round(self.pointZero.y()*multiFactor) >= 0 else 0
+        lowX = round(self.pointMax.x()*multiFactor)  if round(self.pointMax.x()*multiFactor) <= self.picture.size[0] else self.picture.size[0]
+        lowY = round(self.pointMax.y()*multiFactor)  if round(self.pointMax.y()*multiFactor) <= self.picture.size[1] else self.picture.size[1]
+        sizePixelX = abs(lowX - topX)
+        sizePixelY = abs(lowY - topY)
+        
+        #Ne doit pas être de petites valeurs
+     
+        maxX = 750 #via self.picture.size
+        maxY = 500
 
+        middleRect = [topX, topY, lowX, lowY]
+        firstRect = [0,0,topX, self.picture.size[1]]
+        secondRect = [lowX, 0, self.picture.size[0], self.picture.size[1]]
+        thridRect = [topX, 0, topX+sizePixelX , topY]
+        fourthRect = [topX, topY+sizePixelY, lowX, self.picture.size[1]]
 
+        rect = [middleRect, firstRect, secondRect, thridRect, fourthRect]
+        t = time.time()
+        for item in rect :
+
+            nbDivX = ceil(abs(item[2] - item[0])/maxX)
+            nbDivY = ceil(abs(item[3] - item[1])/maxY)
+
+            currentTopX = item[0]
+            currentTopY = item[1]
+            
+            for x in range(nbDivX) :
+                
+                currentLowX = currentTopX + maxX if (currentTopX + maxX) < item[2] else item[2]
+                
+                for y in range(nbDivY) : 
+
+                    currentLowY = currentTopY + maxY if (currentTopY + maxY) < item[3] else item[3]
+                    
+                    cropPicture = self.picture.crop((currentTopX,currentTopY,currentLowX,currentLowY))
+                    
+                    #cropPicture.save(self.temp)
+                    #a = QImage(self.temp)
+                    
+                    cropPictur = np.array(cropPicture)
+                    a = qimage2ndarray.array2qimage(cropPictur)
+                    
+                    b = QPixmap.fromImage(a)
+                    d = self.colorWindow.ui.graphicsView.scene().addPixmap(b)
+                    d.setScale(scaleFactor)
+                    d.setOffset(currentTopX, currentTopY)
+
+                    currentTopY += maxY
+                
+                currentTopX += maxX
+                currentTopY = item[1]
+
+            
+                
+
+        #Découpage de 4 rectangles qui seront ensuite découpé en plus petit rectangle 
+        #Version 1 placer les 5 rectangles sans rien optimisé
+        #Version 2 placer les sous-rectangles
+        #Version 3 placer les sous-rectangles via un thread
+        #Version 4 offrir le seek(0)
+        #Version 5 Offrir le placement selon la proximité 
+        #os.remove(self.temp)
+        self.picture.seek(3) 
 
 
 """import numpy as np
@@ -326,3 +393,75 @@ a = np.asarray(img)
 a.show()
 print(img.size)
 print(a.shape)"""
+
+
+
+"""
+        p = self.picture
+
+        if self.colorWindow.ui.spinBoxContrast.value() != 0 :
+            value = self.colorWindow.ui.spinBoxContrast.value()
+            if value > 0:
+                if value < 50 :
+                    p = ImageEnhance.Contrast(p).enhance(1 + (0.02*value))
+                elif value < 80:
+                    p = ImageEnhance.Contrast(p).enhance(2 + (0.1*(value-50)))
+                else :
+                    p = ImageEnhance.Contrast(p).enhance(5 + (value-80))
+
+            else : 
+                p = ImageEnhance.Contrast(p).enhance(1 +(value/100))
+
+        if self.colorWindow.ui.spinBoxSaturation.value() != 0 :
+            value = self.colorWindow.ui.spinBoxSaturation.value()
+            if value > 0 :
+                p = ImageEnhance.Color(p).enhance(1 + (0.05 * value))
+            else :
+                p = ImageEnhance.Color(p).enhance(1 + int(value/100))
+
+        if self.colorWindow.ui.spinBoxNettete.value() != 0 :
+            p = ImageEnhance.Sharpness(p).enhance(self.colorWindow.ui.spinBoxNettete.value()/10 + 1)
+        
+        s = p.split()
+
+        if self.colorWindow.ui.checkBoxMinMax.checkState() == Qt.Checked : 
+
+            if self.colorWindow.ui.spinBoxRed.value() != 0 or self.colorWindow.ui.spinBoxLuminosite.value() != 0 :
+                mr = s[0].point(self.redEnhance)
+            else :
+                mr = s[0]
+
+            if self.colorWindow.ui.spinBoxGreen.value() != 0 or self.colorWindow.ui.spinBoxLuminosite.value() != 0 :
+                mg = s[1].point(self.greenEnhance)
+            else : 
+                mg = s[1]
+
+            if self.colorWindow.ui.spinBoxBlue.value() != 0 or self.colorWindow.ui.spinBoxLuminosite.value() != 0 :
+                mb = s[2].point(self.blueEnhance)
+            else :
+
+                mb = s[2]
+
+            self.calculHistogram(mr,mg,mb)
+
+            r = mr.point(self.redEqualization)
+            g = mg.point(self.greenEqualization)
+            b = mb.point(self.blueEqualization)
+
+        
+        else :
+            if self.colorWindow.ui.spinBoxRed.value() != 0 or self.colorWindow.ui.spinBoxLuminosite.value() != 0 :
+                r = s[0].point(self.redEnhance)
+            else :
+                r = s[0]
+
+            if self.colorWindow.ui.spinBoxGreen.value() != 0 or self.colorWindow.ui.spinBoxLuminosite.value() != 0 :
+                g = s[1].point(self.greenEnhance)
+            else : 
+                g = s[1]
+
+            if self.colorWindow.ui.spinBoxBlue.value() != 0 or self.colorWindow.ui.spinBoxLuminosite.value() != 0 :
+                b = s[2].point(self.blueEnhance)
+            else :
+                b = s[2]
+        """
