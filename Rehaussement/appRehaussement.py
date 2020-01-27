@@ -41,6 +41,9 @@ class app(QApplication):
         self.savingThreadInProcess = False
         self.isTIF = False
 
+        self.showThreadInProcess = False
+        self.newRequest = False
+
         self.colorWindow.ui.saveButton.clicked.connect(self.saveSelectPicture)
         self.colorWindow.ui.toolButton.clicked.connect(self.showDialog)
         self.colorWindow.ui.zoomInButton.clicked.connect(self.zoomIn)
@@ -70,39 +73,43 @@ class app(QApplication):
         else : 
             self.zoomState = -1 
   
+
+
     def threadSeekNewQuality(self, pointZero, pointMax, multiFactor, seekFactor, scaleFactor):
 
         currentPath = self.path + "/" + self.listPicture[self.colorWindow.ui.tableView.model().currentSelect[0]]
         self.getBoxValues()
-
-        if hasattr(self, "tSeek"):
-            if self.tSeek.isRunning():
-                self.tSeek.newImage.disconnect(self.addPixmap)
-                self.tSeek.exit()
-                self.tSeek.quit()
-                del self.tSeek
-                #self.tSeek.terminate()
-            
-        #Changer la méthode d'assignation
+    
         self.tSeek = threadShow(currentPath, pointZero, pointMax, multiFactor, seekFactor, scaleFactor, self.listParam)
         self.tSeek.newImage.connect(self.addPixmap)
         self.tSeek.finished.connect(self.seekDone)
+        self.showThreadInProcess = True
+        self.newRequest = False
         self.tSeek.start()
 
     def seekDone(self):
 
-        if self.tSeek.seekFactor == 1 :
+        if self.newRequest : 
+            pointZero = self.colorWindow.ui.graphicsView.mapToScene(QPoint(0,0))
+            pointMax = self.colorWindow.ui.graphicsView.mapToScene(QPoint(1401,899))#le point max se trouve à être la taille du graphics view -- changer les valeurs en arg
+            self.threadSeekNewQuality(pointZero, pointMax, 4, 1, 0.25)
+
+
+        elif self.tSeek.seekFactor == 1 :
             pointZero = self.colorWindow.ui.graphicsView.mapToScene(QPoint(0,0))
             pointMax = self.colorWindow.ui.graphicsView.mapToScene(QPoint(1401,899))#le point max se trouve à être la taille du graphics view -- changer les valeurs en arg
             self.threadSeekNewQuality(pointZero, pointMax, 8, 0, 0.125)
-        
 
-
+        else :
+            self.showThreadInProcess = False
+    
     def addPixmap(self, pixmap, scaleFactor, topX, topY) :
 
         d = self.colorWindow.ui.graphicsView.scene().addPixmap(pixmap)
         d.setScale(scaleFactor)
         d.setOffset(topX, topY)
+
+
 
     def mMoveEvent(self, ev):
         
@@ -263,10 +270,11 @@ class app(QApplication):
         
         
         if hasattr(self, "tSeek"): 
-            #self.tSeek.newImage.disconnect(self.addPixmap)
-            self.tSeek.exit()
-            self.tSeek.quit()
-            #del self.tSeek
+            try :
+                self.tSeek.newImage.disconnect(self.addPixmap)
+            except: 
+                pass
+            self.tSeek.keepRunning = False
 
         self.getBoxValues()
         r = imageEnhancing(self.picture, self.listParam).enhance()     
@@ -285,7 +293,10 @@ class app(QApplication):
         if self.isTIF :
             pointZero = self.colorWindow.ui.graphicsView.mapToScene(QPoint(0,0))
             pointMax = self.colorWindow.ui.graphicsView.mapToScene(QPoint(1401,899))#le point max se trouve à être la taille du graphics view -- changer les valeurs en arg
-            self.threadSeekNewQuality(pointZero, pointMax, 4, 1, 0.25)
+            if self.showThreadInProcess == False :
+                self.threadSeekNewQuality(pointZero, pointMax, 4, 1, 0.25)
+            else :
+                self.newRequest = True
 
 
     #Remet la photo à son affichage d'origine
@@ -513,6 +524,7 @@ class threadShow(QThread):
         self.seekFactor = seekFactor
         self.scaleFactor = scaleFactor
         self.listParam = listParam
+        self.keepRunning = True
     
     #Découpage de 4 rectangles qui seront ensuite découpé en plus petit rectangle 
     #Version 1 placer les 5 rectangles sans rien optimisé --> OK
@@ -558,6 +570,10 @@ class threadShow(QThread):
                 
                 for y in range(nbDivY) : 
 
+                    if self.keepRunning == False : 
+                        self.picture.close()
+                        return
+                    
                     currentLowY = currentTopY + maxY if (currentTopY + maxY) < item[3] else item[3]
                     
                     cropPicture = np.array(pictureEnhance.crop((currentTopX,currentTopY,currentLowX,currentLowY)))
