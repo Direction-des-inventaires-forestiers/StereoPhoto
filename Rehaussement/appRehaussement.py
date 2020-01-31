@@ -652,7 +652,7 @@ class threadSave(QThread):
                 self.iterationDone.emit()
  
             else : 
-                t = imageEnhancing(self.picture, self.listParam)
+                t = imageEnhancing(myImage, self.listParam)
                 t.start()
                 toSave = t.join() 
 
