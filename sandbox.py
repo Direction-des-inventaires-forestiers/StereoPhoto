@@ -16,9 +16,10 @@ Image.MAX_IMAGE_PIXELS = 1000000000
 
 
 
-#image = Image.open("//ulysse/LIDAR/Developpement/Programmation/FP/Stereoscopie/Rehaussements_SUMMIT/q19596_019_rgb.tif")
-
-
+image = Image.open("//ulysse/LIDAR/Developpement/Programmation/FP/Stereoscopie/Rehaussements_SUMMIT/q19596_019_rgb.tif")
+t = image._TiffImageFile__frame
+image.seek(3)
+z = image._TiffImageFile__frame
 
 
 a = Image.open("//ulysse/LIDAR/Developpement/Programmation/FP/Stereoscopie/Rehaussements_SUMMIT/Saturation/2019-11-22_000484.png")

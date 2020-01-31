@@ -73,7 +73,7 @@
     <property name="geometry">
      <rect>
       <x>50</x>
-      <y>370</y>
+      <y>360</y>
       <width>61</width>
       <height>22</height>
      </rect>
@@ -92,7 +92,7 @@
     <property name="geometry">
      <rect>
       <x>50</x>
-      <y>430</y>
+      <y>420</y>
       <width>61</width>
       <height>22</height>
      </rect>
@@ -111,7 +111,7 @@
     <property name="geometry">
      <rect>
       <x>50</x>
-      <y>490</y>
+      <y>480</y>
       <width>61</width>
       <height>22</height>
      </rect>
@@ -139,24 +139,11 @@
      <string>Netteté</string>
     </property>
    </widget>
-   <widget class="QCheckBox" name="checkBoxMinMax">
-    <property name="geometry">
-     <rect>
-      <x>50</x>
-      <y>530</y>
-      <width>70</width>
-      <height>17</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Min/Max</string>
-    </property>
-   </widget>
    <widget class="QLabel" name="label_5">
     <property name="geometry">
      <rect>
       <x>50</x>
-      <y>350</y>
+      <y>340</y>
       <width>47</width>
       <height>13</height>
      </rect>
@@ -169,7 +156,7 @@
     <property name="geometry">
      <rect>
       <x>50</x>
-      <y>410</y>
+      <y>400</y>
       <width>47</width>
       <height>13</height>
      </rect>
@@ -182,7 +169,7 @@
     <property name="geometry">
      <rect>
       <x>50</x>
-      <y>470</y>
+      <y>460</y>
       <width>47</width>
       <height>13</height>
      </rect>
@@ -195,7 +182,7 @@
     <property name="geometry">
      <rect>
       <x>40</x>
-      <y>570</y>
+      <y>640</y>
       <width>81</width>
       <height>23</height>
      </rect>
@@ -511,6 +498,79 @@
     <property name="checkable">
      <bool>true</bool>
     </property>
+   </widget>
+   <widget class="QGroupBox" name="groupBoxMinMax">
+    <property name="enabled">
+     <bool>true</bool>
+    </property>
+    <property name="geometry">
+     <rect>
+      <x>20</x>
+      <y>525</y>
+      <width>120</width>
+      <height>101</height>
+     </rect>
+    </property>
+    <property name="title">
+     <string>Min/Max</string>
+    </property>
+    <property name="checkable">
+     <bool>true</bool>
+    </property>
+    <property name="checked">
+     <bool>false</bool>
+    </property>
+    <widget class="QRadioButton" name="radioButtonComplete">
+     <property name="enabled">
+      <bool>false</bool>
+     </property>
+     <property name="geometry">
+      <rect>
+       <x>20</x>
+       <y>25</y>
+       <width>82</width>
+       <height>17</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Vue complète</string>
+     </property>
+     <property name="checked">
+      <bool>true</bool>
+     </property>
+    </widget>
+    <widget class="QRadioButton" name="radioButtonCurrent">
+     <property name="enabled">
+      <bool>false</bool>
+     </property>
+     <property name="geometry">
+      <rect>
+       <x>20</x>
+       <y>50</y>
+       <width>91</width>
+       <height>17</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Vue courrante</string>
+     </property>
+    </widget>
+    <widget class="QPushButton" name="currentStatusButton">
+     <property name="enabled">
+      <bool>false</bool>
+     </property>
+     <property name="geometry">
+      <rect>
+       <x>20</x>
+       <y>70</y>
+       <width>75</width>
+       <height>23</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Conserver</string>
+     </property>
+    </widget>
    </widget>
   </widget>
   <widget class="QMenuBar" name="menubar">
