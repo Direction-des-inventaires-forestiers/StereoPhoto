@@ -289,7 +289,7 @@ class tableModel(QtCore.QAbstractTableModel):
 
 class colorWindow(QtWidgets.QMainWindow): 
     def __init__(self):
-        QtWidgets.QMainWindow.__init__(self)
+        super(colorWindow,self).__init__()
         self.ui = Ui_colorWindow()
         self.initSize = self.size()
         self.ui.setupUi(self)
@@ -297,7 +297,7 @@ class colorWindow(QtWidgets.QMainWindow):
     
     #Revoir cette méthode, semble inversé le state un fois lancé, jamais State maximized quand on le max seulement quand on réduit ---> à décalage!
     def resizeEvent(self, event) :
-        #print(self.windowState().__int__())
+        QtWidgets.QMainWindow.resizeEvent(self, event)
         if self.windowState() == QtCore.Qt.WindowMaximized:
             if event.size().width() > 1070 :
 

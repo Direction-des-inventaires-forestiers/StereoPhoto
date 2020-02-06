@@ -1,3 +1,19 @@
+'''
+L'entièreté du code a été réalisé par Frédérick Pineault (frederick.pineault@mffp.gouv.qc.ca)
+
+Ce dossier contient des classes qui permettent de faire le lien entre les pixels et des coordonnées géospatiales
+
+La classe pictureManager reçoit la taille d'une photo ainsi que le fichier PAR associé à cette photo
+Le fichier PAR contient des informations sur la caméra qui ont pris la photo. Ces informations sont 
+essentielles pour tranférer un pixel en coordonnée. 
+Prochainement, le modèle numérique de terrain pourrait être utilisé pour déterminer l'altitude moyenne du sol sur la photo
+
+La classe dualManager reçoit les informations des deux photos pour produire la zone de recouvrement des photos
+C'est avec ce résultat que les photos sont positionnées automatiquement
+Il est aussi possible de calculer le Z pour un point donné en utilisant l'information des deux photos
+
+'''
+
 from math import cos, sin, radians
 from PyQt5.QtCore import QRectF
 
@@ -16,7 +32,7 @@ class pictureManager():
         
     def initPAR(self):
 
-        f = open(self.pathPAR) # if case si le read foncitonne pas changer le encoding pour open(...,encoding = 'ANSI') probleme seulement dans QGIS
+        f = open(self.pathPAR) # if case si le read fonctionne pas changer le encoding pour open(...,encoding = 'ANSI') problème seulement dans QGIS
         s = f.read() 
         a = []
         for i in range(len(self.paramPAR)) : 
@@ -24,7 +40,6 @@ class pictureManager():
             v2 = s.find("\n", v1)
             w = s[v1:v2]
             a.append(w.split(" ")) 
-
 
         self.AffineA = float(a[0][1])
         self.AffineB = float(a[0][2])
@@ -50,8 +65,7 @@ class pictureManager():
         self.phi = radians(float(a[4][2]))
         self.kappa = radians(float(a[4][3])) 
         
-
-        
+        #Pixel central de la photo traduit en mm -> Utile pour les calculs 
         self.PPCx = self.AffineA * (self.sizePicture[0]/2) + self.AffineB * (self.sizePicture[1]/2) + self.AffineC 
         self.PPCy = self.AffineD * (self.sizePicture[0]/2) + self.AffineE * (self.sizePicture[1]/2) + self.AffineF 
 
@@ -133,7 +147,7 @@ class dualManager() :
 
     def getRect(self) :
 
-        X = (self.leftManager.X0 + self.rightManager.X0) / 2      
+        X = (self.leftManager.X0 + self.rightManager.X0) / 2
         Y = (self.leftManager.Y0 + self.rightManager.Y0) / 2
         pixL = self.leftManager.coordToPixel([X,Y], self.Z) 
         pixR = self.rightManager.coordToPixel([X,Y], self.Z)
@@ -141,8 +155,6 @@ class dualManager() :
         midR = [self.rightManager.sizePicture[0]/2 , self.rightManager.sizePicture[1]/2]
         rectL = QRectF(pixL[0] - midL[0], pixL[1] - midL[1], self.leftManager.sizePicture[0], self.leftManager.sizePicture[1])
         rectR = QRectF(-(pixR[0] - midR[0]), pixR[1] - midR[1], self.rightManager.sizePicture[0], self.rightManager.sizePicture[1]) 
-        print(rectL)
-        print(rectR)
         return rectL, rectR
 
 

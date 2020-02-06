@@ -3,5 +3,8 @@
     <file>Icons/loading.png</file>
     <file>Icons/greenCheck.png</file>
     <file>Icons/redCross.png</file>
+    <file>Icons/zoomIn.png</file>
+    <file>Icons/zoomOut.png</file>
+    <file>Icons/panOption.png</file>
   </qresource>
 </RCC>

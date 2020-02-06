@@ -95,7 +95,6 @@ class app(QApplication):
     #Elle peut relancer le thread à nouveau pour charger une image de plus grande qualité 
     def seekDone(self):
 
-
         if self.newRequest : 
             pointZero = self.colorWindow.ui.graphicsView.mapToScene(QPoint(0,0))
             GV = self.colorWindow.ui.graphicsView
@@ -167,6 +166,7 @@ class app(QApplication):
             self.enhancePicture(1)
     
     #Fonction qui permet de sélectionner le dossier à importer 
+    ###Ajouter un autre bouton pour l'importation de fichier vs dossier 
     def showDialog(self) : 
         path = os.path.dirname(os.path.abspath(__file__))
         fname = QFileDialog.getExistingDirectory(self.colorWindow, 'Ouvrir le dossier',path)

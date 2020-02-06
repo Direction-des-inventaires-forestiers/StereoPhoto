@@ -71,7 +71,7 @@ class graphicsWindow(QtWidgets.QMainWindow):
     def draw(self, event):
         p = QtGui.QPainter()
         p.begin(self.ui.widget)
-        pen = QtGui.QPen(QtGui.QColor(153, 20, 107),3, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin)
+        pen = QtGui.QPen(QtGui.QColor(0, 255, 255),3, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin)
         rect = self.myRect
         p.setPen(pen)
         p.setRenderHint(QtGui.QPainter.Antialiasing)
