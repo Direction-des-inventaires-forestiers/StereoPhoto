@@ -1,39 +1,96 @@
-import cv2, os
+"""import cv2, os
 import numpy as np
-import math, time
-from pynput import mouse
+
+
 from PIL import Image, ImageOps, ImageEnhance, ImageStat
 import gdal
-import libtiff
-#from PyQt5.QtWidgets import *
-#from PyQt5.QtCore import *
-#from PyQt5.QtGui import *
+import libtiff"""
+from PyQt5.QtWidgets import *
+from PyQt5.QtCore import *
+from PyQt5.QtGui import *
+from pynput import mouse
+import math, time, threading
 
 #print(pen.)
 
+#Image.MAX_IMAGE_PIXELS = 1000000000 
 
-Image.MAX_IMAGE_PIXELS = 1000000000 
+#image = Image.open("//ulysse/LIDAR/Developpement/Programmation/FP/Stereoscopie/Rehaussements_SUMMIT/q19596_019_rgb.tif")
+#t = image._TiffImageFile__frame
+#image.seek(3)
+#z = image._TiffImageFile__frame
+
+#QgsProject.instance().fileName()
+#a = QgsVectorLayer()
+#a.startEditing()
+#p1 = p2 = QgsPointXY(float, float)
+#line = [p1, p2, ...]
+#les points ne peuvent pas se croiser
+#a.splitFeatures(line)
+
+#line = [QgsPointXY(-0.29724165594392782 0.23624634305703263), QgsPointXY(0.03001826676176712 0.41875668456597787), QgsPointXY(-0.00209026952537686 -0.22570278064427082), QgsPointXY(-0.29724165594392782 0.23624634305703263)]
+#repeter le dernier point non nécessaire
+#newG = QgsGeometry.fromMultiPolygonXY([[line]])
+#a.getGeometry(i),asMultiPolygon()[0][0][#QgsPointXY][x/y], isNull()
+#a.changeGeometry(i, newQgsGeometry)
+#iface.mapCanvas().refresh()
+
+#Ajouter un polygon à une couche deja existante
+#feat = QgsFeature()
+#feat.setGeometry(newG)
+#QgsVectorLayer.dataProvider().addFeatures([feat])
+
+#Ajouter un polygon sur une nouvelle vectorLayer
+#from osgeo import ogr, osr
+#shapeName = "U:/StereoPhoto/polyLayer.shp"
+#outDriver = ogr.GetDriverByName("ESRI Shapefile")
+#outDataSource = outDriver.CreateDataSource(shapeName)
+#shapeCRS = osr.SpatialReference()
+#shapeCRS.ImportFromEPSG(epsg) epsg --> MTM 10 par exemple mais le code en chiffre
+#outLayer = outDataSource.CreateLayer("polyLayer",shapeCRS , geom_type = ogr.wkbPolygon)
+#iface.addVectorLayer(shapeName, polyLayer, "ogr")
+#feat = QgsFeature()
+#feat.setGeometry(newG)
+#QgsVectorLayer.dataProvider().addFeatures([feat])
+
+#Merge 2 polygon
+#currentG1 = QgsVectorLayer.getGeometry(i) -> QgsGeometry
+#currentG2 = QgsVectorLayer.getGeometry(j) -> QgsGeometry
+#newG = currentG1.combine(currentG2)
+#QgsVectorLayer.deleteFeature(i)
+#QgsVectorLayer.changeGeometry(j, newG)
+
+#Trouver si le point est dans la forme
+#QgsGeometry.contains(QgsPointXY(x,y))
+
+#Trouver les points d'intersection 
+#QgsGeometry.intersection(QgsGeometry) -> le dernier point est comme le premier
+#QgsGeometry.intersects(QgsGeometry)
+
+#Pour le cas ou l'on ne veut pas merge les polygons mais plutôt les séparer
+#Le résultat peut être plusieur polygone, voir si on les sépares en 2 entités
+# geo =  newDrawPolygon.difference(alreadyDrawPoly) -> QgsGeometry pour les 2 cas
 
 
+#symDifference et makeDifference sont des inverses (pas pertinant je crois mais garder en tête)
 
-image = Image.open("//ulysse/LIDAR/Developpement/Programmation/FP/Stereoscopie/Rehaussements_SUMMIT/q19596_019_rgb.tif")
-t = image._TiffImageFile__frame
-image.seek(3)
-z = image._TiffImageFile__frame
+#fields = QgsFields()
+#feet = QgsFeature()
+#r =QgsVectorFileWriter(shapeName, "System", fields, QgsWkbTypes.MultiPolygon, QgsCoordinateReferenceSystem(4326), "ESRI Shapefile")
+#r.addFeature(feet)
 
-
-a = Image.open("//ulysse/LIDAR/Developpement/Programmation/FP/Stereoscopie/Rehaussements_SUMMIT/Saturation/2019-11-22_000484.png")
-sa = a.load()
-psa1 = sa[950,200]
-psa2 = sa[800,200]
+#a = Image.open("//ulysse/LIDAR/Developpement/Programmation/FP/Stereoscopie/Rehaussements_SUMMIT/Saturation/2019-11-22_000484.png")
+#sa = a.load()
+#psa1 = sa[950,200]
+#psa2 = sa[800,200]
 #psa3 = sa[600,500]
 #psa4 = sa[1429,662]
 #psa5 = sa[1429,664]
 
-c = Image.open("//ulysse/LIDAR/Developpement/Programmation/FP/Stereoscopie/Rehaussements_SUMMIT/Saturation/2019-11-22_000486.png")
-sc = c.load()
-psc1 = sc[950,200]
-psc2 = sc[800,200]
+#c = Image.open("//ulysse/LIDAR/Developpement/Programmation/FP/Stereoscopie/Rehaussements_SUMMIT/Saturation/2019-11-22_000486.png")
+#sc = c.load()
+#psc1 = sc[950,200]
+#psc2 = sc[800,200]
 
 """
 psc1 = sc[1429,679]
@@ -43,10 +100,10 @@ psc4 = sc[1429,662]
 psc5 = sc[1429,665]
 psc6 = sc[1429,666]"""
 
-b = Image.open("//ulysse/LIDAR/Developpement/Programmation/FP/Stereoscopie/Rehaussements_SUMMIT/AutoLocalizedHistogram/Original.png")
-sb = b.load()
-psb1 = sb[950,200]
-psb2 = sb[800,200]
+#b = Image.open("//ulysse/LIDAR/Developpement/Programmation/FP/Stereoscopie/Rehaussements_SUMMIT/AutoLocalizedHistogram/Original.png")
+#sb = b.load()
+#psb1 = sb[950,200]
+#psb2 = sb[800,200]
 """
 psb1 = sb[1429,679]
 psb2 = sb[1429,680]
@@ -105,7 +162,7 @@ psg6 = sg[1429,666]"""
         #b[i] = str(u)
         #u += 1
         #print("t")
-print(b)
+
 #a = Image.open("c.tif")
 #b = Image.open("//ulysse/LIDAR/Developpement/Programmation/FP/Stereoscopie/Photos_stereo/Serie_3/008_0913_0370_NIR.tif")
 
@@ -132,6 +189,26 @@ print(b)
 #fileout.GetRasterBand(1).WriteArray(d)
 #fileout.FlushCache()
 #fileout = None
+
+def line_intersection(line1, line2):
+    xdiff = (line1[0][0] - line1[1][0], line2[0][0] - line2[1][0])
+    ydiff = (line1[0][1] - line1[1][1], line2[0][1] - line2[1][1])
+
+    def det(a, b):
+        return a[0] * b[1] - a[1] * b[0]
+
+    div = det(xdiff, ydiff)
+    if div == 0:
+       return False
+
+    d = (det(*line1), det(*line2))
+    x = det(d, xdiff) / div
+    y = det(d, ydiff) / div
+    return x, y
+
+line1 = ((1,1),(-1,-1))
+line2 = ((1,-1),(-1,-1))
+print(line_intersection(line1, line2))
 
 
 
@@ -160,20 +237,41 @@ def on_scroll(x, y, dx, dy):
     print('Scrolled {0} at {1}'.format(
         'down' if dy < 0 else 'up',
         (x, y)))
-
+"""
 # Collect events until released
-#with mouse.Listener(
-#        on_move=on_move,
-#        on_click=on_click,
-#        on_scroll=on_scroll) as listener:
-#    listener.join()
+with mouse.Listener(
+        on_move=on_move,
+        #on_click=on_click,
+        on_scroll=on_scroll) as listener:
+    listener.join()"""
+
+
+pill2kill = threading.Event()
+
+def doit(stop_event, arg):
+    while not stop_event.wait(1):
+        print ("working on %s" % arg)
+    print("Stopping as you wish.")
+
+listener = mouse.Listener(
+    on_move=on_move,
+    on_click=on_click,
+    on_scroll=on_scroll)
+listener.start()
+
+time.sleep(2)
+listener.stop()
+m = mouse.Controller() #Plutot que prendre le controlleur seulement bouger avec ctypes et relancer le listerner ?
+m.move(200,200)
+
+listener = mouse.Listener(
+    on_move=on_move,
+    on_click=on_click,
+    on_scroll=on_scroll)
+listener.start()
 
 # ...or, in a non-blocking fashion:
-#listener = mouse.Listener(
-#    on_move=on_move,
-#    on_click=on_click,
-#    on_scroll=on_scroll)
-#listener.start() 
+ 
 
 #s = time.time()
 #path = "//ulysse/LIDAR/Developpement/Programmation/FP/Stereoscopie/Photos_stereo/Paire_1/Q18066_484_RGB.tif"

@@ -6,8 +6,8 @@
 #
 # WARNING! All changes made in this file will be lost!
 
-from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtCore import Qt
+from qgis.PyQt import QtCore, QtGui, QtWidgets
+from qgis.PyQt.QtCore import Qt
 
 
 class Ui_graphicsWindow(object):
@@ -60,14 +60,11 @@ class graphicsWindow(QtWidgets.QMainWindow):
     def keyReleaseEvent(self, event):
         self.ctrlClick = False
 
-    
     def cursorRectInit(self, x, y):
         r = self.rayon
         self.myRect = QtCore.QRect(int(x/2) - r, int(y/2) - r, 2*r, 2*r)
         self.ui.widget.update()
 
-
-    
     def draw(self, event):
         p = QtGui.QPainter()
         p.begin(self.ui.widget)
@@ -77,5 +74,3 @@ class graphicsWindow(QtWidgets.QMainWindow):
         p.setRenderHint(QtGui.QPainter.Antialiasing)
         p.drawEllipse(rect)
         p.end()
-
-

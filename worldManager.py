@@ -15,7 +15,7 @@ Il est aussi possible de calculer le Z pour un point donné en utilisant l'infor
 '''
 
 from math import cos, sin, radians
-from PyQt5.QtCore import QRectF
+from qgis.PyQt.QtCore import QRectF
 
 
 class pictureManager(): 

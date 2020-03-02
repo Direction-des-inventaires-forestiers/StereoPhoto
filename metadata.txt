@@ -1,0 +1,11 @@
+; the next section is mandatory
+[general]
+name=StereoPhoto
+email=Frederick.Pineault@mffp.gouv.qc.ca
+author=Frédérick Pineault
+qgisMinimumVersion=3.4
+description=Do 3D
+about=Use two pictures to recreate a 3D effect with the right computer setup
+version=version 0.1
+repository=https://github.com/frpin33
+; end of mandatory metadata

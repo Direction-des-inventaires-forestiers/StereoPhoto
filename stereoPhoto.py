@@ -14,98 +14,152 @@ L'application permet de :
     - Offrir une option de Pan (via PushButton + Click souris) et de Zoom (via touche CTRL + Roulette) qui s'exécute simultanément sur les 2 photos
     - Offrir un déplacement opposé des deux images pour ajuster la stéréoscopie (pushButton offset + click souris et Roulette)
     - Rehausser les couleurs des images via une nouvelle fenêtre intéractive 
+    - Traçage de forme géolocalisée
+    - Communication avec QGIS
 
 Le main permet tout simplement de lancer l'application
 
 Plusieurs autres outils seront intégrés à cette application dans le futur :
-    - Traçage de forme géolocalisée
+    - Tracer les formes sur l'image de droite
+    - Fonctionnalité de trace supplémentaire
+    - Amélioration des fonctions de photogrammétrie 
     - Menu de choix de paramètres (numéro des écrans, curseur, keybinding, couleur des traces)
     - Affichage des zones supersposées seulement
-    - Communication avec QGIS
     - Déplacement pour simple avec la souris (pas de drag avec la souris)
     - Gestion de projet 
     et bien d'autre
 
 '''
+from qgis.gui import *
+from qgis.core import *
+from qgis.PyQt.QtWidgets import *
+from qgis.PyQt.QtCore import *
+from qgis.PyQt.QtGui import *
+
+#from PyQt5.QtWidgets import *
+#from PyQt5.QtCore import *
+#from PyQt5.QtGui import *
+
 from PIL import Image, ImageDraw
 import numpy as np
-from PyQt5.QtWidgets import *
-from PyQt5.QtCore import *
-from PyQt5.QtGui import *
-from ui_optionWindow import optionWindow
-from ui_graphicsWindow import graphicsWindow 
-from worldManager import pictureManager, dualManager
-from enhanceManager import enhanceManager, threadShow, imageEnhancing, pictureLayout
+from . import resources
+
+from .ui_optionWindow import optionWindow
+from .ui_graphicsWindow import graphicsWindow 
+from .worldManager import pictureManager, dualManager
+from .enhanceManager import enhanceManager, threadShow, imageEnhancing, pictureLayout
+from .drawFunction import *
 import sys, os, time, math, qimage2ndarray
 
 #Permet l'ouverture avec PIL de fichier énorme!
 Image.MAX_IMAGE_PIXELS = 1000000000 
 
-class stereoPhoto(QApplication):
+class stereoPhoto(object):
 
+    #Fonction d'initilisation 
+    def __init__(self, iface):
+        self.iface = iface
+        self.canvas = self.iface.mapCanvas()
+
+    #Place le bouton de l'application dans QGIS
+    def initGui(self):
+        urlPicture = ":/Anaglyph/Icons/icon.png"
+        self.action = QAction(QIcon(urlPicture), "StereoPhoto", self.iface.mainWindow())
+        
+        self.action.setCheckable(True)
+        self.action.toggled.connect(self.run)
+         
+        self.iface.addToolBarIcon(self.action)
+        self.iface.addPluginToMenu("&StereoPhoto", self.action)
+
+    #Retire le bout de l'application dans QGIS
+    def unload(self):
+        self.iface.removePluginMenu("&StereoPhoto", self.action)
+        self.iface.removeToolBarIcon(self.action)
+        
     #Initialisation de l'application, des variables
     #Connection entre les boutons du menu d'options (mOpt) et leur fonction attitrée
     #On fait apparaître le menu des options seul
     #Les écrans où l'on veut que les fênetres s'ouvrent sont choisi ici 
-    def __init__(self, argv):
-        QApplication.__init__(self,argv)
+    def run(self):
+    
+        if self.action.isChecked() :
+            self.intRightScreen = 0
+            self.intLeftScreen = 1
 
-        self.intRightScreen = 2
-        self.intLeftScreen = 3
+            self.screenRight = QApplication.desktop().screenGeometry(self.intRightScreen)
+            self.screenLeft = QApplication.desktop().screenGeometry(self.intLeftScreen)
 
-        self.screenRight = QApplication.desktop().screenGeometry(self.intRightScreen)
-        self.screenLeft = QApplication.desktop().screenGeometry(self.intLeftScreen)
-
-        self.leftOrientation = 0
-        self.rightOrientation = 0
-        self.leftMiroir = 0
-        self.rightMiroir = 0
+            self.leftOrientation = 0
+            self.rightOrientation = 0
+            self.leftMiroir = 0
+            self.rightMiroir = 0
 
 
-        self.leftName = False 
-        self.rightName = False 
-        self.anaglyphActivate = False 
+            self.leftName = False 
+            self.rightName = False 
+            self.anaglyphActivate = False 
 
-        self.showThreadLeftInProcess = False
-        self.newLeftRequest = False
-        self.showThreadRightInProcess = False
-        self.newRightRequest = False
+            self.showThreadLeftInProcess = False
+            self.newLeftRequest = False
+            self.showThreadRightInProcess = False
+            self.newRightRequest = False
+            self.enableDraw = False
 
-        self.Z = 292
+            #MTM 1 à 17 prendre de 32181 à 32197 
+            #MTM 10 32190
+            #MTM 9  32189   
+            self.crs = 32190
+            self.Z = 300
 
-        self.listParam = [0, 0, 0, 0, 0, 0, 0, False, False, []]
+            self.polygonOnScreen = []
 
-        self.optWindow = optionWindow()
+            self.listParam = [0, 0, 0, 0, 0, 0, 0, False, False, []]
 
-        self.optWindow.ui.boxMiroirLeft.currentIndexChanged.connect(self.mMiroirLeft)
-        self.optWindow.ui.boxMiroirRight.currentIndexChanged.connect(self.mMiroirRight)
-        self.optWindow.ui.boxOrientationLeft.currentIndexChanged.connect(self.mOrientationLeft)
-        self.optWindow.ui.boxOrientationRight.currentIndexChanged.connect(self.mOrientationRight)
-        self.optWindow.ui.importLineLeft.textChanged.connect(self.mNewLeftPic)
-        self.optWindow.ui.importLineRight.textChanged.connect(self.mNewRightPic)
-        self.optWindow.ui.importButtonLeft.clicked.connect(self.mImportLeft)
-        self.optWindow.ui.importButtonRight.clicked.connect(self.mImportRight)
+            self.optWindow = optionWindow()
+
+            self.optWindow.ui.boxMiroirLeft.currentIndexChanged.connect(self.mMiroirLeft)
+            self.optWindow.ui.boxMiroirRight.currentIndexChanged.connect(self.mMiroirRight)
+            self.optWindow.ui.boxOrientationLeft.currentIndexChanged.connect(self.mOrientationLeft)
+            self.optWindow.ui.boxOrientationRight.currentIndexChanged.connect(self.mOrientationRight)
+            self.optWindow.ui.importLineLeft.textChanged.connect(self.mNewLeftPic)
+            self.optWindow.ui.importLineRight.textChanged.connect(self.mNewRightPic)
+            self.optWindow.ui.importLineVectorLayer.textChanged.connect(self.mNewVectorLayer)
+            self.optWindow.ui.importButtonLeft.clicked.connect(self.mImportLeft)
+            self.optWindow.ui.importButtonRight.clicked.connect(self.mImportRight)
+            
+            self.optWindow.ui.panButton.clicked.connect(self.panClick)
+            self.optWindow.ui.offsetButton.clicked.connect(self.offsetClick)
+            self.optWindow.ui.drawButton.clicked.connect(self.drawClick)
+            self.optWindow.ui.enhanceButton.clicked.connect(self.enhanceClick)
+            self.optWindow.ui.cutButton.clicked.connect(self.cutClick)
+
+            self.optWindow.ui.affichageButton.clicked.connect(self.loadWindows)
+            self.optWindow.closeWindow.connect(self.optWindowClose)
+
+            self.optWindow.show()
         
-        
-        self.optWindow.ui.panButton.clicked.connect(self.panClick)
-        self.optWindow.ui.offsetButton.clicked.connect(self.offsetClick)
-        self.optWindow.ui.enhanceButton.clicked.connect(self.enhanceClick)
-
-        self.optWindow.ui.affichageButton.clicked.connect(self.loadWindows)
-        self.optWindow.closeWindow.connect(self.optWindowClose)
-
-        self.optWindow.show()
+        else:
+            self.optWindowClose()
 
 
     #Fonction appelée lors de la fermeture du mOpt
     #Si l'on ferme le mOpt toutes les autres fenêtres Qt se ferment
     def optWindowClose(self):
+        scene = QGraphicsScene()
         if hasattr(self, "graphWindowLeft"):
+            self.graphWindowLeft.ui.graphicsView.setScene(scene)
             self.graphWindowLeft.close()
+            del self.graphWindowLeft
         if hasattr(self, "graphWindowRight"):
+            self.graphWindowRight.ui.graphicsView.setScene(scene)
             self.graphWindowRight.close()
+            del self.graphWindowRight
         if hasattr(self, "enhanceManager"):
+            self.enhanceManager.colorWindow.ui.graphicsView.setScene(scene)
             self.enhanceManager.colorWindow.close()
+            del self.enhanceManager 
+        self.optWindow.close()
         
     #Fonction de traitement d'image pour modifier l'orientation
     #Les angles de rotation possible sont 0, 90, 180 et 270
@@ -278,6 +332,19 @@ class stereoPhoto(QApplication):
         pathPAR = self.optWindow.ui.importLineRight.text().split(".")[0] + ".par"
         self.rightPictureManager = pictureManager(self.rightPic.size, pathPAR, "aa")
 
+    #Fonction qui créer une nouvelle couche de type VectorLayer dans QGIS 
+    #La couche permet d'afficher les polygones tracés sur l'image dans QGIS
+    def mNewVectorLayer(self):
+        shapeName = self.optWindow.ui.importLineVectorLayer.text()
+        
+        if self.optWindow.ui.affichageButton.isEnabled() :
+            self.optWindow.ui.drawButton.setEnabled(True)
+            self.optWindow.ui.cutButton.setEnabled(True)
+    
+        self.enableDraw = True
+
+        self.vectorLayer = createShape(shapeName, self.crs)
+        QgsProject.instance().setCrs(self.vectorLayer.crs())
 
     #Fonction qui lance l'affichage des deux fenêtres sur les écrans Planar (choix dans l'init)
     #Création du dualManager qui utilise les pictures managers pour positionner les photos selon les régions superposées
@@ -310,7 +377,9 @@ class stereoPhoto(QApplication):
     def enableOptionImage(self, action):
         self.optWindow.ui.panButton.setEnabled(action)
         self.optWindow.ui.offsetButton.setEnabled(action)
-        self.optWindow.ui.enhanceButton.setEnabled(action)
+        if self.enableDraw : 
+            self.optWindow.ui.drawButton.setEnabled(action)
+            self.optWindow.ui.cutButton.setEnabled(action)
 
     #Fonction pour zoom In sur les deux photos simultannément
     def mZoomIn(self) :
@@ -374,6 +443,7 @@ class stereoPhoto(QApplication):
         self.leftName = True 
         if self.rightName :
             self.optWindow.ui.affichageButton.setEnabled(True)
+            self.optWindow.ui.enhanceButton.setEnabled(True)
 
     #IDEM à mImportLeft
     def mImportRight(self):
@@ -423,6 +493,7 @@ class stereoPhoto(QApplication):
         self.rightName = True 
         if self.leftName :
             self.optWindow.ui.affichageButton.setEnabled(True)
+            self.optWindow.ui.enhanceButton.setEnabled(True)
 
 
     #Utiliser par threadShow pour afficher une portion de l'image
@@ -494,13 +565,43 @@ class stereoPhoto(QApplication):
             self.showThreadRightInProcess = False
        
     
-    #Désactive le offset pour activer le pan     
+    #Désactive le offset, le cut et le draw pour activer le pan     
     def panClick(self):
         self.optWindow.ui.offsetButton.setChecked(False)
+        self.optWindow.ui.drawButton.setChecked(False)
+        self.optWindow.ui.cutButton.setChecked(False)
+        self.graphWindowLeft.ui.widget.setMouseTracking(False)
 
-    #Désactive le pan pour activer le offset
+    #Désactive le pan, le cut et le draw pour activer le offset
     def offsetClick(self):
         self.optWindow.ui.panButton.setChecked(False)
+        self.optWindow.ui.drawButton.setChecked(False)
+        self.optWindow.ui.cutButton.setChecked(False)
+        self.graphWindowLeft.ui.widget.setMouseTracking(False)
+
+    #Désactive le offset, le cut et le pan pour activer le draw
+    def drawClick(self):
+        self.optWindow.ui.panButton.setChecked(False)
+        self.optWindow.ui.offsetButton.setChecked(False)
+        self.optWindow.ui.cutButton.setChecked(False)
+        self.graphWindowLeft.ui.widget.setMouseTracking(True)
+
+        self.listDrawCoord = []
+        self.listLineObj = []
+        self.firstDrawClick = True
+        self.currentLineObj = None
+
+    #Désactive le offset, le pan et le draw pour activer le cut
+    def cutClick(self):
+        self.optWindow.ui.panButton.setChecked(False)
+        self.optWindow.ui.offsetButton.setChecked(False)
+        self.optWindow.ui.drawButton.setChecked(False)
+        self.graphWindowLeft.ui.widget.setMouseTracking(True)
+
+        self.listDrawCoord = []
+        self.listLineObj = []
+        self.firstDrawClick = True
+        self.currentLineObj = None
     
     #Ouverture de la fenêtre de rehaussement
     def enhanceClick(self):
@@ -516,9 +617,9 @@ class stereoPhoto(QApplication):
         self.mImportLeft()
         self.mImportRight()
 
-    #Fonction qui réalise le pan et le offset selon le bouton sélectionné 
+    #Fonction qui réalise le pan et le offset selon le bouton sélectionné
+    #Elle permet aussi de tracer une ligne pour prévisualiser la trace à venir 
     def mMoveEvent(self, ev):
-        
         if self.optWindow.ui.panButton.isChecked() :
             leftView = self.graphWindowLeft.ui.graphicsView
             rightView = self.graphWindowRight.ui.graphicsView
@@ -539,10 +640,92 @@ class stereoPhoto(QApplication):
             rightView.verticalScrollBar().setValue(rightView.verticalScrollBar().value() + delta.y())
             self.panPosition = ev.pos()
 
-    #Fonction réalisé lors du click sur l'image, elle prend la première position de la souris
+        elif (self.optWindow.ui.drawButton.isChecked() or self.optWindow.ui.cutButton.isChecked()) and not self.firstDrawClick :
+
+            self.endDrawPoint = self.graphWindowLeft.ui.graphicsView.mapToScene(ev.pos())
+            m_line = QLineF(self.startDrawPoint, self.endDrawPoint)
+            m_pen = QPen(QColor(0, 255, 255),10, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin)
+
+            if self.currentLineObj:
+                self.graphWindowLeft.ui.graphicsView.scene().removeItem(self.currentLineObj)
+                
+            self.currentLineObj = self.graphWindowLeft.ui.graphicsView.scene().addLine(m_line, m_pen)
+
+    #Fonction réalisé lors du click sur l'image
+    #En mode Pan et Offset, elle prend la première position de la souris
+    #En mode Draw/Cut Polygon, elle trace les lignes et les polygones sur l'image
+    #Il y a une communication avec QGIS pour afficher les polygones dans le logiciel
+    #Lorsque les polygones se croisent, les polygones peuvent merger ou se séparer automatiquement
+    #Il est aussi possible de découper les polygones
     def mPressEvent(self, ev):
         if self.optWindow.ui.panButton.isChecked() or self.optWindow.ui.offsetButton.isChecked() :
             self.panPosition = ev.pos()
+
+        elif self.optWindow.ui.drawButton.isChecked() or self.optWindow.ui.cutButton.isChecked():
+
+            if ev.button() == Qt.LeftButton:
+                if self.firstDrawClick :
+                    self.startDrawPoint = self.graphWindowLeft.ui.graphicsView.mapToScene(ev.pos())
+                    self.firstDrawClick = False
+                else : 
+                    self.startDrawPoint = self.endDrawPoint
+                    self.listLineObj.append(self.currentLineObj)
+                    self.currentLineObj = None
+                
+                X, Y = self.leftPictureManager.pixelToCoord((self.startDrawPoint.x() , self.startDrawPoint.y()), self.Z)
+                self.listDrawCoord.append(QgsPointXY(X,Y))
+
+            elif ev.button() == Qt.RightButton:
+
+                self.firstDrawClick = True
+                if self.currentLineObj :
+                    self.graphWindowLeft.ui.graphicsView.scene().removeItem(self.currentLineObj)
+                    self.currentLineObj = None
+                
+                for item in self.listLineObj:
+                    self.graphWindowLeft.ui.graphicsView.scene().removeItem(item)
+                self.listLineObj = []
+                
+                if self.optWindow.ui.drawButton.isChecked():
+                    newGeo = QgsGeometry.fromMultiPolygonXY([[self.listDrawCoord]])
+                    currentVectorLayer = self.vectorLayer
+                    #Gestion des plusieurs intersections à faire
+                    for i in range(currentVectorLayer.featureCount()):
+                        featureGeo = currentVectorLayer.getGeometry(i)
+                        if newGeo.intersects(featureGeo) :
+                            if self.optWindow.ui.radioButtonMerge.isChecked() :
+                                mergePolygon(featureGeo, i, newGeo, currentVectorLayer)
+                            else :
+                                automaticPolygon(featureGeo, i, newGeo, currentVectorLayer)
+                            break
+                            
+                    else :
+                        addPolygon(currentVectorLayer, newGeo)
+                else :
+                    currentVectorLayer = self.vectorLayer    
+                    cutPolygon(currentVectorLayer, self.listDrawCoord)
+                
+                self.listDrawCoord = []
+                
+                for item in self.polygonOnScreen :
+                    self.graphWindowLeft.ui.graphicsView.scene().removeItem(item)
+                
+                for i in range(currentVectorLayer.featureCount()):
+                    
+                    featureGeo = currentVectorLayer.getGeometry(i)
+                    
+                    if featureGeo.isNull() == False :
+
+                        listQgsPoint = featureGeo.asMultiPolygon()[0][0]
+                        polygon = QPolygonF()
+                        for item in listQgsPoint :
+                            xPixel, yPixel = self.leftPictureManager.coordToPixel((item.x() , item.y()), self.Z)     
+                            polygon.append(QPointF(xPixel, yPixel))
+
+                        m_pen = QPen(QColor(0, 255, 255),10, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin)
+                        obj = self.graphWindowLeft.ui.graphicsView.scene().addPolygon(polygon, m_pen)
+                        self.polygonOnScreen.append(obj)
+
 
     #Fonction pour zoom In/Out sur les photos avec la souris, elle zoom dans la 
     #direction de la souris 

@@ -6,8 +6,8 @@
 #
 # WARNING! All changes made in this file will be lost!
 
-from PyQt5 import QtCore, QtGui, QtWidgets
-import resources
+from qgis.PyQt import QtCore, QtGui, QtWidgets
+from . import resources
 
 
 class Ui_enhanceWindow(object):
@@ -147,11 +147,11 @@ class Ui_enhanceWindow(object):
         self.groupBoxPicture.setTitle("")
         self.groupBoxPicture.setObjectName("groupBoxPicture")
         self.radioButtonPremiere = QtWidgets.QRadioButton(self.groupBoxPicture)
-        self.radioButtonPremiere.setGeometry(QtCore.QRect(10, 10, 82, 17))
+        self.radioButtonPremiere.setGeometry(QtCore.QRect(10, 20, 82, 17))
         self.radioButtonPremiere.setChecked(True)
         self.radioButtonPremiere.setObjectName("radioButtonPremiere")
         self.radioButtonDeuxieme = QtWidgets.QRadioButton(self.groupBoxPicture)
-        self.radioButtonDeuxieme.setGeometry(QtCore.QRect(10, 30, 82, 17))
+        self.radioButtonDeuxieme.setGeometry(QtCore.QRect(10, 40, 82, 17))
         self.radioButtonDeuxieme.setObjectName("radioButtonDeuxieme")
         enhanceWindow.setCentralWidget(self.centralwidget)
         self.menubar = QtWidgets.QMenuBar(enhanceWindow)

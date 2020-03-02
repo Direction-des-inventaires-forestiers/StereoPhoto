@@ -29,11 +29,19 @@ Optimisation futur
 '''
 from PIL import Image, ImageDraw, ImageEnhance
 import numpy as np
-from PyQt5.QtWidgets import *
-from PyQt5.QtCore import *
-from PyQt5.QtGui import *
-from ui_enhancement import enhanceWindow
-import sys, os, time, gdal, qimage2ndarray, threading
+
+from qgis.gui import *
+from qgis.core import *
+from qgis.PyQt.QtWidgets import *
+from qgis.PyQt.QtCore import *
+from qgis.PyQt.QtGui import *
+
+#from PyQt5.QtWidgets import *
+#from PyQt5.QtCore import *
+#from PyQt5.QtGui import *
+
+from .ui_enhancement import enhanceWindow
+import sys, os, time, qimage2ndarray, threading
 from math import ceil
 
 Image.MAX_IMAGE_PIXELS = 1000000000 
@@ -261,6 +269,8 @@ class enhanceManager(QObject):
 
     #Ferme la fenêtre sans conserver les paramètres modifiés
     def cancelEnhance(self):
+        scene = QGraphicsScene()
+        self.colorWindow.ui.graphicsView.setScene(scene)
         self.colorWindow.close()
 
     #Permet de changer la photo selon les 2 déjà importées
@@ -361,6 +371,8 @@ class enhanceManager(QObject):
             self.currentPixVal = pix
 
         #Cas activation avec les options de rehaussement (spinBox)
+        #Avec un certain recule je ne suis pas certain que cette option soit pertinante puisqu'on pert l'histogramme qu'on souhaite conserver
+        #Aucune influence sans déplacement, y a-t-il une raison pour avoir cette fonctionnalité? À réfléchir
         elif cv and self.statusKeepCurrentView and type(changePixVal) is int:
             pointZero = self.colorWindow.ui.graphicsView.mapToScene(QPoint(0,0))
             GV = self.colorWindow.ui.graphicsView
