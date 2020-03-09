@@ -11,8 +11,8 @@ L'application permet de :
     - Réaliser un effet miroir sur l'horizontal et la verticale
     - Afficher les deux images importées sur les écrans Planar
     - Superposer automatiquement les images en fonction de leur fichier PAR associé
-    - Offrir une option de Pan (via PushButton + Click souris) et de Zoom (via touche CTRL + Roulette) qui s'exécute simultanément sur les 2 photos
-    - Offrir un déplacement opposé des deux images pour ajuster la stéréoscopie (pushButton offset + click souris et Roulette)
+    - Offrir une interface de navigation qui permet le déplacement, le zoom (CTRL+Roulette) et le traçage (Click & 1,2,3,ESC) 
+    - Offrir un déplacement opposé des deux images pour ajuster la stéréoscopie (Roulette)
     - Rehausser les couleurs des images via une nouvelle fenêtre intéractive 
     - Traçage de forme géolocalisée
     - Communication avec QGIS
@@ -20,13 +20,12 @@ L'application permet de :
 Le main permet tout simplement de lancer l'application
 
 Plusieurs autres outils seront intégrés à cette application dans le futur :
-    - Tracer les formes sur l'image de droite
     - Fonctionnalité de trace supplémentaire
     - Amélioration des fonctions de photogrammétrie 
     - Menu de choix de paramètres (numéro des écrans, curseur, keybinding, couleur des traces)
     - Affichage des zones supersposées seulement
-    - Déplacement pour simple avec la souris (pas de drag avec la souris)
-    - Gestion de projet 
+    - Gestion de projet
+    - Utiliser un shapefile déjà importé dans QGIS et afficher la région concernée  
     et bien d'autre
 
 '''
@@ -49,7 +48,7 @@ from .ui_graphicsWindow import graphicsWindow
 from .worldManager import pictureManager, dualManager
 from .enhanceManager import enhanceManager, threadShow, imageEnhancing, pictureLayout
 from .drawFunction import *
-import sys, os, time, math, qimage2ndarray
+import sys, os, time, math, qimage2ndarray, win32api
 
 #Permet l'ouverture avec PIL de fichier énorme!
 Image.MAX_IMAGE_PIXELS = 1000000000 
@@ -82,13 +81,16 @@ class stereoPhoto(object):
     #On fait apparaître le menu des options seul
     #Les écrans où l'on veut que les fênetres s'ouvrent sont choisi ici 
     def run(self):
-    
+
         if self.action.isChecked() :
-            self.intRightScreen = 0
-            self.intLeftScreen = 1
+            self.intRightScreen = 2
+            self.intLeftScreen = 3
 
             self.screenRight = QApplication.desktop().screenGeometry(self.intRightScreen)
             self.screenLeft = QApplication.desktop().screenGeometry(self.intLeftScreen)
+
+            self.panCenter = (int(self.screenLeft.width()/2), int(self.screenLeft.height()/2))
+            self.leftScreenCenter = ( self.screenLeft.x() + int(self.screenLeft.width()/2), self.screenLeft.y() + int(self.screenLeft.height()/2))
 
             self.leftOrientation = 0
             self.rightOrientation = 0
@@ -112,7 +114,8 @@ class stereoPhoto(object):
             self.crs = 32190
             self.Z = 300
 
-            self.polygonOnScreen = []
+            self.polygonOnLeftScreen = []
+            self.polygonOnRightScreen = []
 
             self.listParam = [0, 0, 0, 0, 0, 0, 0, False, False, []]
 
@@ -129,10 +132,8 @@ class stereoPhoto(object):
             self.optWindow.ui.importButtonRight.clicked.connect(self.mImportRight)
             
             self.optWindow.ui.panButton.clicked.connect(self.panClick)
-            self.optWindow.ui.offsetButton.clicked.connect(self.offsetClick)
-            self.optWindow.ui.drawButton.clicked.connect(self.drawClick)
             self.optWindow.ui.enhanceButton.clicked.connect(self.enhanceClick)
-            self.optWindow.ui.cutButton.clicked.connect(self.cutClick)
+            self.optWindow.keyDrawEvent.connect(self.keyboardHandler)
 
             self.optWindow.ui.affichageButton.clicked.connect(self.loadWindows)
             self.optWindow.closeWindow.connect(self.optWindowClose)
@@ -215,7 +216,6 @@ class stereoPhoto(object):
         self.optWindow.ui.boxMiroirLeft.setCurrentIndex(0)
           
         self.leftName = False
-        self.enableOptionImage(False)
         self.optWindow.ui.affichageButton.setEnabled(False)
 
         try :
@@ -227,7 +227,7 @@ class stereoPhoto(object):
         self.leftPic = Image.open(self.optWindow.ui.importLineLeft.text())
         self.demoLeftPic = Image.open(self.optWindow.ui.importLineLeft.text())
 
-        if hasattr(self.demoLeftPic, "n_frames"): #and format == tif??
+        if hasattr(self.demoLeftPic, "n_frames"): 
             for i in range(self.demoLeftPic.n_frames):
                 self.demoLeftPic.seek(i)
                 if self.demoLeftPic.size < (200,200) :
@@ -263,6 +263,7 @@ class stereoPhoto(object):
         self.graphWindowLeft.ui.graphicsView.setGeometry(rect)
         self.graphWindowLeft.ui.widget.setGeometry(rect)
         self.graphWindowLeft.move(QPoint(self.screenLeft.x(), self.screenLeft.y()))
+        self.graphWindowLeft.keyDrawEvent.connect(self.keyboardHandler)
 
         fname = self.optWindow.ui.importLineLeft.text()
         filename = "/" +  fname.split("/")[-1].split(".")[0]
@@ -270,6 +271,7 @@ class stereoPhoto(object):
 
         pathPAR = self.optWindow.ui.importLineLeft.text().split(".")[0] + ".par"
         self.leftPictureManager = pictureManager(self.leftPic.size, pathPAR, "aa")
+        self.leftPicSize = self.leftPic.size
 
     #Idem à mNewLeftPic
     def mNewRightPic(self):
@@ -280,7 +282,6 @@ class stereoPhoto(object):
         self.rightOrientation = 0
         self.rightMiroir = 0
         self.rightName = False
-        self.enableOptionImage(False)
         self.optWindow.ui.affichageButton.setEnabled(False)
 
         try :
@@ -331,16 +332,13 @@ class stereoPhoto(object):
 
         pathPAR = self.optWindow.ui.importLineRight.text().split(".")[0] + ".par"
         self.rightPictureManager = pictureManager(self.rightPic.size, pathPAR, "aa")
+        self.rightPicSize = self.rightPic.size
 
     #Fonction qui créer une nouvelle couche de type VectorLayer dans QGIS 
     #La couche permet d'afficher les polygones tracés sur l'image dans QGIS
     def mNewVectorLayer(self):
         shapeName = self.optWindow.ui.importLineVectorLayer.text()
-        
-        if self.optWindow.ui.affichageButton.isEnabled() :
-            self.optWindow.ui.drawButton.setEnabled(True)
-            self.optWindow.ui.cutButton.setEnabled(True)
-    
+            
         self.enableDraw = True
 
         self.vectorLayer = createShape(shapeName, self.crs)
@@ -369,17 +367,7 @@ class stereoPhoto(object):
         self.graphWindowLeft.ui.graphicsView.fitInView(self.leftRect, Qt.KeepAspectRatio)
         self.graphWindowRight.ui.graphicsView.fitInView(self.rightRect, Qt.KeepAspectRatio)
         self.optWindow.activateWindow()
-        self.enableOptionImage(True)
-
-    
-    #Fonction pour permettre l'utilisation des boutons d'option pour les fenêtres séparées 
-    #Action peut être True ou False selon la permission que l'on veut donner
-    def enableOptionImage(self, action):
-        self.optWindow.ui.panButton.setEnabled(action)
-        self.optWindow.ui.offsetButton.setEnabled(action)
-        if self.enableDraw : 
-            self.optWindow.ui.drawButton.setEnabled(action)
-            self.optWindow.ui.cutButton.setEnabled(action)
+        self.optWindow.ui.panButton.setEnabled(True)
 
     #Fonction pour zoom In sur les deux photos simultannément
     def mZoomIn(self) :
@@ -484,9 +472,6 @@ class stereoPhoto(object):
         else :
             self.newRightRequest = True
 
-        self.graphWindowRight.ui.widget.mouseMoveEvent = self.mMoveEvent
-        self.graphWindowRight.ui.widget.mousePressEvent = self.mPressEvent
-        self.graphWindowRight.ui.widget.wheelEvent = self.wheelEvent
         self.graphWindowRight.ui.graphicsView.show()
         self.optWindow.ui.importDoneRight.setStyleSheet("image: url(:/Anaglyph/Icons/greenCheck.png);")
         self.optWindow.ui.importButtonRight.setEnabled(True)
@@ -565,49 +550,60 @@ class stereoPhoto(object):
             self.showThreadRightInProcess = False
        
     
-    #Désactive le offset, le cut et le draw pour activer le pan     
+    #Place la souris en mode pan, active/désactive les boutons de dessin   
     def panClick(self):
-        self.optWindow.ui.offsetButton.setChecked(False)
-        self.optWindow.ui.drawButton.setChecked(False)
-        self.optWindow.ui.cutButton.setChecked(False)
-        self.graphWindowLeft.ui.widget.setMouseTracking(False)
 
-    #Désactive le pan, le cut et le draw pour activer le offset
-    def offsetClick(self):
-        self.optWindow.ui.panButton.setChecked(False)
-        self.optWindow.ui.drawButton.setChecked(False)
-        self.optWindow.ui.cutButton.setChecked(False)
-        self.graphWindowLeft.ui.widget.setMouseTracking(False)
+        if self.optWindow.ui.panButton.isChecked():
+            
+            #22 est la taille en pixel de la barre du haute de la fenetre
+            #Il y a toujours un petit pan lorsqu'on active le Pan sinon 
+            self.lastX = self.panCenter[0]
+            self.lastY = self.panCenter[1] - 22
+            win32api.SetCursorPos(self.leftScreenCenter)
+            self.graphWindowLeft.ui.widget.setMouseTracking(True)
+            self.graphWindowLeft.setCursor(self.graphWindowLeft.invisibleCursor)
+            if self.enableDraw : 
+                self.optWindow.ui.drawButton.setEnabled(True)
+                self.optWindow.ui.cutButton.setEnabled(True)
+        
+        else : 
+            self.optWindow.ui.drawButton.setEnabled(False)
+            self.optWindow.ui.cutButton.setEnabled(False)
+            self.graphWindowLeft.ui.widget.setMouseTracking(False)
+            win32api.SetCursorPos((self.optWindow.pos().x(), self.optWindow.pos().y()))
+            self.graphWindowLeft.setCursor(self.graphWindowLeft.normalCursor)
 
-    #Désactive le offset, le cut et le pan pour activer le draw
+    #Désactive le cut pour activer le draw
+    #Initialise les variables de dessins à un état de base (aucun polygon)
     def drawClick(self):
-        self.optWindow.ui.panButton.setChecked(False)
-        self.optWindow.ui.offsetButton.setChecked(False)
         self.optWindow.ui.cutButton.setChecked(False)
-        self.graphWindowLeft.ui.widget.setMouseTracking(True)
+        self.optWindow.ui.drawButton.setChecked(True)
 
         self.listDrawCoord = []
-        self.listLineObj = []
+        self.listLeftLineObj = []
+        self.listRightLineObj = []
         self.firstDrawClick = True
-        self.currentLineObj = None
+        self.currentLeftLineObj = None
+        self.currentRightLineObj = None
 
-    #Désactive le offset, le pan et le draw pour activer le cut
+    #Désactive le draw pour activer le cut
+    #Initialise les variables de dessins à un état de base (aucun polygon)
     def cutClick(self):
-        self.optWindow.ui.panButton.setChecked(False)
-        self.optWindow.ui.offsetButton.setChecked(False)
+        self.optWindow.ui.cutButton.setChecked(True)
         self.optWindow.ui.drawButton.setChecked(False)
-        self.graphWindowLeft.ui.widget.setMouseTracking(True)
 
         self.listDrawCoord = []
-        self.listLineObj = []
+        self.listLeftLineObj = []
+        self.listRightLineObj = []
         self.firstDrawClick = True
-        self.currentLineObj = None
+        self.currentLeftLineObj = None
+        self.currentRightLineObj = None
     
     #Ouverture de la fenêtre de rehaussement
     def enhanceClick(self):
         nameLeft = self.optWindow.ui.importLineLeft.text()
         nameRight = self.optWindow.ui.importLineRight.text()
-        self.enhanceManager = enhanceManager(nameLeft,nameRight,self.listParam)
+        self.enhanceManager = enhanceManager(nameLeft, nameRight, self.listParam)
         self.enhanceManager.listParamSignal.connect(self.applyEnhance)
 
     #Permet le lancement du traitement de modification des images
@@ -617,115 +613,186 @@ class stereoPhoto(object):
         self.mImportLeft()
         self.mImportRight()
 
-    #Fonction qui réalise le pan et le offset selon le bouton sélectionné
-    #Elle permet aussi de tracer une ligne pour prévisualiser la trace à venir 
-    def mMoveEvent(self, ev):
-        if self.optWindow.ui.panButton.isChecked() :
-            leftView = self.graphWindowLeft.ui.graphicsView
-            rightView = self.graphWindowRight.ui.graphicsView
-            delta = ev.pos() - self.panPosition
-            leftView.horizontalScrollBar().setValue(leftView.horizontalScrollBar().value() - delta.x())
-            leftView.verticalScrollBar().setValue(leftView.verticalScrollBar().value() - delta.y())
-            rightView.horizontalScrollBar().setValue(rightView.horizontalScrollBar().value() + delta.x())
-            rightView.verticalScrollBar().setValue(rightView.verticalScrollBar().value() - delta.y())
-            self.panPosition = ev.pos()
+    #Fonction appelée lorsque les touches respectives du clavier sont appuyées
+    #Les touches sont utiles lorsque le mode pan est en cours d'utilisation
+    #Possibilité d'ajouter d'autres fonctions plus tard
+    def keyboardHandler(self, number):
         
-        elif self.optWindow.ui.offsetButton.isChecked():
+        if number == "1" :
+            if self.optWindow.ui.drawButton.isChecked() :
+                self.optWindow.ui.drawButton.setChecked(False)
+            elif self.enableDraw :
+                self.drawClick()
+        
+        elif number == "2" :
+            if self.optWindow.ui.cutButton.isChecked() :
+                self.optWindow.ui.cutButton.setChecked(False)
+            elif self.enableDraw :
+                self.cutClick()
+        
+        elif number == "3" :
+
+            if self.optWindow.ui.radioButtonMerge.isChecked():
+                self.optWindow.ui.radioButtonAuto.setChecked(True)
+                self.optWindow.ui.radioButtonMerge.setChecked(False)
+
+            elif self.optWindow.ui.radioButtonAuto.isChecked() :
+                self.optWindow.ui.radioButtonAuto.setChecked(False)
+                self.optWindow.ui.radioButtonMerge.setChecked(True)
+
+        elif number == "ESC":
+            self.optWindow.ui.panButton.setChecked(False)
+            self.panClick()
+            
+
+    #Fonction qui réalise le pan et qui permet de prévisualiser la trace à venir
+    #Lors du pan la souris est présente sur l'écran qui contient l'image de gauche
+    #Cette fonction s'assure que la souris reste sur l'écran conserné pendant le Pan afin de garder le curseur invisible  
+    def mMoveEvent(self, ev):
+
+        if self.optWindow.ui.panButton.isChecked() :
+            self.deltaX = int((ev.x()-self.lastX) / 2)
+            self.lastX = ev.x()
+            self.deltaY = int((ev.y()-self.lastY) / 2)
+            self.lastY = ev.y()
             leftView = self.graphWindowLeft.ui.graphicsView
             rightView = self.graphWindowRight.ui.graphicsView
-            delta = ev.pos() - self.panPosition
-            leftView.horizontalScrollBar().setValue(leftView.horizontalScrollBar().value() - delta.x())
-            leftView.verticalScrollBar().setValue(leftView.verticalScrollBar().value() - delta.y())
-            rightView.horizontalScrollBar().setValue(rightView.horizontalScrollBar().value() - delta.x())
-            rightView.verticalScrollBar().setValue(rightView.verticalScrollBar().value() + delta.y())
-            self.panPosition = ev.pos()
-
-        elif (self.optWindow.ui.drawButton.isChecked() or self.optWindow.ui.cutButton.isChecked()) and not self.firstDrawClick :
-
-            self.endDrawPoint = self.graphWindowLeft.ui.graphicsView.mapToScene(ev.pos())
-            m_line = QLineF(self.startDrawPoint, self.endDrawPoint)
-            m_pen = QPen(QColor(0, 255, 255),10, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin)
-
-            if self.currentLineObj:
-                self.graphWindowLeft.ui.graphicsView.scene().removeItem(self.currentLineObj)
+            if ev.x() > (self.screenLeft.width() - 250) or ev.x() < 250 or ev.y() < 250 or ev.y() > (self.screenLeft.height() - 250) :
+                self.graphWindowLeft.ui.widget.setMouseTracking(False)
+                win32api.SetCursorPos(self.leftScreenCenter)
+                self.lastX = self.panCenter[0]
+                self.lastY = self.panCenter[1]
+                self.graphWindowLeft.ui.widget.setMouseTracking(True)
                 
-            self.currentLineObj = self.graphWindowLeft.ui.graphicsView.scene().addLine(m_line, m_pen)
+            leftView.horizontalScrollBar().setValue(leftView.horizontalScrollBar().value() - self.deltaX)
+            leftView.verticalScrollBar().setValue(leftView.verticalScrollBar().value() - self.deltaY)
+            rightView.horizontalScrollBar().setValue(rightView.horizontalScrollBar().value() + self.deltaX)
+            rightView.verticalScrollBar().setValue(rightView.verticalScrollBar().value() - self.deltaY)
+        
+            if (self.optWindow.ui.drawButton.isChecked() or self.optWindow.ui.cutButton.isChecked()) and not self.firstDrawClick :
+
+                point = QPoint(self.panCenter[0], self.panCenter[1])
+                self.endDrawPoint = self.graphWindowLeft.ui.graphicsView.mapToScene(point)
+                lineL = QLineF(self.startDrawPoint, self.endDrawPoint)
+                
+                xStartPoint = -self.startDrawPoint.x() + self.rightPicSize[0] + self.rightRect.x() + self.leftRect.x()
+                startRightPoint = QPointF(xStartPoint, self.startDrawPoint.y())
+                
+                xEndPoint = -self.endDrawPoint.x() + self.rightPicSize[0] + self.rightRect.x() + self.leftRect.x()
+                endRightPoint = QPointF(xEndPoint, self.endDrawPoint.y())
+                
+                lineR = QLineF(startRightPoint, endRightPoint)
+
+                m_pen = QPen(QColor(0, 255, 255),10, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin)
+
+                if self.currentLeftLineObj:
+                    self.graphWindowLeft.ui.graphicsView.scene().removeItem(self.currentLeftLineObj)
+                
+                if self.currentRightLineObj:
+                    self.graphWindowRight.ui.graphicsView.scene().removeItem(self.currentRightLineObj)
+                    
+                self.currentLeftLineObj = self.graphWindowLeft.ui.graphicsView.scene().addLine(lineL, m_pen)
+                self.currentRightLineObj = self.graphWindowRight.ui.graphicsView.scene().addLine(lineR, m_pen)
 
     #Fonction réalisé lors du click sur l'image
-    #En mode Pan et Offset, elle prend la première position de la souris
+    #La fonctionnalité sont possible seulement lorque le mode Pan est activé
     #En mode Draw/Cut Polygon, elle trace les lignes et les polygones sur l'image
     #Il y a une communication avec QGIS pour afficher les polygones dans le logiciel
     #Lorsque les polygones se croisent, les polygones peuvent merger ou se séparer automatiquement
     #Il est aussi possible de découper les polygones
+    #Les polygones s'affichent sur les deux images
+    #Le click droit permet de terminer une trace ou de quitter le pan si aucune option est sélectionné
     def mPressEvent(self, ev):
-        if self.optWindow.ui.panButton.isChecked() or self.optWindow.ui.offsetButton.isChecked() :
-            self.panPosition = ev.pos()
 
-        elif self.optWindow.ui.drawButton.isChecked() or self.optWindow.ui.cutButton.isChecked():
+        if self.optWindow.ui.panButton.isChecked():
+            
+            if self.optWindow.ui.drawButton.isChecked() or self.optWindow.ui.cutButton.isChecked():
 
-            if ev.button() == Qt.LeftButton:
-                if self.firstDrawClick :
-                    self.startDrawPoint = self.graphWindowLeft.ui.graphicsView.mapToScene(ev.pos())
-                    self.firstDrawClick = False
-                else : 
-                    self.startDrawPoint = self.endDrawPoint
-                    self.listLineObj.append(self.currentLineObj)
-                    self.currentLineObj = None
-                
-                X, Y = self.leftPictureManager.pixelToCoord((self.startDrawPoint.x() , self.startDrawPoint.y()), self.Z)
-                self.listDrawCoord.append(QgsPointXY(X,Y))
+                if ev.button() == Qt.LeftButton:
+                    if self.firstDrawClick :
+                        point = QPoint(self.panCenter[0], self.panCenter[1])
+                        self.startDrawPoint = self.graphWindowLeft.ui.graphicsView.mapToScene(point)
+                        self.firstDrawClick = False
+                    else : 
+                        self.startDrawPoint = self.endDrawPoint
+                        self.listLeftLineObj.append(self.currentLeftLineObj)
+                        self.listRightLineObj.append(self.currentRightLineObj)
+                        self.currentLeftLineObj = None
+                        self.currentRightLineObj = None
+                    
+                    X, Y = self.leftPictureManager.pixelToCoord((self.startDrawPoint.x() , self.startDrawPoint.y()), self.Z)
+                    self.listDrawCoord.append(QgsPointXY(X,Y))
 
-            elif ev.button() == Qt.RightButton:
+                elif ev.button() == Qt.RightButton:
 
-                self.firstDrawClick = True
-                if self.currentLineObj :
-                    self.graphWindowLeft.ui.graphicsView.scene().removeItem(self.currentLineObj)
-                    self.currentLineObj = None
-                
-                for item in self.listLineObj:
-                    self.graphWindowLeft.ui.graphicsView.scene().removeItem(item)
-                self.listLineObj = []
-                
-                if self.optWindow.ui.drawButton.isChecked():
-                    newGeo = QgsGeometry.fromMultiPolygonXY([[self.listDrawCoord]])
-                    currentVectorLayer = self.vectorLayer
-                    #Gestion des plusieurs intersections à faire
-                    for i in range(currentVectorLayer.featureCount()):
-                        featureGeo = currentVectorLayer.getGeometry(i)
-                        if newGeo.intersects(featureGeo) :
-                            if self.optWindow.ui.radioButtonMerge.isChecked() :
-                                mergePolygon(featureGeo, i, newGeo, currentVectorLayer)
-                            else :
-                                automaticPolygon(featureGeo, i, newGeo, currentVectorLayer)
-                            break
-                            
+                    self.firstDrawClick = True
+                    if self.currentLeftLineObj :
+                        self.graphWindowLeft.ui.graphicsView.scene().removeItem(self.currentLeftLineObj)
+                        self.currentLeftLineObj = None
+
+                    if self.currentRightLineObj :
+                        self.graphWindowRight.ui.graphicsView.scene().removeItem(self.currentRightLineObj)
+                        self.currentRightLineObj = None
+                    
+                    for item in self.listLeftLineObj:
+                        self.graphWindowLeft.ui.graphicsView.scene().removeItem(item)
+                    self.listLeftLineObj = []
+
+                    for item in self.listRightLineObj:
+                        self.graphWindowRight.ui.graphicsView.scene().removeItem(item)
+                    self.listRightLineObj = []
+                    
+                    if self.optWindow.ui.drawButton.isChecked():
+                        newGeo = QgsGeometry.fromMultiPolygonXY([[self.listDrawCoord]])
+                        currentVectorLayer = self.vectorLayer
+                        #Gestion des plusieurs intersections à faire
+                        for i in range(currentVectorLayer.featureCount()):
+                            featureGeo = currentVectorLayer.getGeometry(i)
+                            if newGeo.intersects(featureGeo) :
+                                if self.optWindow.ui.radioButtonMerge.isChecked() :
+                                    mergePolygon(featureGeo, i, newGeo, currentVectorLayer)
+                                else :
+                                    automaticPolygon(featureGeo, i, newGeo, currentVectorLayer)
+                                break
+                                
+                        else :
+                            addPolygon(currentVectorLayer, newGeo)
                     else :
-                        addPolygon(currentVectorLayer, newGeo)
-                else :
-                    currentVectorLayer = self.vectorLayer    
-                    cutPolygon(currentVectorLayer, self.listDrawCoord)
-                
-                self.listDrawCoord = []
-                
-                for item in self.polygonOnScreen :
-                    self.graphWindowLeft.ui.graphicsView.scene().removeItem(item)
-                
-                for i in range(currentVectorLayer.featureCount()):
+                        currentVectorLayer = self.vectorLayer    
+                        cutPolygon(currentVectorLayer, self.listDrawCoord)
                     
-                    featureGeo = currentVectorLayer.getGeometry(i)
+                    self.listDrawCoord = []
                     
-                    if featureGeo.isNull() == False :
+                    for item in self.polygonOnLeftScreen :
+                        self.graphWindowLeft.ui.graphicsView.scene().removeItem(item)
 
-                        listQgsPoint = featureGeo.asMultiPolygon()[0][0]
-                        polygon = QPolygonF()
-                        for item in listQgsPoint :
-                            xPixel, yPixel = self.leftPictureManager.coordToPixel((item.x() , item.y()), self.Z)     
-                            polygon.append(QPointF(xPixel, yPixel))
+                    for item in self.polygonOnRightScreen :
+                        self.graphWindowRight.ui.graphicsView.scene().removeItem(item)
+                    
+                    for i in range(currentVectorLayer.featureCount()):
+                        
+                        featureGeo = currentVectorLayer.getGeometry(i)
+                        
+                        if featureGeo.isNull() == False :
 
-                        m_pen = QPen(QColor(0, 255, 255),10, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin)
-                        obj = self.graphWindowLeft.ui.graphicsView.scene().addPolygon(polygon, m_pen)
-                        self.polygonOnScreen.append(obj)
+                            listQgsPoint = featureGeo.asMultiPolygon()[0][0]
+                            polygonL = QPolygonF()
+                            polygonR = QPolygonF()
+                            for item in listQgsPoint :
+                                xPixel, yPixel = self.leftPictureManager.coordToPixel((item.x() , item.y()), self.Z)     
+                                polygonL.append(QPointF(xPixel, yPixel))
+                                xRPixel = -xPixel + self.rightPicSize[0] + self.rightRect.x() + self.leftRect.x()
+                                polygonR.append(QPointF(xRPixel, yPixel))
 
+                            m_pen = QPen(QColor(0, 255, 255),10, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin)
+                            leftObj = self.graphWindowLeft.ui.graphicsView.scene().addPolygon(polygonL, m_pen)
+                            rightObj = self.graphWindowRight.ui.graphicsView.scene().addPolygon(polygonR, m_pen)
+                            self.polygonOnLeftScreen.append(leftObj)
+                            self.polygonOnRightScreen.append(rightObj)
+            
+            elif ev.button() == Qt.RightButton :
+                self.optWindow.ui.panButton.setChecked(False)
+                self.panClick()
 
     #Fonction pour zoom In/Out sur les photos avec la souris, elle zoom dans la 
     #direction de la souris 
@@ -733,7 +800,6 @@ class stereoPhoto(object):
         factor = 1.41 ** (event.angleDelta().y() / 240.0)
         leftView = self.graphWindowLeft.ui.graphicsView
         rightView = self.graphWindowRight.ui.graphicsView
-        
         if self.optWindow.ctrlClick or self.graphWindowLeft.ctrlClick or self.graphWindowRight.ctrlClick :
             oldPos = self.graphWindowLeft.ui.graphicsView.mapToScene(event.pos())
             if factor > 1 : 

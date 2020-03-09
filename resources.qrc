@@ -7,5 +7,6 @@
     <file>Icons/zoomOut.png</file>
     <file>Icons/panOption.png</file>
     <file>Icons/icon.png</file>
+    <file>Icons/cursor3x3.png</file>
   </qresource>
 </RCC>

@@ -2,15 +2,15 @@
 import numpy as np
 
 
-from PIL import Image, ImageOps, ImageEnhance, ImageStat
+
 import gdal
 import libtiff"""
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 from pynput import mouse
-import math, time, threading
-
+import math, time, threading, win32api
+from PIL import Image, ImageOps, ImageEnhance, ImageStat
 #print(pen.)
 
 #Image.MAX_IMAGE_PIXELS = 1000000000 
@@ -164,8 +164,8 @@ psg6 = sg[1429,666]"""
         #print("t")
 
 #a = Image.open("c.tif")
-#b = Image.open("//ulysse/LIDAR/Developpement/Programmation/FP/Stereoscopie/Photos_stereo/Serie_3/008_0913_0370_NIR.tif")
-
+b = Image.open("//ulysse/LIDAR/Developpement/Programmation/FP/Stereoscopie/Photos_stereo/Serie_3/008_0913_0370_NIR.tif")
+print(b.size)
 #z = b.split()
 
 
@@ -208,7 +208,7 @@ def line_intersection(line1, line2):
 
 line1 = ((1,1),(-1,-1))
 line2 = ((1,-1),(-1,-1))
-print(line_intersection(line1, line2))
+line_intersection(line1, line2)
 
 
 
@@ -245,30 +245,20 @@ with mouse.Listener(
         on_scroll=on_scroll) as listener:
     listener.join()"""
 
-
-pill2kill = threading.Event()
-
-def doit(stop_event, arg):
-    while not stop_event.wait(1):
-        print ("working on %s" % arg)
-    print("Stopping as you wish.")
-
+win32api.SetCursorPos((960,540))
 listener = mouse.Listener(
     on_move=on_move,
     on_click=on_click,
     on_scroll=on_scroll)
 listener.start()
 
-time.sleep(2)
+time.sleep(1)
 listener.stop()
-m = mouse.Controller() #Plutot que prendre le controlleur seulement bouger avec ctypes et relancer le listerner ?
-m.move(200,200)
 
-listener = mouse.Listener(
-    on_move=on_move,
-    on_click=on_click,
-    on_scroll=on_scroll)
-listener.start()
+
+
+#m = mouse.Controller() #Plutot que prendre le controlleur seulement bouger avec ctypes et relancer le listerner ?
+#m.move(200,200)
 
 # ...or, in a non-blocking fashion:
  

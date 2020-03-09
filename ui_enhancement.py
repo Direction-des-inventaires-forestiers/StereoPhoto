@@ -128,7 +128,7 @@ class Ui_enhanceWindow(object):
         self.groupBoxMinMax.setObjectName("groupBoxMinMax")
         self.radioButtonComplete = QtWidgets.QRadioButton(self.groupBoxMinMax)
         self.radioButtonComplete.setEnabled(False)
-        self.radioButtonComplete.setGeometry(QtCore.QRect(20, 25, 82, 17))
+        self.radioButtonComplete.setGeometry(QtCore.QRect(20, 25, 91, 17))
         self.radioButtonComplete.setChecked(True)
         self.radioButtonComplete.setObjectName("radioButtonComplete")
         self.radioButtonCurrent = QtWidgets.QRadioButton(self.groupBoxMinMax)

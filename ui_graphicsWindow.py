@@ -8,7 +8,7 @@
 
 from qgis.PyQt import QtCore, QtGui, QtWidgets
 from qgis.PyQt.QtCore import Qt
-
+import os
 
 class Ui_graphicsWindow(object):
     def setupUi(self, graphicsWindow, nom):
@@ -42,6 +42,7 @@ class Ui_graphicsWindow(object):
         graphicsWindow.setWindowTitle(_translate("graphicsWindow", nom))
 
 class graphicsWindow(QtWidgets.QMainWindow): 
+    keyDrawEvent = QtCore.pyqtSignal(str)
     def __init__(self, nom):
         QtWidgets.QMainWindow.__init__(self)
         self.ui = Ui_graphicsWindow()
@@ -51,11 +52,26 @@ class graphicsWindow(QtWidgets.QMainWindow):
         self.myPen = QtGui.QPen()
         self.rayon = 40
         self.ui.widget.paintEvent = self.draw
+        
+        cursorPath =  ":/Anaglyph/Icons/cursor3x3.png"
+        cursorImage = QtGui.QImage(cursorPath)
+        cursorPix = QtGui.QPixmap.fromImage(cursorImage)
+        self.invisibleCursor = QtGui.QCursor(cursorPix)
+        self.normalCursor = self.cursor()
         #self.setWindowFlags(Qt.Window | Qt.WindowTitleHint | Qt.CustomizeWindowHint | Qt.WindowMaximizeButtonHint | Qt.WindowMinimizeButtonHint)
 
     def keyPressEvent(self, event):
         if event.key() == QtCore.Qt.Key_Control:
             self.ctrlClick = True
+        elif event.key() == QtCore.Qt.Key_1:
+            self.keyDrawEvent.emit("1")
+        elif event.key() == QtCore.Qt.Key_2 :
+            self.keyDrawEvent.emit("2") 
+        elif event.key() == QtCore.Qt.Key_3:
+            self.keyDrawEvent.emit("3")
+        elif event.key() == QtCore.Qt.Key_Escape:
+            self.keyDrawEvent.emit("ESC")
+
 
     def keyReleaseEvent(self, event):
         self.ctrlClick = False

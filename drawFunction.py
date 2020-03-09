@@ -13,7 +13,6 @@ Il est possible de :
     - Reformer un polygon pour faire place à un nouveau
 
 Des fonctionnalités supplémentaires seront ajouter dans le futur pour agrémenter l'outil de trace :
-    - Utiliser un shapefile déjà importé dans QGIS et afficher la région concernée 
     - Trace automatique (sans click)
     - Accrochage des segments entre les formes via les segments ou les arêtes 
     - Ajout de points et de lignes
@@ -71,6 +70,7 @@ def mergePolygon(currentGeo, currentIndex, extraGeo, vectorLayer):
     return newGeo
 
 #Découpe la couche en fonction d'une ligne tracer par l'utilisateur
+#Si les lignes tracées se croisent aucune coupe à lieu (IDEM à QGIS)
 def cutPolygon(vectorLayer, line):
     #p1 = p2 = QgsPointXY(float, float)
     #line = [p1, p2, ...]
@@ -84,8 +84,17 @@ def cutPolygon(vectorLayer, line):
 def automaticPolygon(oldGeo, currentIndex, newGeo, vectorLayer):
     vectorLayer.startEditing()
     finalGeo =  oldGeo.difference(newGeo)
-    #Séparer les polygons en différente entité à changer
-    vectorLayer.changeGeometry(currentIndex, finalGeo)
+
+    firstShape = True
+    for item in finalGeo.asGeometryCollection():
+        if firstShape :
+            vectorLayer.changeGeometry(currentIndex, item)
+            firstShape = False
+        else : 
+            feat = QgsFeature()
+            feat.setGeometry(item)
+            vectorLayer.dataProvider().addFeature(feat)
+
     feat = QgsFeature()
     feat.setGeometry(newGeo)
     vectorLayer.dataProvider().addFeature(feat)
