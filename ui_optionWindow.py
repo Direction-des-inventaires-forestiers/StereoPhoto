@@ -9,7 +9,10 @@
 from qgis.PyQt import QtCore, QtGui, QtWidgets
 from qgis.PyQt.QtCore import pyqtSignal
 import os
+from qgis.utils import iface
+from qgis.core import QgsMapLayerType
 from . import resources
+from .ui_getVectorLayer import getVectorLayer
 
 class Ui_optionWindow(object):
     def setupUi(self, optionWindow):
@@ -299,6 +302,7 @@ class optionWindow(QtWidgets.QMainWindow):
         self.ui.importToolVectorLayer.clicked.connect(self.showImportVector)
         self.ctrlClick = False
         self.shapePath = ""
+        self.vLayer = None
 
     def showImportRight(self) :
         fname = QtWidgets.QFileDialog.getOpenFileName(self, 'Import picture', os.path.dirname(os.path.abspath(__file__)),"Image (*.png, *.jpg, *.tif)")[0]
@@ -311,10 +315,33 @@ class optionWindow(QtWidgets.QMainWindow):
             self.ui.importLineLeft.setText(fname)
             
     def showImportVector(self):
-        fname = QtWidgets.QFileDialog.getSaveFileName(self, 'Choose a path for your Vector Layer',  os.path.dirname(os.path.abspath(__file__)), "File (*.shp)")[0]
-        if fname:
-            self.ui.importLineVectorLayer.setText(fname)
+        self.dictLayerName = {}
+        for item in iface.mapCanvas().layers():
+            if item.type() == QgsMapLayerType.VectorLayer: 
+                self.dictLayerName[item.name()] = item
+        if self.dictLayerName : 
+            self.vectorWindow = getVectorLayer(self.dictLayerName)
+            self.vectorWindow.show()
+            self.vectorWindow.ui.buttonBox.accepted.connect(self.importVectorAccept)
+            self.vectorWindow.ui.buttonBox.rejected.connect(self.importVectorCancel)
+            #Ouvrir une fenetre pour choisir la layer désiré
 
+        else :
+            #No Current VectorLayer
+            return
+        #fname = QtWidgets.QFileDialog.getSaveFileName(self, 'Choose a path for your Vector Layer',  os.path.dirname(os.path.abspath(__file__)), "File (*.shp)")[0]
+        #if fname:
+            #self.ui.importLineVectorLayer.setText(fname)
+
+
+    def importVectorAccept(self):
+        vLayerName = self.vectorWindow.ui.listWidget.selectedItems()[0].text()
+        self.vLayer = self.dictLayerName[vLayerName]
+        self.ui.importLineVectorLayer.setText(vLayerName)
+        self.vectorWindow.close()
+
+    def importVectorCancel(self):
+        self.vectorWindow.close()
 
     def closeEvent(self,event):
         self.closeWindow.emit()

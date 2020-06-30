@@ -52,6 +52,9 @@ def createShape(shapeName, EPSG):
 def getVectorLayer():
     return iface.activeLayer()
 
+def getRectPolygon(rect, vectorLayer):
+    return list(vectorLayer.getFeatures(rect))
+
 #Ajout d'un polygon sur la couche
 #Avec geometry comme intrant on considère déja un QgsGeometry
 def addPolygon(vectorLayer, geometry):
@@ -80,7 +83,7 @@ def cutPolygon(vectorLayer, line):
     vectorLayer.commitChanges()
 
 #Lorsqu'un nouveau polygon entre en contact avec un polygon existant
-#Le nouveau est conservé dans son entièreter et l'ancien est reformé pour laisser la place au nouveau
+#Le nouveau est conservé dans son entièreté et l'ancien est reformé pour laisser la place au nouveau
 def automaticPolygon(oldGeo, currentIndex, newGeo, vectorLayer):
     vectorLayer.startEditing()
     finalGeo =  oldGeo.difference(newGeo)

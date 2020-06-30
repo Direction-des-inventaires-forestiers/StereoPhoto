@@ -157,14 +157,3 @@ class dualManager() :
         rectR = QRectF(-(pixR[0] - midR[0]), pixR[1] - midR[1], self.rightManager.sizePicture[0], self.rightManager.sizePicture[1]) 
         return rectL, rectR
 
-
-
-
-
-
-
-
-
-
-
-
