@@ -84,7 +84,7 @@ class stereoPhoto(object):
 
         if self.action.isChecked() :
             self.intRightScreen = 1
-            self.intLeftScreen = 1
+            self.intLeftScreen = 2
 
             #Sur Windows 10 la barre windows en bas existe sur toutes les écrans, faire attention pour ce cas
             #Sur windows 10 il y a un problème avec le Pan et le retour au centre, il y a un plus grand décalage que celui désiré (seulement sur windows 10?)
@@ -774,7 +774,8 @@ class stereoPhoto(object):
             self.lastY = ev.y()
             leftView = self.graphWindowLeft.ui.graphicsView
             rightView = self.graphWindowRight.ui.graphicsView
-            if ev.x() > (self.screenLeft.width() - 250) or ev.x() < 250 or ev.y() < 250 or ev.y() > (self.screenLeft.height() - 250) :
+            pixRange = 400
+            if ev.x() > (self.screenLeft.width() - pixRange) or ev.x() < pixRange or ev.y() < pixRange or ev.y() > (self.screenLeft.height() - pixRange) :
                 self.graphWindowLeft.ui.widget.setMouseTracking(False)
                 win32api.SetCursorPos(self.leftScreenCenter)
                 self.lastX = self.panCenterLeft[0]

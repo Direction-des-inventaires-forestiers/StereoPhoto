@@ -50,7 +50,7 @@ class graphicsWindow(QtWidgets.QMainWindow):
         self.ctrlClick = False
         self.myRect = QtCore.QRect()
         self.myPen = QtGui.QPen()
-        self.rayon = 40
+        self.rayon = 20
         self.ui.widget.paintEvent = self.draw
         
         cursorPath =  ":/Anaglyph/Icons/cursor3x3.png"
