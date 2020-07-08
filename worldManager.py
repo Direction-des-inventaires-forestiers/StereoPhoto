@@ -41,29 +41,29 @@ class pictureManager():
             w = s[v1:v2]
             a.append(w.split(" ")) 
 
-        self.AffineA = float(a[0][1])
-        self.AffineB = float(a[0][2])
-        self.AffineC = float(a[0][3])
-        self.AffineD = float(a[0][4])
-        self.AffineE = float(a[0][5]) 
-        self.AffineF = float(a[0][6])
+        self.AffineA = float(a[0][-6])
+        self.AffineB = float(a[0][-5])
+        self.AffineC = float(a[0][-4])
+        self.AffineD = float(a[0][-3])
+        self.AffineE = float(a[0][-2]) 
+        self.AffineF = float(a[0][-1])
         
-        self.InvA = float(a[1][1])
-        self.InvB = float(a[1][2])
-        self.InvC = float(a[1][3])
-        self.InvD = float(a[1][4])
-        self.InvE = float(a[1][5])
-        self.InvF = float(a[1][6])
+        self.InvA = float(a[1][-6])
+        self.InvB = float(a[1][-5])
+        self.InvC = float(a[1][-4])
+        self.InvD = float(a[1][-3])
+        self.InvE = float(a[1][-2])
+        self.InvF = float(a[1][-1])
         
-        self.Focal = float(a[2][1])
+        self.Focal = float(a[2][-1])
         
-        self.X0 = float(a[3][1])
-        self.Y0 = float(a[3][2])
-        self.Z0 = float(a[3][3])
+        self.X0 = float(a[3][-3])
+        self.Y0 = float(a[3][-2])
+        self.Z0 = float(a[3][-1])
 
-        self.omega = radians(float(a[4][1])) 
-        self.phi = radians(float(a[4][2]))
-        self.kappa = radians(float(a[4][3])) 
+        self.omega = radians(float(a[4][-3])) 
+        self.phi = radians(float(a[4][-2]))
+        self.kappa = radians(float(a[4][-1])) 
         
         #Pixel central de la photo traduit en mm -> Utile pour les calculs 
         self.PPCx = self.AffineA * (self.sizePicture[0]/2) + self.AffineB * (self.sizePicture[1]/2) + self.AffineC 
@@ -125,7 +125,7 @@ class pictureManager():
 
 class dualManager() :
 
-    def __init__(self, leftManager, rightManager, Z):
+    def __init__(self, leftManager, rightManager, Z=0):
         self.leftManager = leftManager
         self.rightManager = rightManager
         self.Z = Z

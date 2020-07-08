@@ -699,8 +699,8 @@ class imageEnhancing(threading.Thread):
     
 
 #Fonction qui réalise une rotation et/ou un effet miroir d'une photo PIL
-#Elle retourne une photo PIL ou une QImage selon le choix isQImage (True/False) 
-def pictureLayout(picture, rotation, miroir, isQImage):
+#Elle retourne une photo PIL ou une QImage selon le choix retQImage (True/False) 
+def pictureLayout(picture, rotation, miroir, retQImage):
     
     if rotation == 0 and miroir == 0 :
         pic = picture
@@ -719,7 +719,7 @@ def pictureLayout(picture, rotation, miroir, isQImage):
         elif miroir == 2 :
             pic = pic.transpose(Image.FLIP_TOP_BOTTOM)
 
-    if isQImage : 
+    if retQImage : 
         npPicture = np.array(pic)
         qtI = qimage2ndarray.array2qimage(npPicture)
         return qtI

@@ -8,7 +8,7 @@ import libtiff"""
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
-from pynput import mouse
+#from pynput import mouse
 import math, time, threading, win32api
 from PIL import Image, ImageOps, ImageEnhance, ImageStat
 #print(pen.)
@@ -246,11 +246,11 @@ with mouse.Listener(
     listener.join()"""
 
 win32api.SetCursorPos((960,540))
-listener = mouse.Listener(
+"""listener = mouse.Listener(
     on_move=on_move,
     on_click=on_click,
     on_scroll=on_scroll)
-listener.start()
+listener.start()"""
 
 time.sleep(1)
 listener.stop()
