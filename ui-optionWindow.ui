@@ -348,7 +348,7 @@
      </rect>
     </property>
     <property name="currentIndex">
-     <number>0</number>
+     <number>1</number>
     </property>
     <item>
      <property name="text">
@@ -878,9 +878,6 @@
      <width>51</width>
      <height>22</height>
     </rect>
-   </property>
-   <property name="cursor">
-    <cursorShape>CrossCursor</cursorShape>
    </property>
    <property name="maximum">
     <number>100</number>

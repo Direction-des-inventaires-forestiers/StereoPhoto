@@ -583,7 +583,7 @@ class app(QApplication):
             QTimer.singleShot(5000, self.go2Cross)
 
 
-    #Calcul de l'histogramme sur une portion de la photo lorsque l'on veut conserver le min/max pour la vue courrante
+    #Calcul de l'histogramme sur une portion de la photo lorsque l'on veut conserver le min/max pour la vue courante
     def calculHistogram(self, top, low):
 
         h = self.picture.crop((top.x(), top.y(), low.x(), low.y())).histogram()
@@ -665,7 +665,7 @@ class threadSave(QThread):
 
 #Thread qui permet l'affichage des images de plus grandes résolutions
 #Il ajoute des petites portions de l'image à chaque itération
-#Il concidère toujours la vue courrante dans la priorité d'affichage
+#Il concidère toujours la vue courante dans la priorité d'affichage
 class threadShow(QThread):
     newImage = pyqtSignal(QPixmap, float, int, int)
     def __init__(self, picture, pointZero, pointMax, multiFactor, seekFactor, scaleFactor, listParam):

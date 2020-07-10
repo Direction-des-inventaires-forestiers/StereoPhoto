@@ -10,13 +10,15 @@ L'application permet de :
     - Réaliser une rotation de 90°, 180° et 270°
     - Réaliser un effet miroir sur l'horizontal et la verticale
     - Afficher les deux images importées sur les écrans Planar
-    - Superposer automatiquement les images en fonction de leur fichier PAR associé
+    - Superposer automatiquement les images en fonction d'un pourcentage choisi par l'utilisateur
     - Offrir une interface de navigation qui permet le déplacement, le zoom (CTRL+Roulette) et le traçage (Click & 1,2,3,ESC) 
-    - Offrir un déplacement opposé des deux images pour ajuster la stéréoscopie (Roulette)
+    - Offrir un déplacement de l'image de droite pour ajuster l'altitude (Roulette)
     - Rehausser les couleurs des images via une nouvelle fenêtre intéractive 
     - Traçage de forme géolocalisée
     - Communication avec QGIS
-    - Utiliser un shapefile 2D déjà importé dans QGIS et afficher la région concernée 
+    - Utiliser un shapefile 2D déjà importé dans QGIS et afficher la région concernée
+    - Afficher le Z du centre de l'image
+    - Afficher les coordonnées XYZ lors d'un clic 
 
 Le main permet tout simplement de lancer l'application
 
@@ -270,7 +272,7 @@ class stereoPhoto(object):
     def mNewRightPic(self):
         
         self.optWindow.ui.boxOrientationRight.setCurrentIndex(0)
-        self.optWindow.ui.boxMiroirRight.setCurrentIndex(0)
+        self.optWindow.ui.boxMiroirRight.setCurrentIndex(1)
 
         self.intRightScreen = self.optWindow.ui.spinBoxRightScreen.value()
         self.screenRight = QApplication.desktop().screenGeometry(self.intRightScreen)
@@ -431,7 +433,7 @@ class stereoPhoto(object):
         if self.enableDraw :
             self.addPolygonOnScreen()
 
-    #Obligatoire après les imports, attention au thread aussi
+    ###Obligatoire après les imports, attention au thread aussi
     #Call après le dernier thread.
     def addPolygonOnScreen(self) :
         rectCoord = self.getShowRect()
@@ -506,7 +508,7 @@ class stereoPhoto(object):
         pointMax = self.graphWindowLeft.ui.graphicsView.mapToScene(QPoint(GV.width(),GV.height()))
 
         if self.showThreadLeftInProcess == False :
-            self.threadSeekLeft(pointZero, pointMax, 0.5, 1, 2)
+            #self.threadSeekLeft(pointZero, pointMax, 0.5, 1, 2)
             self.showThreadLeftInProcess = True
         else :
             self.newLeftRequest = True
@@ -557,7 +559,7 @@ class stereoPhoto(object):
         pointMax = self.graphWindowRight.ui.graphicsView.mapToScene(QPoint(GV.width(),GV.height()))
 
         if self.showThreadRightInProcess == False :
-            self.threadSeekRight(pointZero, pointMax, 0.5, 1, 2)
+            #self.threadSeekRight(pointZero, pointMax, 0.5, 1, 2)
             self.showThreadRightInProcess = True
         else :
             self.newRightRequest = True
@@ -602,6 +604,7 @@ class stereoPhoto(object):
         self.tSeekRight.start(QThread.IdlePriority)
 
     #Fonction exécutée lorsque le thread d'affichage se termine
+    #Elle redessine les polygones sur les images
     #Elle relance le thread avec la même résolution si une requête a été faite sinon
     #elle relance le thread avec une plus grande résolution d'image 
     def seekLeftDone(self):

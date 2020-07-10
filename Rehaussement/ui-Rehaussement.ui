@@ -552,7 +552,7 @@
       </rect>
      </property>
      <property name="text">
-      <string>Vue courrante</string>
+      <string>Vue courante</string>
      </property>
     </widget>
     <widget class="QPushButton" name="currentStatusButton">

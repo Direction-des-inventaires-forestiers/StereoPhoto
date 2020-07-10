@@ -297,7 +297,6 @@ class Ui_optionWindow(object):
         self.label_10.setObjectName("label_10")
         self.spinBoxRecouvrement = QtWidgets.QSpinBox(optionWindow)
         self.spinBoxRecouvrement.setGeometry(QtCore.QRect(360, 400, 51, 22))
-        self.spinBoxRecouvrement.setCursor(QtGui.QCursor(QtCore.Qt.CrossCursor))
         self.spinBoxRecouvrement.setMaximum(100)
         self.spinBoxRecouvrement.setProperty("value", 60)
         self.spinBoxRecouvrement.setObjectName("spinBoxRecouvrement")
@@ -315,7 +314,7 @@ class Ui_optionWindow(object):
         self.spinBoxRecouvrement.raise_()
 
         self.retranslateUi(optionWindow)
-        self.boxMiroirRight.setCurrentIndex(0)
+        self.boxMiroirRight.setCurrentIndex(1)
         QtCore.QMetaObject.connectSlotsByName(optionWindow)
 
     def retranslateUi(self, optionWindow):

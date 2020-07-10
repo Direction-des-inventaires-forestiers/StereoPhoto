@@ -178,7 +178,7 @@ class Ui_enhanceWindow(object):
         self.applyButton.setText(_translate("enhanceWindow", "Appliquer"))
         self.groupBoxMinMax.setTitle(_translate("enhanceWindow", "Min/Max"))
         self.radioButtonComplete.setText(_translate("enhanceWindow", "Vue complète"))
-        self.radioButtonCurrent.setText(_translate("enhanceWindow", "Vue courrante"))
+        self.radioButtonCurrent.setText(_translate("enhanceWindow", "Vue courante"))
         self.currentStatusButton.setText(_translate("enhanceWindow", "Conserver"))
         self.cancelButton.setText(_translate("enhanceWindow", "Annuler"))
         self.radioButtonPremiere.setText(_translate("enhanceWindow", "Photo 1"))

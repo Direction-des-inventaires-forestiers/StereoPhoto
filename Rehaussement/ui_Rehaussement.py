@@ -210,7 +210,7 @@ class Ui_colorWindow(object):
         self.label_8.setText(_translate("colorWindow", "Liste des photos dans le dossier"))
         self.groupBoxMinMax.setTitle(_translate("colorWindow", "Min/Max"))
         self.radioButtonComplete.setText(_translate("colorWindow", "Vue complète"))
-        self.radioButtonCurrent.setText(_translate("colorWindow", "Vue courrante"))
+        self.radioButtonCurrent.setText(_translate("colorWindow", "Vue courante"))
         self.currentStatusButton.setText(_translate("colorWindow", "Conserver"))
 
 
