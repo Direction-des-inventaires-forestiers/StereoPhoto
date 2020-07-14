@@ -886,6 +886,48 @@
     <number>60</number>
    </property>
   </widget>
+  <widget class="QGroupBox" name="groupBox">
+   <property name="geometry">
+    <rect>
+     <x>30</x>
+     <y>550</y>
+     <width>111</width>
+     <height>71</height>
+    </rect>
+   </property>
+   <property name="title">
+    <string>Type de couche</string>
+   </property>
+   <widget class="QRadioButton" name="radioButton_2">
+    <property name="geometry">
+     <rect>
+      <x>20</x>
+      <y>40</y>
+      <width>82</width>
+      <height>17</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Points</string>
+    </property>
+   </widget>
+   <widget class="QRadioButton" name="radioButton">
+    <property name="geometry">
+     <rect>
+      <x>20</x>
+      <y>20</y>
+      <width>82</width>
+      <height>17</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Polygones</string>
+    </property>
+    <property name="checked">
+     <bool>true</bool>
+    </property>
+   </widget>
+  </widget>
   <zorder>groupBoxRight</zorder>
   <zorder>label_5</zorder>
   <zorder>label_6</zorder>
@@ -898,6 +940,7 @@
   <zorder>lineEditCurrentZ</zorder>
   <zorder>label_10</zorder>
   <zorder>spinBoxRecouvrement</zorder>
+  <zorder>groupBox</zorder>
  </widget>
  <resources>
   <include location="resources.qrc"/>

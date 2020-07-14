@@ -76,11 +76,13 @@ class graphicsWindow(QtWidgets.QMainWindow):
     def keyReleaseEvent(self, event):
         self.ctrlClick = False
 
+    #Détermine la position du curseur 
     def cursorRectInit(self, x, y):
         r = self.rayon
         self.myRect = QtCore.QRect(int(x/2) - r, int(y/2) - r, 2*r, 2*r)
         self.ui.widget.update()
 
+    #Fonction qui dessine le curseur au centre de l'image
     def draw(self, event):
         p = QtGui.QPainter()
         p.begin(self.ui.widget)

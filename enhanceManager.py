@@ -151,7 +151,7 @@ class enhanceManager(QObject):
             GV = self.colorWindow.ui.graphicsView
             pointMax = self.colorWindow.ui.graphicsView.mapToScene(QPoint(GV.width(),GV.height()))
             if self.showThreadInProcess == False :
-                #self.threadSeekNewQuality(pointZero, pointMax, 4, 1, 0.25)
+                self.threadSeekNewQuality(pointZero, pointMax, 4, 1, 0.25)
                 self.showThreadInProcess = True
             else :
                 self.newRequest = True

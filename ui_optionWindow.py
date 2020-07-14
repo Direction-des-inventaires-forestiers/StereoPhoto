@@ -10,7 +10,7 @@ from qgis.PyQt import QtCore, QtGui, QtWidgets
 from qgis.PyQt.QtCore import pyqtSignal
 import os
 from qgis.utils import iface
-from qgis.core import QgsMapLayerType
+from qgis.core import QgsMapLayerType, QgsWkbTypes
 from . import resources
 from .ui_getVectorLayer import getVectorLayer
 
@@ -377,12 +377,13 @@ class dropedit(QtWidgets.QGroupBox):
             fileName = fileURL.split('file:///')[1]
         except :
             fileName = fileURL.split('file:')[1]
-        for child in self.children(): 
-            if child.metaObject().className() == "QLineEdit":
-                child.setText(fileName)
+        if fileName.split(".")[-1] == 'tif' :
+            for child in self.children(): 
+                if child.metaObject().className() == "QLineEdit":
+                    child.setText(fileName)
 
 
-
+#Classe qui gère certaines fonctionnalités du menu des options.
 class optionWindow(QtWidgets.QMainWindow): 
     closeWindow = pyqtSignal()
     keyDrawEvent = pyqtSignal(str)
@@ -397,20 +398,23 @@ class optionWindow(QtWidgets.QMainWindow):
         self.shapePath = ""
         self.vLayer = None
 
+    #Ouvre une fenêtre de navigation Windows pour choisir le TIF de droite
     def showImportRight(self) :
-        fname = QtWidgets.QFileDialog.getOpenFileName(self, 'Import picture', os.path.dirname(os.path.abspath(__file__)),"Image (*.png, *.jpg, *.tif)")[0]
+        fname = QtWidgets.QFileDialog.getOpenFileName(self, 'Import picture', os.path.dirname(os.path.abspath(__file__)),"Image (*.tif)")[0]
         if fname:
             self.ui.importLineRight.setText(fname)
 
+    #Ouvre une fenêtre de navigation Windows pour choisir le TIF de gauche
     def showImportLeft(self) :
-        fname = QtWidgets.QFileDialog.getOpenFileName(self, 'Import picture', os.path.dirname(os.path.abspath(__file__)), "Image (*.png, *.jpg, *.tif)")[0]
+        fname = QtWidgets.QFileDialog.getOpenFileName(self, 'Import picture', os.path.dirname(os.path.abspath(__file__)), "Image (*.tif)")[0]
         if fname:
             self.ui.importLineLeft.setText(fname)
             
+    #Ouvre une fenêtre de Qt pour choisir la couche de polygones
     def showImportVector(self):
         self.dictLayerName = {}
         for item in iface.mapCanvas().layers():
-            if item.type() == QgsMapLayerType.VectorLayer: 
+            if item.type() == QgsMapLayerType.VectorLayer and item.geometryType() == QgsWkbTypes.PolygonGeometry: 
                 self.dictLayerName[item.name()] = item
         if self.dictLayerName : 
             self.vectorWindow = getVectorLayer(self.dictLayerName)
@@ -426,7 +430,7 @@ class optionWindow(QtWidgets.QMainWindow):
         #if fname:
             #self.ui.importLineVectorLayer.setText(fname)
 
-
+    #Création de l'objet qui réprésente la couche vectorielle
     def importVectorAccept(self):
         vLayerName = self.vectorWindow.ui.listWidget.selectedItems()[0].text()
         self.vLayer = self.dictLayerName[vLayerName]
@@ -439,6 +443,7 @@ class optionWindow(QtWidgets.QMainWindow):
     def closeEvent(self,event):
         self.closeWindow.emit()
 
+    #Fonction appelé lorsqu'une touche du clavier est appuyée
     def keyPressEvent(self, event):
         if event.key() == QtCore.Qt.Key_Control:
             self.ctrlClick = True

@@ -9,7 +9,7 @@ L'application permet de :
     - Importer des fichiers TIF de grandes tailles via un drag n drop
     - Réaliser une rotation de 90°, 180° et 270°
     - Réaliser un effet miroir sur l'horizontal et la verticale
-    - Afficher les deux images importées sur les écrans Planar
+    - Afficher les deux images importées
     - Superposer automatiquement les images en fonction d'un pourcentage choisi par l'utilisateur
     - Offrir une interface de navigation qui permet le déplacement, le zoom (CTRL+Roulette) et le traçage (Click & 1,2,3,ESC) 
     - Offrir un déplacement de l'image de droite pour ajuster l'altitude (Roulette)
@@ -19,13 +19,14 @@ L'application permet de :
     - Utiliser un shapefile 2D déjà importé dans QGIS et afficher la région concernée
     - Afficher le Z du centre de l'image
     - Afficher les coordonnées XYZ lors d'un clic 
+    - Permettre le choix des écrans
 
 Le main permet tout simplement de lancer l'application
 
 Plusieurs autres outils seront intégrés à cette application dans le futur :
     - Fonctionnalité de trace supplémentaire
     - Amélioration des fonctions de photogrammétrie 
-    - Menu de choix de paramètres (numéro des écrans, curseur, keybinding, couleur des traces)
+    - Menu de choix de paramètres (curseur, keybinding, couleur des traces)
     - Affichage des zones supersposées seulement
     - Gestion de projet
     - Utiliser un shapefile 3D
@@ -73,22 +74,20 @@ class stereoPhoto(object):
         self.iface.addToolBarIcon(self.action)
         self.iface.addPluginToMenu("&StereoPhoto", self.action)
 
-    #Retire le bout de l'application dans QGIS
+    #Retire le bouton de l'application dans QGIS
     def unload(self):
         self.iface.removePluginMenu("&StereoPhoto", self.action)
         self.iface.removeToolBarIcon(self.action)
         
-    #Initialisation de l'application, des variables
-    #Connection entre les boutons du menu d'options (mOpt) et leur fonction attitrée
-    #On fait apparaître le menu des options seul
-    #Les écrans où l'on veut que les fênetres s'ouvrent sont choisi ici 
+    #Initialisation de l'application et des variables
+    #Connection entre les boutons du menu d'options (mOpt) et leurs fonctions attitrées
+    #Ouverture du menu d'options
     def run(self):
-
 
         self.leftOrientation = 0
         self.rightOrientation = 0
         self.leftMiroir = 0
-        self.rightMiroir = 0
+        self.rightMiroir = 1
 
 
         self.leftName = False 
@@ -171,8 +170,8 @@ class stereoPhoto(object):
         self.optWindow.ui.graphicsViewRight.setScene(scene)
         self.optWindow.ui.graphicsViewRight.fitInView(self.optWindow.ui.graphicsViewRight.sceneRect(), Qt.KeepAspectRatio)
         
-    #Fonction de traitement d'image pour ajouter un effet mirroir à l'image
-    #Deux modes sont possible, soit un effet mirroir à l'horizontal et un à la verticale
+    #Fonction de traitement d'image pour ajouter un effet miroir à l'image
+    #Deux modes sont possible, soit un effet miroir à l'horizontal et un à la verticale
     def mMiroirLeft(self, value):
         self.leftMiroir = value
         QtImg = pictureLayout(self.demoLeftPic, self.leftOrientation, self.leftMiroir, True)
@@ -197,9 +196,8 @@ class stereoPhoto(object):
     #L'image est affiché en petit format pour permettre une visualisation du 
     #résultat qui sera produit suite à l'importation  
     #Si une nouvelle photo est importée, l'ancienne est fermée 
-    #Si la photo est un fichier tif avec plusieurs versions de l'image, 
-    #on récupère une version plus petite plutot que la produire, le résultat est donc instantané
-    #Création d'un pictureManager pour associer les pixels à des coordonnées en fonction du .par de la photo
+    #Création d'un pictureManager pour associer le fichier .par à la photo
+    #Récupération du choix de l'écran pour l'affichage
     def mNewLeftPic(self) : 
 
         self.optWindow.ui.boxOrientationLeft.setCurrentIndex(0)
@@ -260,15 +258,12 @@ class stereoPhoto(object):
         self.graphWindowLeft.move(QPoint(self.screenLeft.x(), self.screenLeft.y()))
         self.graphWindowLeft.keyDrawEvent.connect(self.keyboardHandler)
 
-        fname = self.optWindow.ui.importLineLeft.text()
-        filename = "/" +  fname.split("/")[-1].split(".")[0]
-        self.path = fname.partition(filename)[0]
-
         pathPAR = self.optWindow.ui.importLineLeft.text().split(".")[0] + ".par"
         self.leftPictureManager = pictureManager(self.leftPic.size, pathPAR, "aa")
         self.leftPicSize = self.leftPic.size
 
     #Idem à mNewLeftPic
+    #L'image a un effet miroir horizontal dès son ouverture
     def mNewRightPic(self):
         
         self.optWindow.ui.boxOrientationRight.setCurrentIndex(0)
@@ -279,7 +274,7 @@ class stereoPhoto(object):
         self.panCenterRight = (int(self.screenRight.width()/2), int(self.screenRight.height()/2))
 
         self.rightOrientation = 0
-        self.rightMiroir = 0
+        self.rightMiroir = 1
         self.rightName = False
         self.optWindow.ui.affichageButton.setEnabled(False)
 
@@ -306,8 +301,10 @@ class stereoPhoto(object):
 
         draw = ImageDraw.Draw(self.demoRightPic)
         draw.ellipse((20,20,60,60), fill="red", outline="white")
-
-        npPicture = np.array(self.demoRightPic)
+        
+        dRightPic = self.demoRightPic.transpose(Image.FLIP_LEFT_RIGHT)
+        
+        npPicture = np.array(dRightPic)
         img = qimage2ndarray.array2qimage(npPicture)
 
         sceneRight = QGraphicsScene()
@@ -333,8 +330,8 @@ class stereoPhoto(object):
         self.rightPictureManager = pictureManager(self.rightPic.size, pathPAR, "aa")
         self.rightPicSize = self.rightPic.size
 
-    #Fonction qui créer une nouvelle couche de type VectorLayer dans QGIS 
-    #La couche permet d'afficher les polygones tracés sur l'image dans QGIS
+    #Fonction qui récupère la couche vectorielle et change le SIG de QGIS 
+    #Si possible appel la fonction pour afficher la couche vectorielle sur les images
     def mNewVectorLayer(self):
 
         self.enableDraw = True
@@ -345,6 +342,8 @@ class stereoPhoto(object):
             self.addPolygonOnScreen()
 
     
+    #Fonction qui détermine la région approximative des photos
+    #Retourne le rectangle de coordonnée
     def getShowRect(self) :
         
         if hasattr(self, "leftRect"): 
@@ -357,6 +356,9 @@ class stereoPhoto(object):
         else :
             return QgsRectangle(QgsPointXY(0, 0), QgsPointXY(0, 0))
         
+    #Fonction qui reçoit un pixel de chaque image
+    #Utilise les deux pixels pour faire le calcul du Z et des coordonnées
+    #Retourne la valeur des coordonnées moyennées
     def dualPixelToCoord(self, QPointLeft, QPointRight):
         pixL = (QPointLeft.x(), QPointLeft.y())
         mirrorX = self.rightPicSize[0] - QPointRight.x()
@@ -371,10 +373,14 @@ class stereoPhoto(object):
         return X, Y
 
     
-    #Fonction qui lance l'affichage des deux fenêtres sur les écrans Planar (choix dans l'init)
-    #Création du dualManager qui utilise les pictures managers pour positionner les photos selon les régions superposées
+    #Fonction qui ouvre les deux fenêtres sur les écrans choisis
+    #Récupère les valeurs en pixels du centre de l'image
+    #Création du dualManager qui permet de calculer l'altitude
+    #Premier calcul de l'altitude du centre des images 
+    #Utilise le pourcentage de recouvrement pour placer les images
     #Affichage de l'image complète
-    #Affichage d'un curseur au centre des fenêtres  
+    #Affichage d'un curseur au centre des fenêtres
+    #Si possible appel la fonction pour afficher la couche vectorielle sur les images   
     def loadWindows(self, value):
 
         self.intLeftScreen = self.optWindow.ui.spinBoxLeftScreen.value()
@@ -405,10 +411,8 @@ class stereoPhoto(object):
         self.graphWindowLeft.close()
         self.graphWindowRight.close()
         
-        #self.leftRect, self.rightRect = self.dualManager.getRect()
         self.graphWindowLeft.cursorRectInit(self.screenLeft.width(), self.screenLeft.height())
         self.graphWindowRight.cursorRectInit(self.screenRight.width(), self.screenRight.height())
-
 
         self.graphWindowLeft.show()
         self.graphWindowRight.show()
@@ -433,8 +437,9 @@ class stereoPhoto(object):
         if self.enableDraw :
             self.addPolygonOnScreen()
 
-    ###Obligatoire après les imports, attention au thread aussi
-    #Call après le dernier thread.
+    #Fonction qui ajoute les polygones sur chaque image
+    #Elle concidère les coordonnées approximatives pour récupérer
+    #les polygones de la région sur la couche vectorielle
     def addPolygonOnScreen(self) :
         rectCoord = self.getShowRect()
         listGeo = list(self.vectorLayer.getFeatures(rectCoord))
@@ -471,7 +476,7 @@ class stereoPhoto(object):
 
     #Fonction pour permettre l'imporation de l'image sur le graphicsView
     #Similaire au fichier enhanceManager, une version de basse résolution de l'image est affichée immédiatement
-    #Par la suite, un un thread est lancer pour venir afficher les plus hautes résolutions
+    #Par la suite, un thread est lancé pour venir afficher les plus hautes résolutions
     #Le rehaussement, la rotation et l'effet miroir sont considérés
     #Les connections pour les fonctiones de navigations sont établies
     def mImportLeft(self):
@@ -508,7 +513,7 @@ class stereoPhoto(object):
         pointMax = self.graphWindowLeft.ui.graphicsView.mapToScene(QPoint(GV.width(),GV.height()))
 
         if self.showThreadLeftInProcess == False :
-            #self.threadSeekLeft(pointZero, pointMax, 0.5, 1, 2)
+            self.threadSeekLeft(pointZero, pointMax, 0.5, 1, 2)
             self.showThreadLeftInProcess = True
         else :
             self.newLeftRequest = True
@@ -559,7 +564,7 @@ class stereoPhoto(object):
         pointMax = self.graphWindowRight.ui.graphicsView.mapToScene(QPoint(GV.width(),GV.height()))
 
         if self.showThreadRightInProcess == False :
-            #self.threadSeekRight(pointZero, pointMax, 0.5, 1, 2)
+            self.threadSeekRight(pointZero, pointMax, 0.5, 1, 2)
             self.showThreadRightInProcess = True
         else :
             self.newRightRequest = True
@@ -573,7 +578,7 @@ class stereoPhoto(object):
             self.optWindow.ui.enhanceButton.setEnabled(True)
 
 
-    #Utiliser par threadShow pour afficher une portion de l'image
+    #Utiliser par threadShow pour afficher une portion de l'image à une certaine position
     def addLeftPixmap(self, pixmap, scaleFactor, topX, topY) :
         d = self.graphWindowLeft.ui.graphicsView.scene().addPixmap(pixmap)
         d.setScale(scaleFactor)
@@ -672,8 +677,8 @@ class stereoPhoto(object):
             win32api.SetCursorPos((self.optWindow.pos().x(), self.optWindow.pos().y()))
             self.graphWindowLeft.setCursor(self.graphWindowLeft.normalCursor)
 
-    #Désactive le cut pour activer le draw
-    #Initialise les variables de dessins à un état de base (aucun polygon)
+    #Active le draw et peut désactiver le cut
+    #Initialise les variables de dessins à un état de base
     def drawClick(self):
         self.optWindow.ui.cutButton.setChecked(False)
         self.optWindow.ui.drawButton.setChecked(True)
@@ -685,8 +690,8 @@ class stereoPhoto(object):
         self.currentLeftLineObj = None
         self.currentRightLineObj = None
 
-    #Désactive le draw pour activer le cut
-    #Initialise les variables de dessins à un état de base (aucun polygon)
+    #Active le cut et peut désactiver le draw
+    #Initialise les variables de dessins à un état de base
     def cutClick(self):
         self.optWindow.ui.cutButton.setChecked(True)
         self.optWindow.ui.drawButton.setChecked(False)
@@ -804,7 +809,8 @@ class stereoPhoto(object):
     #Lorsque les polygones se croisent, les polygones peuvent merger ou se séparer automatiquement
     #Il est aussi possible de découper les polygones
     #Les polygones s'affichent sur les deux images
-    #Le click droit permet de terminer une trace ou de quitter le pan si aucune option est sélectionné
+    #Le clic droit permet de terminer une trace ou de quitter le pan si aucune option est sélectionné
+    #Un clic permet de rafraîchir les valeurs XYZ affichées sur le menu
     def mPressEvent(self, ev):
 
         if self.optWindow.ui.panButton.isChecked():
@@ -896,8 +902,9 @@ class stereoPhoto(object):
                 self.optWindow.ui.panButton.setChecked(False)
                 self.panClick()
 
-    #Fonction pour zoom In/Out sur les photos avec la souris, elle zoom dans la 
-    #direction de la souris 
+    #Fonction activer par la roulette de la souris
+    #Avec la touche CTRL, il est possible de zoom In/Out sur les photos 
+    #Sinon il est possible de déplacer l'image de droite et d'actualiser la valeur Z du centre 
     def wheelEvent(self, event):
         factor = 1.41 ** (event.angleDelta().y() / 240.0)
         leftView = self.graphWindowLeft.ui.graphicsView
