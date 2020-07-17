@@ -157,7 +157,7 @@ class Ui_optionWindow(object):
         self.affichageButton.setObjectName("affichageButton")
         self.groupBoxShape = QtWidgets.QGroupBox(optionWindow)
         self.groupBoxShape.setEnabled(True)
-        self.groupBoxShape.setGeometry(QtCore.QRect(150, 440, 251, 251))
+        self.groupBoxShape.setGeometry(QtCore.QRect(150, 460, 251, 251))
         font = QtGui.QFont()
         font.setPointSize(10)
         font.setBold(True)
@@ -295,11 +295,30 @@ class Ui_optionWindow(object):
         self.label_10 = QtWidgets.QLabel(optionWindow)
         self.label_10.setGeometry(QtCore.QRect(205, 400, 161, 16))
         self.label_10.setObjectName("label_10")
-        self.spinBoxRecouvrement = QtWidgets.QSpinBox(optionWindow)
-        self.spinBoxRecouvrement.setGeometry(QtCore.QRect(360, 400, 51, 22))
-        self.spinBoxRecouvrement.setMaximum(100)
-        self.spinBoxRecouvrement.setProperty("value", 60)
-        self.spinBoxRecouvrement.setObjectName("spinBoxRecouvrement")
+        self.spinBoxRecouvrementH = QtWidgets.QSpinBox(optionWindow)
+        self.spinBoxRecouvrementH.setGeometry(QtCore.QRect(360, 400, 51, 22))
+        self.spinBoxRecouvrementH.setMaximum(100)
+        self.spinBoxRecouvrementH.setProperty("value", 60)
+        self.spinBoxRecouvrementH.setObjectName("spinBoxRecouvrementH")
+        self.groupBox = QtWidgets.QGroupBox(optionWindow)
+        self.groupBox.setGeometry(QtCore.QRect(30, 550, 111, 71))
+        self.groupBox.setObjectName("groupBox")
+        self.radioPointLayer = QtWidgets.QRadioButton(self.groupBox)
+        self.radioPointLayer.setGeometry(QtCore.QRect(20, 50, 82, 17))
+        self.radioPointLayer.setObjectName("radioPointLayer")
+        self.radioPolygonLayer = QtWidgets.QRadioButton(self.groupBox)
+        self.radioPolygonLayer.setGeometry(QtCore.QRect(20, 30, 82, 17))
+        self.radioPolygonLayer.setChecked(True)
+        self.radioPolygonLayer.setObjectName("radioPolygonLayer")
+        self.label_14 = QtWidgets.QLabel(optionWindow)
+        self.label_14.setGeometry(QtCore.QRect(205, 430, 161, 16))
+        self.label_14.setObjectName("label_14")
+        self.spinBoxRecouvrementV = QtWidgets.QSpinBox(optionWindow)
+        self.spinBoxRecouvrementV.setEnabled(False)
+        self.spinBoxRecouvrementV.setGeometry(QtCore.QRect(360, 430, 51, 22))
+        self.spinBoxRecouvrementV.setMaximum(100)
+        self.spinBoxRecouvrementV.setProperty("value", 100)
+        self.spinBoxRecouvrementV.setObjectName("spinBoxRecouvrementV")
         self.groupBoxRight.raise_()
         self.label_5.raise_()
         self.label_6.raise_()
@@ -311,7 +330,10 @@ class Ui_optionWindow(object):
         self.label_7.raise_()
         self.lineEditCurrentZ.raise_()
         self.label_10.raise_()
-        self.spinBoxRecouvrement.raise_()
+        self.spinBoxRecouvrementH.raise_()
+        self.groupBox.raise_()
+        self.label_14.raise_()
+        self.spinBoxRecouvrementV.raise_()
 
         self.retranslateUi(optionWindow)
         self.boxMiroirRight.setCurrentIndex(1)
@@ -359,7 +381,11 @@ class Ui_optionWindow(object):
         self.label_13.setText(_translate("optionWindow", "Valeur X du clic : "))
         self.panButton.setText(_translate("optionWindow", "Naviguer"))
         self.label_7.setText(_translate("optionWindow", "Valeur Z du centre: "))
-        self.label_10.setText(_translate("optionWindow", "Pourcentage de recouvrement:"))
+        self.label_10.setText(_translate("optionWindow", "Recouvrement Horizontal :"))
+        self.groupBox.setTitle(_translate("optionWindow", "Type de couche"))
+        self.radioPointLayer.setText(_translate("optionWindow", "Points"))
+        self.radioPolygonLayer.setText(_translate("optionWindow", "Polygones"))
+        self.label_14.setText(_translate("optionWindow", "Recouvrement Vertical :"))
 
 
 class dropedit(QtWidgets.QGroupBox):   
@@ -414,8 +440,14 @@ class optionWindow(QtWidgets.QMainWindow):
     def showImportVector(self):
         self.dictLayerName = {}
         for item in iface.mapCanvas().layers():
-            if item.type() == QgsMapLayerType.VectorLayer and item.geometryType() == QgsWkbTypes.PolygonGeometry: 
-                self.dictLayerName[item.name()] = item
+            if self.ui.radioPointLayer.isChecked() :
+                if item.type() == QgsMapLayerType.VectorLayer and item.geometryType() == QgsWkbTypes.PointGeometry: 
+                    self.dictLayerName[item.name()] = item
+            
+            elif self.ui.radioPolygonLayer.isChecked() :
+                if item.type() == QgsMapLayerType.VectorLayer and item.geometryType() == QgsWkbTypes.PolygonGeometry: 
+                    self.dictLayerName[item.name()] = item
+        
         if self.dictLayerName : 
             self.vectorWindow = getVectorLayer(self.dictLayerName)
             self.vectorWindow.show()

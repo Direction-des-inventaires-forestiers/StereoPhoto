@@ -103,6 +103,8 @@ class stereoPhoto(object):
 
         self.polygonOnLeftScreen = []
         self.polygonOnRightScreen = []
+        self.pointOnLeftScreen = []
+        self.pointOnRightScreen = []
 
         self.listParam = [0, 0, 0, 0, 0, 0, 0, False, False, []]
 
@@ -121,6 +123,7 @@ class stereoPhoto(object):
         
         self.optWindow.ui.panButton.clicked.connect(self.panClick)
         self.optWindow.ui.enhanceButton.clicked.connect(self.enhanceClick)
+        self.optWindow.ui.radioPolygonLayer.toggled.connect(self.radioLayerManager)
         self.optWindow.keyDrawEvent.connect(self.keyboardHandler)
 
         self.optWindow.ui.affichageButton.clicked.connect(self.loadWindows)
@@ -339,7 +342,10 @@ class stereoPhoto(object):
         QgsProject.instance().setCrs(self.vectorLayer.crs())
 
         if self.enableShow :
-            self.addPolygonOnScreen()
+            if self.optWindow.ui.radioPointLayer.isChecked() :
+                self.addPointOnScreen()
+            elif self.optWindow.ui.radioPolygonLayer.isChecked() :
+                self.addPolygonOnScreen()
 
     
     #Fonction qui détermine la région approximative des photos
@@ -403,8 +409,8 @@ class stereoPhoto(object):
         self.graphWindowRight.move(QPoint(self.screenRight.x(), self.screenRight.y()))
 
         self.dualManager = dualManager(self.leftPictureManager, self.rightPictureManager)
-        xLeft = (self.leftPicSize[0]/2)*((100-self.optWindow.ui.spinBoxRecouvrement.value())/100)
-        xRight = (self.rightPicSize[0]/2)*((100-self.optWindow.ui.spinBoxRecouvrement.value())/100)
+        xLeft = (self.leftPicSize[0]/2)*((100-self.optWindow.ui.spinBoxRecouvrementH.value())/100)
+        xRight = (self.rightPicSize[0]/2)*((100-self.optWindow.ui.spinBoxRecouvrementH.value())/100)
         self.leftRect = QRectF(xLeft, 0, self.leftPicSize[0], self.leftPicSize[1])
         self.rightRect = QRectF(xRight, 0, self.rightPicSize[0], self.rightPicSize[1]) 
         
@@ -435,7 +441,40 @@ class stereoPhoto(object):
         self.initAltitude = Z
         
         if self.enableDraw :
-            self.addPolygonOnScreen()
+            if self.optWindow.ui.radioPointLayer.isChecked() :
+                self.addPointOnScreen()
+            elif self.optWindow.ui.radioPolygonLayer.isChecked() :
+                self.addPolygonOnScreen()
+
+    def addPointOnScreen(self):
+        rectCoord = self.getShowRect()
+        listGeo = list(self.vectorLayer.getFeatures(rectCoord))
+
+        if self.pointOnLeftScreen :
+            for item in self.pointOnLeftScreen :
+                self.graphWindowLeft.ui.graphicsView.scene().removeItem(item)
+        self.pointOnLeftScreen = []
+
+        if self.pointOnRightScreen :
+            for item in self.pointOnRightScreen :
+                self.graphWindowRight.ui.graphicsView.scene().removeItem(item)
+        self.pointOnRightScreen = []
+            
+        for item in listGeo : 
+            featureGeo = item.geometry()
+            
+            if featureGeo.isNull() == False :
+
+                QgsPoint = featureGeo.asPoint()
+                xPixel, yPixel = self.leftPictureManager.coordToPixel((QgsPoint.x() , QgsPoint.y()), self.initAltitude) 
+                xRPixel = -xPixel + self.rightPicSize[0] + self.rightRect.x() + self.leftRect.x()
+
+                m_pen = QPen(QColor(0, 255, 255),14, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin)
+                m_brush = QBrush(QColor(0, 255, 255))
+                leftObj = self.graphWindowLeft.ui.graphicsView.scene().addEllipse(xPixel, yPixel, 50, 50, m_pen, m_brush)
+                rightObj = self.graphWindowRight.ui.graphicsView.scene().addEllipse(xRPixel, yPixel, 50, 50, m_pen, m_brush)
+                self.pointOnLeftScreen.append(leftObj)
+                self.pointOnRightScreen.append(rightObj)
 
     #Fonction qui ajoute les polygones sur chaque image
     #Elle concidère les coordonnées approximatives pour récupérer
@@ -513,7 +552,7 @@ class stereoPhoto(object):
         pointMax = self.graphWindowLeft.ui.graphicsView.mapToScene(QPoint(GV.width(),GV.height()))
 
         if self.showThreadLeftInProcess == False :
-            self.threadSeekLeft(pointZero, pointMax, 0.5, 1, 2)
+            #self.threadSeekLeft(pointZero, pointMax, 0.5, 1, 2)
             self.showThreadLeftInProcess = True
         else :
             self.newLeftRequest = True
@@ -564,7 +603,7 @@ class stereoPhoto(object):
         pointMax = self.graphWindowRight.ui.graphicsView.mapToScene(QPoint(GV.width(),GV.height()))
 
         if self.showThreadRightInProcess == False :
-            self.threadSeekRight(pointZero, pointMax, 0.5, 1, 2)
+            #self.threadSeekRight(pointZero, pointMax, 0.5, 1, 2)
             self.showThreadRightInProcess = True
         else :
             self.newRightRequest = True
@@ -615,7 +654,10 @@ class stereoPhoto(object):
     def seekLeftDone(self):
 
         if self.enableDraw and hasattr(self, "initAltitude"):
-            self.addPolygonOnScreen()
+            if self.optWindow.ui.radioPointLayer.isChecked() :
+                self.addPointOnScreen()
+            elif self.optWindow.ui.radioPolygonLayer.isChecked() :
+                self.addPolygonOnScreen()
 
         if self.newLeftRequest : 
             pointZero = self.graphWindowLeft.ui.graphicsView.mapToScene(QPoint(0,0))
@@ -636,7 +678,10 @@ class stereoPhoto(object):
     def seekRightDone(self):
 
         if self.enableDraw and hasattr(self, "initAltitude") :
-            self.addPolygonOnScreen()
+            if self.optWindow.ui.radioPointLayer.isChecked() :
+                self.addPointOnScreen()
+            elif self.optWindow.ui.radioPolygonLayer.isChecked() :
+                self.addPolygonOnScreen()
 
         if self.newRightRequest : 
             pointZero = self.graphWindowRight.ui.graphicsView.mapToScene(QPoint(0,0))
@@ -668,7 +713,8 @@ class stereoPhoto(object):
             self.graphWindowLeft.setCursor(self.graphWindowLeft.invisibleCursor)
             if self.enableDraw : 
                 self.optWindow.ui.drawButton.setEnabled(True)
-                self.optWindow.ui.cutButton.setEnabled(True)
+                if self.optWindow.ui.radioPolygonLayer.isChecked() :
+                    self.optWindow.ui.cutButton.setEnabled(True)
         
         else : 
             self.optWindow.ui.drawButton.setEnabled(False)
@@ -702,6 +748,24 @@ class stereoPhoto(object):
         self.firstDrawClick = True
         self.currentLeftLineObj = None
         self.currentRightLineObj = None
+
+    def radioLayerManager(self):
+
+        self.vectorLayer = None 
+        self.enableDraw = False
+        self.optWindow.ui.cutButton.setEnabled(False)
+        self.optWindow.ui.drawButton.setEnabled(False)
+
+        self.optWindow.ui.importLineVectorLayer.textChanged.disconnect(self.mNewVectorLayer)
+        self.optWindow.ui.importLineVectorLayer.setText("")
+        self.optWindow.ui.importLineVectorLayer.textChanged.connect(self.mNewVectorLayer)
+
+        if self.optWindow.ui.radioPointLayer.isChecked():
+            self.optWindow.ui.drawButton.setText("Ajouter Point (1)")
+        
+        elif self.optWindow.ui.radioPolygonLayer.isChecked():
+            self.optWindow.ui.drawButton.setText("Ajouter Polygon (1)")
+
     
     #Ouverture de la fenêtre de rehaussement
     def enhanceClick(self):
@@ -770,11 +834,11 @@ class stereoPhoto(object):
                 self.graphWindowLeft.ui.widget.setMouseTracking(True)
                 
             leftView.horizontalScrollBar().setValue(leftView.horizontalScrollBar().value() - self.deltaX)
-            leftView.verticalScrollBar().setValue(leftView.verticalScrollBar().value() - self.deltaY)
+            leftView.verticalScrollBar().setValue(leftView.verticalScrollBar().value() + self.deltaY)
             rightView.horizontalScrollBar().setValue(rightView.horizontalScrollBar().value() + self.deltaX)
-            rightView.verticalScrollBar().setValue(rightView.verticalScrollBar().value() - self.deltaY)
+            rightView.verticalScrollBar().setValue(rightView.verticalScrollBar().value() + self.deltaY)
         
-            if (self.optWindow.ui.drawButton.isChecked() or self.optWindow.ui.cutButton.isChecked()) and not self.firstDrawClick :
+            if (self.optWindow.ui.drawButton.isChecked() or self.optWindow.ui.cutButton.isChecked()) and not self.firstDrawClick and self.optWindow.ui.radioPolygonLayer.isChecked() :
 
                 
                 pointL = QPoint(self.panCenterLeft[0], self.panCenterLeft[1])
@@ -831,7 +895,7 @@ class stereoPhoto(object):
             self.optWindow.ui.lineEditYClic.setText(str(round(Y,5)))
             self.optWindow.ui.lineEditZClic.setText(str(round(Z,2)))
             
-            if self.optWindow.ui.drawButton.isChecked() or self.optWindow.ui.cutButton.isChecked():
+            if (self.optWindow.ui.drawButton.isChecked() or self.optWindow.ui.cutButton.isChecked()) and self.optWindow.ui.radioPolygonLayer.isChecked() :
 
                 if ev.button() == Qt.LeftButton:
                     if self.firstDrawClick :
@@ -897,7 +961,26 @@ class stereoPhoto(object):
                     
                     self.addPolygonOnScreen()
                     
-            
+            elif self.optWindow.ui.radioPointLayer.isChecked() and self.optWindow.ui.drawButton.isChecked() :
+                
+                if ev.button() == Qt.LeftButton:
+                    pointL = QPoint(self.panCenterLeft[0], self.panCenterLeft[1])
+                    pointR = QPoint(self.panCenterRight[0], self.panCenterRight[1])
+                    self.startDrawPointLeft = self.graphWindowLeft.ui.graphicsView.mapToScene(pointL)
+                    self.startDrawPointRight = self.graphWindowRight.ui.graphicsView.mapToScene(pointR)
+                    
+                    X, Y = self.dualPixelToCoord(self.startDrawPointLeft, self.startDrawPointRight)
+                    
+                    point = QgsPointXY(X,Y)
+                    geometry =  QgsGeometry.fromPointXY(point)
+                    self.vectorLayer.startEditing()
+                    feat = QgsFeature()
+                    feat.setGeometry(geometry)
+                    self.vectorLayer.dataProvider().addFeature(feat)
+                    self.vectorLayer.commitChanges()
+                    self.addPointOnScreen()
+
+
             elif ev.button() == Qt.RightButton :
                 self.optWindow.ui.panButton.setChecked(False)
                 self.panClick()
