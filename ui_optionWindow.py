@@ -314,7 +314,6 @@ class Ui_optionWindow(object):
         self.label_14.setGeometry(QtCore.QRect(205, 430, 161, 16))
         self.label_14.setObjectName("label_14")
         self.spinBoxRecouvrementV = QtWidgets.QSpinBox(optionWindow)
-        self.spinBoxRecouvrementV.setEnabled(False)
         self.spinBoxRecouvrementV.setGeometry(QtCore.QRect(360, 430, 51, 22))
         self.spinBoxRecouvrementV.setMaximum(100)
         self.spinBoxRecouvrementV.setProperty("value", 100)
@@ -421,6 +420,7 @@ class optionWindow(QtWidgets.QMainWindow):
         self.ui.importToolLeft.clicked.connect(self.showImportLeft)
         self.ui.importToolVectorLayer.clicked.connect(self.showImportVector)
         self.ctrlClick = False
+        self.shiftClick = False 
         self.shapePath = ""
         self.vLayer = None
 
@@ -479,6 +479,8 @@ class optionWindow(QtWidgets.QMainWindow):
     def keyPressEvent(self, event):
         if event.key() == QtCore.Qt.Key_Control:
             self.ctrlClick = True
+        elif event.key() == QtCore.Qt.Key_Shift :
+            self.shiftClick = True
         elif event.key() == QtCore.Qt.Key_1:
             self.keyDrawEvent.emit("1")
         elif event.key() == QtCore.Qt.Key_2 :
@@ -490,6 +492,7 @@ class optionWindow(QtWidgets.QMainWindow):
 
     def keyReleaseEvent(self, event):
         self.ctrlClick = False
+        self.shiftClick = False
 
 
 

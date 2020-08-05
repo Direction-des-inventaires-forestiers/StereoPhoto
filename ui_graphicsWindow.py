@@ -48,6 +48,7 @@ class graphicsWindow(QtWidgets.QMainWindow):
         self.ui = Ui_graphicsWindow()
         self.ui.setupUi(self, nom)
         self.ctrlClick = False
+        self.shiftClick = False
         self.myRect = QtCore.QRect()
         self.myPen = QtGui.QPen()
         self.rayon = 20
@@ -63,6 +64,8 @@ class graphicsWindow(QtWidgets.QMainWindow):
     def keyPressEvent(self, event):
         if event.key() == QtCore.Qt.Key_Control:
             self.ctrlClick = True
+        elif event.key() == QtCore.Qt.Key_Shift :
+            self.shiftClick = True
         elif event.key() == QtCore.Qt.Key_1:
             self.keyDrawEvent.emit("1")
         elif event.key() == QtCore.Qt.Key_2 :
@@ -75,6 +78,7 @@ class graphicsWindow(QtWidgets.QMainWindow):
 
     def keyReleaseEvent(self, event):
         self.ctrlClick = False
+        self.shiftClick = False
 
     #Détermine la position du curseur 
     def cursorRectInit(self, x, y):

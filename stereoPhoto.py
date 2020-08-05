@@ -86,8 +86,8 @@ class stereoPhoto(object):
 
         self.leftOrientation = 0
         self.rightOrientation = 0
-        self.leftMiroir = 0
-        self.rightMiroir = 1
+        self.leftMiroir = 1
+        self.rightMiroir = 0
 
 
         self.leftName = False 
@@ -204,13 +204,16 @@ class stereoPhoto(object):
     def mNewLeftPic(self) : 
 
         self.optWindow.ui.boxOrientationLeft.setCurrentIndex(0)
-        self.optWindow.ui.boxMiroirLeft.setCurrentIndex(0)
+        self.optWindow.ui.boxMiroirLeft.setCurrentIndex(1)
 
         self.intLeftScreen = self.optWindow.ui.spinBoxLeftScreen.value()
         self.screenLeft = QApplication.desktop().screenGeometry(self.intLeftScreen)
         self.panCenterLeft = (int(self.screenLeft.width()/2), int(self.screenLeft.height()/2))
         self.leftScreenCenter = ( self.screenLeft.x() + int(self.screenLeft.width()/2), self.screenLeft.y() + int(self.screenLeft.height()/2))
           
+        self.leftOrientation = 0
+        self.leftMiroir = 1
+
         self.leftName = False
         self.optWindow.ui.affichageButton.setEnabled(False)
 
@@ -270,14 +273,14 @@ class stereoPhoto(object):
     def mNewRightPic(self):
         
         self.optWindow.ui.boxOrientationRight.setCurrentIndex(0)
-        self.optWindow.ui.boxMiroirRight.setCurrentIndex(1)
+        self.optWindow.ui.boxMiroirRight.setCurrentIndex(0)
 
         self.intRightScreen = self.optWindow.ui.spinBoxRightScreen.value()
         self.screenRight = QApplication.desktop().screenGeometry(self.intRightScreen)
         self.panCenterRight = (int(self.screenRight.width()/2), int(self.screenRight.height()/2))
 
         self.rightOrientation = 0
-        self.rightMiroir = 1
+        self.rightMiroir = 0
         self.rightName = False
         self.optWindow.ui.affichageButton.setEnabled(False)
 
@@ -366,9 +369,29 @@ class stereoPhoto(object):
     #Utilise les deux pixels pour faire le calcul du Z et des coordonnées
     #Retourne la valeur des coordonnées moyennées
     def dualPixelToCoord(self, QPointLeft, QPointRight):
-        pixL = (QPointLeft.x(), QPointLeft.y())
-        mirrorX = self.rightPicSize[0] - QPointRight.x()
-        pixR = (mirrorX, QPointRight.y())
+        
+        if self.leftMiroir == 1 :
+            mirrorX = self.leftPicSize[0] - QPointLeft.x()
+            pixL = (mirrorX, QPointLeft.y())
+    
+        elif self.leftMiroir == 2 :
+            mirrorY = self.leftPicSize[1] - QPointLeft.y()
+            pixL = (QPointLeft.x(), mirrorY)
+    
+        else :
+            pixL = (QPointLeft.x(), QPointLeft.y())            
+
+        if self.rightMiroir == 1 :
+            mirrorX = self.rightPicSize[0] - QPointRight.x()
+            pixR = (mirrorX, QPointRight.y())
+
+        elif self.rightMiroir == 2 :
+            mirrorY = self.rightPicSize[1] - QPointRight.y()
+            pixR = (QPointRight.x(), mirrorY)
+
+        else : 
+            pixR = (QPointRight.x(), QPointRight.y())
+        
         Z = self.dualManager.calculateZ(pixL, pixR)
         XL, YL = self.leftPictureManager.pixelToCoord(pixL, Z)
         XR, YR = self.rightPictureManager.pixelToCoord(pixR, Z)
@@ -408,11 +431,20 @@ class stereoPhoto(object):
         self.graphWindowRight.ui.widget.setGeometry(rect)
         self.graphWindowRight.move(QPoint(self.screenRight.x(), self.screenRight.y()))
 
+        if self.leftOrientation == 1 or self.leftOrientation == 3 :
+            self.leftPicSize = (self.leftPicSize[1], self.leftPicSize[0])
+
+        if self.rightOrientation == 1 or self.rightOrientation == 3 : 
+            self.rightPicSize = (self.rightPicSize[1], self.rightPicSize[0]) 
+
+
         self.dualManager = dualManager(self.leftPictureManager, self.rightPictureManager)
         xLeft = (self.leftPicSize[0]/2)*((100-self.optWindow.ui.spinBoxRecouvrementH.value())/100)
         xRight = (self.rightPicSize[0]/2)*((100-self.optWindow.ui.spinBoxRecouvrementH.value())/100)
-        self.leftRect = QRectF(xLeft, 0, self.leftPicSize[0], self.leftPicSize[1])
-        self.rightRect = QRectF(xRight, 0, self.rightPicSize[0], self.rightPicSize[1]) 
+        yLeft = (self.leftPicSize[1]/2)*((100-self.optWindow.ui.spinBoxRecouvrementV.value())/100)
+        yRight = (self.rightPicSize[1]/2)*((100-self.optWindow.ui.spinBoxRecouvrementV.value())/100)
+        self.leftRect = QRectF(xLeft, yLeft, self.leftPicSize[0], self.leftPicSize[1])
+        self.rightRect = QRectF(xRight, yRight, self.rightPicSize[0], self.rightPicSize[1]) 
         
         self.graphWindowLeft.close()
         self.graphWindowRight.close()
@@ -432,9 +464,30 @@ class stereoPhoto(object):
         
         centerPointLeft = self.graphWindowLeft.ui.graphicsView.mapToScene(QPoint(self.panCenterLeft[0], self.panCenterLeft[1]))
         centerPointRight = self.graphWindowRight.ui.graphicsView.mapToScene(QPoint(self.panCenterRight[0], self.panCenterRight[1]))
-        self.centerPixelLeft = (centerPointLeft.x(), centerPointLeft.y())
-        mirrorX = self.rightPicSize[0] - centerPointRight.x()
-        self.centerPixelRight = (mirrorX, centerPointRight.y())
+
+        if self.leftMiroir == 1 :
+            mirrorX = self.leftPicSize[0] - centerPointLeft.x()
+            self.centerPixelLeft = (mirrorX, centerPointLeft.y())
+        
+        elif self.leftMiroir == 2 :
+            mirrorY = self.leftPicSize[1] - centerPointLeft.y()
+            self.centerPixelLeft = (centerPointLeft.x(), mirrorY)
+       
+        else :
+            self.centerPixelLeft = (centerPointLeft.x(), centerPointLeft.y())            
+
+        if self.rightMiroir == 1 :
+            mirrorX = self.rightPicSize[0] - centerPointRight.x()
+            self.centerPixelRight = (mirrorX, centerPointRight.y())
+
+        elif self.rightMiroir == 2 :
+            mirrorY = self.rightPicSize[1] - centerPointRight.y()
+            self.centerPixelRight = (centerPointRight.x(), mirrorY)
+
+        else : 
+            self.centerPixelRight = (centerPointRight.x(), centerPointRight.y())
+
+
         Z = self.dualManager.calculateZ(self.centerPixelLeft, self.centerPixelRight)
         self.optWindow.ui.lineEditCurrentZ.setText(str(round(Z,2)))
 
@@ -467,12 +520,33 @@ class stereoPhoto(object):
 
                 QgsPoint = featureGeo.asPoint()
                 xPixel, yPixel = self.leftPictureManager.coordToPixel((QgsPoint.x() , QgsPoint.y()), self.initAltitude) 
-                xRPixel = -xPixel + self.rightPicSize[0] + self.rightRect.x() + self.leftRect.x()
+                
+                if self.leftMiroir == 1 :
+                    mirrorX = -xPixel + self.leftPicSize[0] + self.rightRect.x() + self.leftRect.x()
+                    pixL = (mirrorX, yPixel)
+            
+                elif self.leftMiroir == 2 :
+                    mirrorY = -yPixel + self.leftPicSize[1] + self.rightRect.y() + self.leftRect.y()
+                    pixL = (xPixel, mirrorY)
+            
+                else :
+                    pixL = (xPixel, yPixel)            
 
+                if self.rightMiroir == 1 :
+                    mirroirX = -xPixel + self.rightPicSize[0] + self.rightRect.x() + self.leftRect.x()
+                    pixL = (mirrorX, yPixel)
+
+                elif self.rightMiroir == 2 :
+                    mirrorY = -yPixel + self.rightPicSize[1] + self.rightRect.y() + self.leftRect.y()
+                    pixR = (xPixel, mirrorY)
+
+                else : 
+                    pixR = (xPixel, yPixel)
+                
                 m_pen = QPen(QColor(0, 255, 255),14, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin)
                 m_brush = QBrush(QColor(0, 255, 255))
-                leftObj = self.graphWindowLeft.ui.graphicsView.scene().addEllipse(xPixel, yPixel, 50, 50, m_pen, m_brush)
-                rightObj = self.graphWindowRight.ui.graphicsView.scene().addEllipse(xRPixel, yPixel, 50, 50, m_pen, m_brush)
+                leftObj = self.graphWindowLeft.ui.graphicsView.scene().addEllipse(pixL[0], pixL[1], 50, 50, m_pen, m_brush)
+                rightObj = self.graphWindowRight.ui.graphicsView.scene().addEllipse(pixR[0], pixR[1], 50, 50, m_pen, m_brush)
                 self.pointOnLeftScreen.append(leftObj)
                 self.pointOnRightScreen.append(rightObj)
 
@@ -502,10 +576,35 @@ class stereoPhoto(object):
                 polygonL = QPolygonF()
                 polygonR = QPolygonF()
                 for point in listQgsPoint :
-                    xPixel, yPixel = self.leftPictureManager.coordToPixel((point.x() , point.y()), self.initAltitude)     
-                    polygonL.append(QPointF(xPixel, yPixel))
-                    xRPixel = -xPixel + self.rightPicSize[0] + self.rightRect.x() + self.leftRect.x()
-                    polygonR.append(QPointF(xRPixel, yPixel))
+
+                    xPixel, yPixel = self.leftPictureManager.coordToPixel((point.x() , point.y()), self.initAltitude)
+
+                    if self.leftMiroir == 1 :
+                        mirrorX = -xPixel + self.leftPicSize[0] + self.rightRect.x() + self.leftRect.x()
+                        pixL = (mirrorX, yPixel)
+                
+                    elif self.leftMiroir == 2 :
+                        mirrorY = -yPixel + self.leftPicSize[1] + self.rightRect.y() + self.leftRect.y()
+                        pixL = (xPixel, mirrorY)
+                
+                    else :
+                        pixL = (xPixel, yPixel)            
+
+                    if self.rightMiroir == 1 :
+                        mirroirX = -xPixel + self.rightPicSize[0] + self.rightRect.x() + self.leftRect.x()
+                        pixL = (mirrorX, yPixel)
+
+                    elif self.rightMiroir == 2 :
+                        mirrorY = -yPixel + self.rightPicSize[1] + self.rightRect.y() + self.leftRect.y()
+                        pixR = (xPixel, mirrorY)
+
+                    else : 
+                        pixR = (xPixel, yPixel)
+
+
+
+                    polygonL.append(QPointF(pixL[0], pixL[1]))
+                    polygonR.append(QPointF(pixR[0], pixR[1]))
 
                 m_pen = QPen(QColor(0, 255, 255),10, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin)
                 leftObj = self.graphWindowLeft.ui.graphicsView.scene().addPolygon(polygonL, m_pen)
@@ -845,6 +944,31 @@ class stereoPhoto(object):
                 pointR = QPoint(self.panCenterRight[0], self.panCenterRight[1])
                 self.endDrawPointLeft = self.graphWindowLeft.ui.graphicsView.mapToScene(pointL)
                 self.endDrawPointRight = self.graphWindowRight.ui.graphicsView.mapToScene(pointR)
+                
+                if self.leftMiroir == 1 :
+                    mirrorX = -xPixel + self.leftPicSize[0] + self.rightRect.x() + self.leftRect.x()
+                    pixL = (mirrorX, yPixel)
+            
+                elif self.leftMiroir == 2 :
+                    mirrorY = -yPixel + self.leftPicSize[1] + self.rightRect.y() + self.leftRect.y()
+                    pixL = (xPixel, mirrorY)
+            
+                else :
+                    pixL = (xPixel, yPixel)            
+
+                if self.rightMiroir == 1 :
+                    mirroirX = -xPixel + self.rightPicSize[0] + self.rightRect.x() + self.leftRect.x()
+                    pixL = (mirrorX, yPixel)
+
+                elif self.rightMiroir == 2 :
+                    mirrorY = -yPixel + self.rightPicSize[1] + self.rightRect.y() + self.leftRect.y()
+                    pixR = (xPixel, mirrorY)
+
+                else : 
+                    pixR = (xPixel, yPixel)
+
+                
+                
                 lineL = QLineF(self.startDrawPointLeft, self.endDrawPointLeft)
                 
                 xStartPoint = -self.startDrawPointLeft.x() + self.rightPicSize[0] + self.rightRect.x() + self.leftRect.x()
@@ -883,9 +1007,30 @@ class stereoPhoto(object):
             pointRight = QPoint(self.panCenterRight[0], self.panCenterRight[1])
             centerPointLeft = self.graphWindowLeft.ui.graphicsView.mapToScene(pointLeft)
             centerPointRight = self.graphWindowRight.ui.graphicsView.mapToScene(pointRight)
-            pixL = (centerPointLeft.x(), centerPointLeft.y())
-            mirrorX = self.rightPicSize[0] - centerPointRight.x()
-            pixR = (mirrorX, centerPointRight.y())
+
+
+            if self.leftMiroir == 1 :
+                mirrorX = self.leftPicSize[0] - centerPointLeft.x()
+                pixL = (mirrorX, centerPointLeft.y())
+        
+            elif self.leftMiroir == 2 :
+                mirrorY = self.leftPicSize[1] - centerPointLeft.y()
+                pixL = (centerPointLeft.x(), mirrorY)
+        
+            else :
+                pixL = (centerPointLeft.x(), centerPointLeft.y())            
+
+            if self.rightMiroir == 1 :
+                mirrorX = self.rightPicSize[0] - centerPointRight.x()
+                pixR = (mirrorX, centerPointRight.y())
+
+            elif self.rightMiroir == 2 :
+                mirrorY = self.rightPicSize[1] - centerPointRight.y()
+                pixR = (centerPointRight.x(), mirrorY)
+
+            else : 
+                pixR = (centerPointRight.x(), centerPointRight.y())
+
             Z = self.dualManager.calculateZ(pixL, pixR)
             XL, YL = self.leftPictureManager.pixelToCoord(pixL, Z)
             XR, YR = self.rightPictureManager.pixelToCoord(pixR, Z)
@@ -1000,6 +1145,20 @@ class stereoPhoto(object):
             else :
                 leftView.scale(0.8, 0.8)
                 rightView.scale(0.8, 0.8)
+
+        elif self.optWindow.shiftClick or self.graphWindowLeft.shiftClick or self.graphWindowRight.shiftClick :
+            bPoint = self.graphWindowRight.ui.graphicsView.mapToScene(QPoint(self.panCenterRight[0], self.panCenterRight[1]))
+            if factor > 1 : 
+                rightView.verticalScrollBar().setValue(rightView.verticalScrollBar().value() - 1)
+            else :
+                rightView.verticalScrollBar().setValue(rightView.verticalScrollBar().value() + 1)
+
+            aPoint = self.graphWindowRight.ui.graphicsView.mapToScene(QPoint(self.panCenterRight[0], self.panCenterRight[1]))
+            diffY = aPoint.y() - bPoint.y()
+
+            self.centerPixelRight = (self.centerPixelRight[0], self.centerPixelRight[1]-diffY) 
+            Z = self.dualManager.calculateZ(self.centerPixelLeft, self.centerPixelRight)
+            self.optWindow.ui.lineEditCurrentZ.setText(str(round(Z,2)))
 
         else : 
 
