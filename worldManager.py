@@ -32,8 +32,12 @@ class pictureManager():
         
     def initPAR(self):
 
-        f = open(self.pathPAR) # if case si le read fonctionne pas changer le encoding pour open(...,encoding = 'ANSI') problème seulement dans QGIS
-        s = f.read() 
+        try :
+            f = open(self.pathPAR) 
+            s = f.read()
+        except : 
+            f = open(self.pathPAR, encoding='ANSI')
+            s = f.read() 
         a = []
         for i in range(len(self.paramPAR)) : 
             v1 = s.find(self.paramPAR[i])
@@ -157,3 +161,9 @@ class dualManager() :
         rectR = QRectF(-(pixR[0] - midR[0]), pixR[1] - midR[1], self.rightManager.sizePicture[0], self.rightManager.sizePicture[1]) 
         return rectL, rectR
 
+'''
+class demManager() :
+    b.identify(QgsPointXY(-70.00001,48),QgsRaster.IdentifyFormatValue).results()'''
+
+    #Coord 1 = centre et son Z
+    #Coord 2 = Coord calculer + Z 

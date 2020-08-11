@@ -335,7 +335,7 @@ class Ui_optionWindow(object):
         self.spinBoxRecouvrementV.raise_()
 
         self.retranslateUi(optionWindow)
-        self.boxMiroirRight.setCurrentIndex(1)
+        self.boxMiroirLeft.setCurrentIndex(1)
         QtCore.QMetaObject.connectSlotsByName(optionWindow)
 
     def retranslateUi(self, optionWindow):

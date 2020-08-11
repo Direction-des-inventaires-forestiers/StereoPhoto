@@ -398,6 +398,12 @@ class stereoPhoto(object):
 
         X = (XL + XR) / 2
         Y = (YL + YR) / 2
+        #print(XL)
+        #print(XR)
+        #print(YL)
+        #print(YR)
+        #print(X)
+        #print(Y)
         
         return X, Y
 
@@ -522,22 +528,24 @@ class stereoPhoto(object):
                 xPixel, yPixel = self.leftPictureManager.coordToPixel((QgsPoint.x() , QgsPoint.y()), self.initAltitude) 
                 
                 if self.leftMiroir == 1 :
-                    mirrorX = -xPixel + self.leftPicSize[0] + self.rightRect.x() + self.leftRect.x()
+                    mirrorX = -xPixel + self.leftPicSize[0] 
                     pixL = (mirrorX, yPixel)
             
                 elif self.leftMiroir == 2 :
-                    mirrorY = -yPixel + self.leftPicSize[1] + self.rightRect.y() + self.leftRect.y()
+                    mirrorY = -yPixel + self.leftPicSize[1]
                     pixL = (xPixel, mirrorY)
             
                 else :
                     pixL = (xPixel, yPixel)            
 
+                xPixel, yPixel = self.rightPictureManager.coordToPixel((QgsPoint.x() , QgsPoint.y()), self.initAltitude) 
+                
                 if self.rightMiroir == 1 :
-                    mirroirX = -xPixel + self.rightPicSize[0] + self.rightRect.x() + self.leftRect.x()
-                    pixL = (mirrorX, yPixel)
+                    mirrorX = -xPixel + self.rightPicSize[0]
+                    pixR = (mirrorX, yPixel)
 
                 elif self.rightMiroir == 2 :
-                    mirrorY = -yPixel + self.rightPicSize[1] + self.rightRect.y() + self.leftRect.y()
+                    mirrorY = -yPixel + self.rightPicSize[1]
                     pixR = (xPixel, mirrorY)
 
                 else : 
@@ -580,28 +588,28 @@ class stereoPhoto(object):
                     xPixel, yPixel = self.leftPictureManager.coordToPixel((point.x() , point.y()), self.initAltitude)
 
                     if self.leftMiroir == 1 :
-                        mirrorX = -xPixel + self.leftPicSize[0] + self.rightRect.x() + self.leftRect.x()
+                        mirrorX = -xPixel + self.leftPicSize[0]
                         pixL = (mirrorX, yPixel)
                 
                     elif self.leftMiroir == 2 :
-                        mirrorY = -yPixel + self.leftPicSize[1] + self.rightRect.y() + self.leftRect.y()
+                        mirrorY = -yPixel + self.leftPicSize[1] 
                         pixL = (xPixel, mirrorY)
                 
                     else :
                         pixL = (xPixel, yPixel)            
 
+                    xPixel, yPixel = self.rightPictureManager.coordToPixel((point.x() , point.y()), self.initAltitude)
+                    
                     if self.rightMiroir == 1 :
-                        mirroirX = -xPixel + self.rightPicSize[0] + self.rightRect.x() + self.leftRect.x()
-                        pixL = (mirrorX, yPixel)
+                        mirrorX = -xPixel + self.rightPicSize[0]
+                        pixR = (mirrorX, yPixel)
 
                     elif self.rightMiroir == 2 :
-                        mirrorY = -yPixel + self.rightPicSize[1] + self.rightRect.y() + self.leftRect.y()
+                        mirrorY = -yPixel + self.rightPicSize[1]
                         pixR = (xPixel, mirrorY)
 
                     else : 
                         pixR = (xPixel, yPixel)
-
-
 
                     polygonL.append(QPointF(pixL[0], pixL[1]))
                     polygonR.append(QPointF(pixR[0], pixR[1]))
@@ -651,7 +659,7 @@ class stereoPhoto(object):
         pointMax = self.graphWindowLeft.ui.graphicsView.mapToScene(QPoint(GV.width(),GV.height()))
 
         if self.showThreadLeftInProcess == False :
-            #self.threadSeekLeft(pointZero, pointMax, 0.5, 1, 2)
+            self.threadSeekLeft(pointZero, pointMax, 0.5, 1, 2)
             self.showThreadLeftInProcess = True
         else :
             self.newLeftRequest = True
@@ -702,7 +710,7 @@ class stereoPhoto(object):
         pointMax = self.graphWindowRight.ui.graphicsView.mapToScene(QPoint(GV.width(),GV.height()))
 
         if self.showThreadRightInProcess == False :
-            #self.threadSeekRight(pointZero, pointMax, 0.5, 1, 2)
+            self.threadSeekRight(pointZero, pointMax, 0.5, 1, 2)
             self.showThreadRightInProcess = True
         else :
             self.newRightRequest = True
@@ -861,9 +869,29 @@ class stereoPhoto(object):
 
         if self.optWindow.ui.radioPointLayer.isChecked():
             self.optWindow.ui.drawButton.setText("Ajouter Point (1)")
+            
+            if self.polygonOnLeftScreen :
+                for item in self.polygonOnLeftScreen :
+                    self.graphWindowLeft.ui.graphicsView.scene().removeItem(item)
+            self.polygonOnLeftScreen = []
+
+            if self.polygonOnRightScreen :
+                for item in self.polygonOnRightScreen :
+                    self.graphWindowRight.ui.graphicsView.scene().removeItem(item)
+            self.polygonOnRightScreen = []
         
         elif self.optWindow.ui.radioPolygonLayer.isChecked():
             self.optWindow.ui.drawButton.setText("Ajouter Polygon (1)")
+            
+            if self.pointOnLeftScreen :
+                for item in self.pointOnLeftScreen :
+                    self.graphWindowLeft.ui.graphicsView.scene().removeItem(item)
+            self.pointOnLeftScreen = []
+
+            if self.pointOnRightScreen :
+                for item in self.pointOnRightScreen :
+                    self.graphWindowRight.ui.graphicsView.scene().removeItem(item)
+            self.pointOnRightScreen = []
 
     
     #Ouverture de la fenêtre de rehaussement
@@ -946,38 +974,58 @@ class stereoPhoto(object):
                 self.endDrawPointRight = self.graphWindowRight.ui.graphicsView.mapToScene(pointR)
                 
                 if self.leftMiroir == 1 :
-                    mirrorX = -xPixel + self.leftPicSize[0] + self.rightRect.x() + self.leftRect.x()
-                    pixL = (mirrorX, yPixel)
+                    xStartPoint = -self.startDrawPointLeft.x() + self.leftPicSize[0]
+                    startRightPoint = QPointF(xStartPoint, self.startDrawPointLeft.y())
+                
+                    xEndPoint = -self.endDrawPointLeft.x() + self.leftPicSize[0]
+                    endRightPoint = QPointF(xEndPoint, self.endDrawPointLeft.y())
+                
+                    lineL = QLineF(startRightPoint, endRightPoint)
             
                 elif self.leftMiroir == 2 :
-                    mirrorY = -yPixel + self.leftPicSize[1] + self.rightRect.y() + self.leftRect.y()
-                    pixL = (xPixel, mirrorY)
+                    yStartPoint = -self.startDrawPointRight.y() + self.leftPicSize[1]
+                    startRightPoint = QPointF(self.startDrawPointLeft.x(), yStartPoint)
+                
+                    yEndPoint = -self.endDrawPointLeft.y() + self.leftPicSize[1]
+                    endRightPoint = QPointF(self.endDrawPointLeft.x(), yEndPoint)
+                    
+                    lineL = QLineF(startRightPoint, endRightPoint)
             
                 else :
-                    pixL = (xPixel, yPixel)            
+                    lineL = QLineF(self.startDrawPointLeft, self.endDrawPointLeft)            
 
                 if self.rightMiroir == 1 :
-                    mirroirX = -xPixel + self.rightPicSize[0] + self.rightRect.x() + self.leftRect.x()
-                    pixL = (mirrorX, yPixel)
+                    xStartPoint = -self.startDrawPointRight.x() + self.rightPicSize[0]
+                    startRightPoint = QPointF(xStartPoint, self.startDrawPointRight.y())
+                
+                    xEndPoint = -self.endDrawPointRight.x() + self.rightPicSize[0]
+                    endRightPoint = QPointF(xEndPoint, self.endDrawPointRight.y())
+                
+                    lineR = QLineF(startRightPoint, endRightPoint)
 
                 elif self.rightMiroir == 2 :
-                    mirrorY = -yPixel + self.rightPicSize[1] + self.rightRect.y() + self.leftRect.y()
-                    pixR = (xPixel, mirrorY)
+                    yStartPoint = -self.startDrawPointRight.y() + self.rightPicSize[1]
+                    startRightPoint = QPointF(self.startDrawPointRight.x(), yStartPoint)
+                
+                    yEndPoint = -self.endDrawPointRight.y() + self.rightPicSize[1]
+                    endRightPoint = QPointF(self.endDrawPointRight.x(), yEndPoint)
+                
+                    lineR = QLineF(startRightPoint, endRightPoint)
 
                 else : 
-                    pixR = (xPixel, yPixel)
+                    lineR = QLineF(self.startDrawPointRight, self.endDrawPointRight) 
 
+                #################
                 
                 
-                lineL = QLineF(self.startDrawPointLeft, self.endDrawPointLeft)
                 
-                xStartPoint = -self.startDrawPointLeft.x() + self.rightPicSize[0] + self.rightRect.x() + self.leftRect.x()
-                startRightPoint = QPointF(xStartPoint, self.startDrawPointLeft.y())
+                #xStartPoint = -self.startDrawPointLeft.x() + self.rightPicSize[0] + self.rightRect.x() + self.leftRect.x()
+                #startRightPoint = QPointF(xStartPoint, self.startDrawPointLeft.y())
                 
-                xEndPoint = -self.endDrawPointLeft.x() + self.rightPicSize[0] + self.rightRect.x() + self.leftRect.x()
-                endRightPoint = QPointF(xEndPoint, self.endDrawPointLeft.y())
+                #xEndPoint = -self.endDrawPointLeft.x() + self.rightPicSize[0] + self.rightRect.x() + self.leftRect.x()
+                #endRightPoint = QPointF(xEndPoint, self.endDrawPointLeft.y())
                 
-                lineR = QLineF(startRightPoint, endRightPoint)
+                #lineR = QLineF(startRightPoint, endRightPoint)
 
                 m_pen = QPen(QColor(0, 255, 255),10, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin)
 
