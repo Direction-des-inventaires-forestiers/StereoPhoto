@@ -15,7 +15,8 @@ Il est aussi possible de calculer le Z pour un point donné en utilisant l'infor
 '''
 
 from math import cos, sin, radians
-from qgis.PyQt.QtCore import QRectF
+#from qgis.PyQt.QtCore import QRectF
+from PyQt5.QtCore import QRectF
 
 
 class pictureManager(): 
@@ -72,6 +73,10 @@ class pictureManager():
         #Pixel central de la photo traduit en mm -> Utile pour les calculs 
         self.PPCx = self.AffineA * (self.sizePicture[0]/2) + self.AffineB * (self.sizePicture[1]/2) + self.AffineC 
         self.PPCy = self.AffineD * (self.sizePicture[0]/2) + self.AffineE * (self.sizePicture[1]/2) + self.AffineF 
+        #print(self.PPCx)
+        #print(self.PPCy)
+        self.PPCy = 0
+        self.PPCx = 0
 
 
     def initDEM(self):
@@ -167,3 +172,11 @@ class demManager() :
 
     #Coord 1 = centre et son Z
     #Coord 2 = Coord calculer + Z 
+
+"""
+path = "U:\\Photos\\q18067_171_rgb.par"
+size = [11310,17310]
+a = pictureManager(size,path,'a')
+pix = [11310/2,17310/2]
+print(a.pixelToCoord(size,300))
+"""
