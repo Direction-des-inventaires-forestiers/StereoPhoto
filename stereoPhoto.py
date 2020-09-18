@@ -33,6 +33,7 @@ Plusieurs autres outils seront intégrés à cette application dans le futur :
     et bien d'autre
 
 '''
+
 from qgis.gui import *
 from qgis.core import *
 from qgis.PyQt.QtWidgets import *
@@ -558,6 +559,83 @@ class stereoPhoto(object):
                 self.pointOnLeftScreen.append(leftObj)
                 self.pointOnRightScreen.append(rightObj)
 
+    def addLineOnScreen(self):
+        rectCoord = self.getShowRect()
+        listGeo = list(self.vectorLayer.getFeatures(rectCoord))
+
+        
+        pointOnLeftScreen, pointOnRightScreen
+        
+        self.lineOnLeftScreen
+        self.lineOnRightScreen
+
+        if self.lineOnLeftScreen :
+            for item in self.lineOnLeftScreen :
+                self.graphWindowLeft.ui.graphicsView.scene().removeItem(item)
+        self.lineOnLeftScreen = []
+
+        if self.lineOnRightScreen :
+            for item in self.lineOnRightScreen :
+                self.graphWindowRight.ui.graphicsView.scene().removeItem(item)
+        self.lineOnRightScreen = []
+            
+        for item in listGeo : 
+            featureGeo = item.geometry()
+            
+            if featureGeo.isNull() == False :
+
+                QgsPoints = featureGeo.asMultiPolyline()[0]
+                lastPixelL = None
+                lastPixelR = None
+                #a.getFeature(0).geometry().asMultiPolyline()[0]
+                for point in QgsPoints :
+                    xPixel, yPixel = self.leftPictureManager.coordToPixel((point.x() , point.y()), self.initAltitude)
+
+                    if self.leftMiroir == 1 :
+                        mirrorX = -xPixel + self.leftPicSize[0]
+                        pixL = (mirrorX, yPixel)
+                
+                    elif self.leftMiroir == 2 :
+                        mirrorY = -yPixel + self.leftPicSize[1] 
+                        pixL = (xPixel, mirrorY)
+                
+                    else :
+                        pixL = (xPixel, yPixel)            
+
+                    xPixel, yPixel = self.rightPictureManager.coordToPixel((point.x() , point.y()), self.initAltitude)
+                    
+                    if self.rightMiroir == 1 :
+                        mirrorX = -xPixel + self.rightPicSize[0]
+                        pixR = (mirrorX, yPixel)
+
+                    elif self.rightMiroir == 2 :
+                        mirrorY = -yPixel + self.rightPicSize[1]
+                        pixR = (xPixel, mirrorY)
+
+                    else : 
+                        pixR = (xPixel, yPixel)
+
+                    if lastPixelL and lastPixelR :
+                        m_pen = QPen(QColor(0, 255, 255),14, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin)
+                        m_brush = QBrush(QColor(0, 255, 255))
+                        leftObj = self.graphWindowLeft.ui.graphicsView.scene().addEllipse(pixL[0], pixL[1], 50, 50, m_pen, m_brush)
+                        rightObj = self.graphWindowRight.ui.graphicsView.scene().addEllipse(pixR[0], pixR[1], 50, 50, m_pen, m_brush)
+                        self.pointOnLeftScreen.append(leftObj)
+                        self.pointOnRightScreen.append(rightObj)
+
+
+
+
+                    lastPixelL = pixL
+                    lastPixelR = pixR
+                
+                m_pen = QPen(QColor(0, 255, 255),14, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin)
+                m_brush = QBrush(QColor(0, 255, 255))
+                leftObj = self.graphWindowLeft.ui.graphicsView.scene().addEllipse(pixL[0], pixL[1], 50, 50, m_pen, m_brush)
+                rightObj = self.graphWindowRight.ui.graphicsView.scene().addEllipse(pixR[0], pixR[1], 50, 50, m_pen, m_brush)
+                self.pointOnLeftScreen.append(leftObj)
+                self.pointOnRightScreen.append(rightObj)
+
     #Fonction qui ajoute les polygones sur chaque image
     #Elle concidère les coordonnées approximatives pour récupérer
     #les polygones de la région sur la couche vectorielle
@@ -659,7 +737,7 @@ class stereoPhoto(object):
         pointMax = self.graphWindowLeft.ui.graphicsView.mapToScene(QPoint(GV.width(),GV.height()))
 
         if self.showThreadLeftInProcess == False :
-            self.threadSeekLeft(pointZero, pointMax, 0.5, 1, 2)
+            #self.threadSeekLeft(pointZero, pointMax, 0.5, 1, 2)
             self.showThreadLeftInProcess = True
         else :
             self.newLeftRequest = True
@@ -710,7 +788,7 @@ class stereoPhoto(object):
         pointMax = self.graphWindowRight.ui.graphicsView.mapToScene(QPoint(GV.width(),GV.height()))
 
         if self.showThreadRightInProcess == False :
-            self.threadSeekRight(pointZero, pointMax, 0.5, 1, 2)
+            #self.threadSeekRight(pointZero, pointMax, 0.5, 1, 2)
             self.showThreadRightInProcess = True
         else :
             self.newRightRequest = True
@@ -1177,6 +1255,10 @@ class stereoPhoto(object):
             elif ev.button() == Qt.RightButton :
                 self.optWindow.ui.panButton.setChecked(False)
                 self.panClick()
+
+        else :
+            self.optWindow.ui.panButton.setChecked(True)
+            self.panClick()
 
     #Fonction activer par la roulette de la souris
     #Avec la touche CTRL, il est possible de zoom In/Out sur les photos 

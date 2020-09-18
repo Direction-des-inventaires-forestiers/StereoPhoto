@@ -892,7 +892,7 @@
      <x>30</x>
      <y>550</y>
      <width>111</width>
-     <height>71</height>
+     <height>101</height>
     </rect>
    </property>
    <property name="title">
@@ -902,7 +902,7 @@
     <property name="geometry">
      <rect>
       <x>20</x>
-      <y>50</y>
+      <y>70</y>
       <width>82</width>
       <height>17</height>
      </rect>
@@ -925,6 +925,19 @@
     </property>
     <property name="checked">
      <bool>true</bool>
+    </property>
+   </widget>
+   <widget class="QRadioButton" name="radioLineLayer">
+    <property name="geometry">
+     <rect>
+      <x>20</x>
+      <y>50</y>
+      <width>82</width>
+      <height>17</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Lignes</string>
     </property>
    </widget>
   </widget>
@@ -970,7 +983,7 @@
     <string>Modèle numérique de terrain : </string>
    </property>
   </widget>
-  <widget class="QLineEdit" name="lineEdit">
+  <widget class="QLineEdit" name="lineEditMNT">
    <property name="geometry">
     <rect>
      <x>160</x>
@@ -980,7 +993,7 @@
     </rect>
    </property>
   </widget>
-  <widget class="QToolButton" name="toolButton">
+  <widget class="QToolButton" name="toolButtonMNT">
    <property name="geometry">
     <rect>
      <x>380</x>
@@ -1009,8 +1022,8 @@
   <zorder>label_14</zorder>
   <zorder>spinBoxRecouvrementV</zorder>
   <zorder>label_15</zorder>
-  <zorder>lineEdit</zorder>
-  <zorder>toolButton</zorder>
+  <zorder>lineEditMNT</zorder>
+  <zorder>toolButtonMNT</zorder>
  </widget>
  <resources>
   <include location="resources.qrc"/>
