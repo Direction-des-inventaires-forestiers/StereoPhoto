@@ -49,7 +49,7 @@ def createShape(shapeName, EPSG):
 
 #Future fonction propose la liste des current layers et choisir parmis la liste ou tout simplement créer une nouvelle couche
 #Pour le moment, elle retourne la couche active
-def getVectorLayer():
+def getVectorActiveLayer():
     return iface.activeLayer()
 
 def getRectPolygon(rect, vectorLayer):
