@@ -376,12 +376,14 @@ class optionWindow(QtWidgets.QMainWindow):
             self.shiftClick = True
         elif event.key() == QtCore.Qt.Key_Z:    
             self.altClick = True
-        elif event.key() == QtCore.Qt.Key_1:
-            self.keyDrawEvent.emit("1")
-        elif event.key() == QtCore.Qt.Key_2 :
-            self.keyDrawEvent.emit("2") 
-        elif event.key() == QtCore.Qt.Key_3:
-            self.keyDrawEvent.emit("3")
+        elif event.key() == QtCore.Qt.Key_W:
+            self.keyDrawEvent.emit("N")
+        elif event.key() == QtCore.Qt.Key_A :
+            self.keyDrawEvent.emit("O") 
+        elif event.key() == QtCore.Qt.Key_S :
+            self.keyDrawEvent.emit("S") 
+        elif event.key() == QtCore.Qt.Key_D :
+            self.keyDrawEvent.emit("E") 
         elif event.key() == QtCore.Qt.Key_Escape:
             self.keyDrawEvent.emit("ESC")
 
