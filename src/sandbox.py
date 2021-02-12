@@ -13,6 +13,10 @@ import math, time, threading, win32api
 from PIL import Image, ImageOps, ImageEnhance, ImageStat
 #print(pen.)
 
+#cropV = (2000,0,11310,17310)
+#i = Image.open('C:\\Users\\pinfr1\\Downloads\\Photos\\AP13052_0930_RGB.tif')
+#i.seek(3)
+
 #Image.MAX_IMAGE_PIXELS = 1000000000 
 
 #image = Image.open("//ulysse/LIDAR/Developpement/Programmation/FP/Stereoscopie/Rehaussements_SUMMIT/q19596_019_rgb.tif")
@@ -245,15 +249,15 @@ with mouse.Listener(
         on_scroll=on_scroll) as listener:
     listener.join()"""
 
-win32api.SetCursorPos((960,540))
+#win32api.SetCursorPos((960,540))
 """listener = mouse.Listener(
     on_move=on_move,
     on_click=on_click,
     on_scroll=on_scroll)
 listener.start()"""
 
-time.sleep(1)
-listener.stop()
+#time.sleep(1)
+#listener.stop()
 
 
 

@@ -110,7 +110,7 @@ class Ui_optionWindow(object):
         font.setBold(False)
         font.setWeight(50)
         self.pushButtonShowPicture.setFont(font)
-        self.pushButtonShowPicture.setCheckable(True)
+        #self.pushButtonShowPicture.setCheckable(True)
         self.pushButtonShowPicture.setObjectName("pushButtonShowPicture")
         self.label_7 = QtWidgets.QLabel(optionWindow)
         self.label_7.setGeometry(QtCore.QRect(170, 430, 91, 16))

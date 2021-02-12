@@ -46,6 +46,7 @@ class pictureManager():
             w = s[v1:v2]
             a.append(w.split(" ")) 
 
+        f.close()
         self.AffineA = float(a[0][-6])
         self.AffineB = float(a[0][-5])
         self.AffineC = float(a[0][-4])

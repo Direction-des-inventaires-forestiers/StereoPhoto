@@ -35,6 +35,7 @@ Plusieurs autres outils seront intégrés à cette application dans le futur :
 
 '''
 
+from PyQt5 import QtWidgets
 from qgis.gui import *
 from qgis.core import *
 from qgis.PyQt.QtWidgets import *
@@ -45,7 +46,7 @@ from qgis.PyQt.QtGui import *
 #from PyQt5.QtCore import *
 #from PyQt5.QtGui import *
 
-from PIL import Image, ImageDraw
+from PIL import Image
 import numpy as np
 from . import resources
 
@@ -82,6 +83,18 @@ class stereoPhoto(object):
     def unload(self):
         self.iface.removePluginMenu("&StereoPhoto", self.action)
         self.iface.removeToolBarIcon(self.action)
+
+    def run2(self):
+        pass
+        '''
+        from .dock import dockWindow
+        self.d = dockWindow(self.iface)
+        self.iface.addDockWidget(Qt.RightDockWidgetArea, self.d)
+        class dockWindow(QtWidgets.QDockWidget): 
+            def __init__(self, iface):
+                QtWidgets.QMainWindow.__init__(self, iface.mainWindow())
+                self.ui = Ui_StereoDockWidget()
+                self.ui.setupUi(self)'''
         
     #Initialisation de l'application et des variables
     #Connection entre les boutons du menu d'options (mOpt) et leurs fonctions attitrées
@@ -93,6 +106,7 @@ class stereoPhoto(object):
         self.showThreadRightInProcess = False
         self.newRightRequest = False
         self.enableDraw = False
+        self.enableShow = False
 
         self.isEstPicture = False
 
@@ -102,8 +116,8 @@ class stereoPhoto(object):
         self.listParam = [0, 0, 0, 0, 0, 0, 0, False, False, []]
 
         #Je garde ces variables par simplicité et compréhension 
-        self.leftOrientation = self.rightOrientation = self.rightMiroir = 0
-        self.leftMiroir = 1
+        self.leftOrientation = self.rightOrientation = self.leftMiroir = 0
+        self.rightMiroir = 1
 
         self.optWindow = optionWindow()
         
@@ -122,7 +136,6 @@ class stereoPhoto(object):
         
         self.optWindow.ui.pushButtonRemoveShape.clicked.connect(self.removePolygonOnScreen)
         self.optWindow.keyDrawEvent.connect(self.keyboardHandler)
-
         self.optWindow.closeWindow.connect(self.optWindowClose)
 
         nbScreen = QApplication.desktop().screenCount()-1
@@ -136,6 +149,14 @@ class stereoPhoto(object):
     #Si l'on ferme le mOpt toutes les autres fenêtres Qt se ferment
     def closeAllSideWindows(self) :
         scene = QGraphicsScene()
+        if hasattr(self, "tSeekLeft"): 
+            try : self.tSeekLeft.newImage.disconnect(self.addLeftPixmap)
+            except: pass
+            self.tSeekLeft.keepRunning = False
+        if hasattr(self, "tSeekRight"): 
+            try : self.tSeekRight.newImage.disconnect(self.addRightPixmap)
+            except: pass
+            self.tSeekRight.keepRunning = False
         if hasattr(self, "graphWindowLeft"):
             self.graphWindowLeft.ui.graphicsView.setScene(scene)
             self.graphWindowLeft.close()
@@ -251,7 +272,7 @@ class stereoPhoto(object):
                 self.demoLeftPic.seek(i)
                 if self.demoLeftPic.size < (200,200) :
                     self.demoLeftPic.seek(i-1)
-                    leftPic = pictureLayout(self.demoLeftPic, 0, 0, True)
+                    leftPic = pictureLayout(self.demoLeftPic, self.leftOrientation, self.leftMiroir, True)
                     sceneLeft = QGraphicsScene()
                     sceneLeft.addPixmap(QPixmap.fromImage(leftPic))
                     
@@ -265,7 +286,7 @@ class stereoPhoto(object):
                 self.demoRightPic.seek(i)
                 if self.demoRightPic.size < (200,200) :
                     self.demoRightPic.seek(i-1)
-                    rightPic = pictureLayout(self.demoRightPic, 0, 0, True)
+                    rightPic = pictureLayout(self.demoRightPic, self.rightOrientation, self.rightMiroir, True)
                     sceneRight = QGraphicsScene()
                     sceneRight.addPixmap(QPixmap.fromImage(rightPic))
                     
@@ -287,14 +308,9 @@ class stereoPhoto(object):
 
         if self.setPairID(newID) :  self.addNewPair()
 
-        if self.optWindow.ui.pushButtonShowPicture.isEnabled():
+        if self.enableShow:
             self.loadNewPair()
-            #self.closeAllSideWindows() ??
-            #self.startViewing() ?? on doit concidérer des appels similaire, mais les fenêtres existent déjà 
 
-        #Sera disponible avec WASD donc regarder pushbuttonShowPicture.isEnabled() -> plus tard
-        #Toujours en fonction de l'image de gauche
-        #selon l'orientation donnée, détermine la prochaine paire
 
     def createGraphicsWindows(self) : 
 
@@ -319,7 +335,6 @@ class stereoPhoto(object):
         
 
         self.graphWindowLeft.ui.widget.mouseMoveEvent = self.mMoveEvent
-        self.graphWindowLeft.ui.widget.mousePressEvent = self.mPressEvent
         self.graphWindowLeft.ui.widget.wheelEvent = self.wheelEvent
 
         
@@ -333,31 +348,26 @@ class stereoPhoto(object):
         self.graphWindowLeft.cursorRectInit(self.screenLeft.width(), self.screenLeft.height())
         self.graphWindowRight.cursorRectInit(self.screenRight.width(), self.screenRight.height())
 
-        centerPointLeft = self.graphWindowLeft.ui.graphicsView.mapToScene(QPoint(self.panCenterLeft[0], self.panCenterLeft[1]))
-        centerPointRight = self.graphWindowRight.ui.graphicsView.mapToScene(QPoint(self.panCenterRight[0], self.panCenterRight[1]))
-        mirrorX = self.leftPicSize[0] - centerPointLeft.x()
-        self.centerPixelLeft = (mirrorX, centerPointLeft.y())            
-        self.centerPixelRight = (centerPointRight.x(), centerPointRight.y())
+        
+        #22 est la taille en pixel de la barre du haute de la fenetre
+        #Il y a toujours un petit pan lorsqu'on active le Pan sinon 
+        self.lastX = self.panCenterLeft[0]
+        self.lastY = self.panCenterLeft[1] - 22
+        win32api.SetCursorPos(self.leftScreenCenter)
+        self.graphWindowLeft.ui.widget.setMouseTracking(True)
+        self.graphWindowLeft.setCursor(self.graphWindowLeft.invisibleCursor)
 
-        #Avant ou après le show?
+        self.enableShow = True
         self.loadNewPair()
 
-        self.graphWindowLeft.show()
-        self.graphWindowRight.show()
-        #self.optWindow.activateWindow()
         
     def loadNewPair(self):
-
-        try :self.leftPic.close()
-        except : pass
 
         if hasattr(self, "tSeekLeft"): 
             try : self.tSeekLeft.newImage.disconnect(self.addLeftPixmap)
             except: pass
             self.tSeekLeft.keepRunning = False
 
-        try :self.rightPic.close()
-        except : pass
 
         if hasattr(self, "tSeekRight"): 
             try : self.tSeekRight.newImage.disconnect(self.addRightPixmap)
@@ -367,54 +377,71 @@ class stereoPhoto(object):
         self.leftPic = Image.open(self.currentLeftTIF)
         self.rightPic = Image.open(self.currentRightTIF)  
 
-        self.leftPicSize = self.leftPic.size
-        self.rightPicSize = self.rightPic.size
+        fullLeftPicSize = self.leftPic.size
+        fullRightPicSize = self.rightPic.size
+
+        self.leftPic.close()
+        self.rightPic.close()
+
+        xLeft = (fullLeftPicSize[0])*((100-self.optWindow.ui.spinBoxRecouvrementH.value())/100)
+        xRight = (fullRightPicSize[0])*((100-self.optWindow.ui.spinBoxRecouvrementH.value())/100)
+        
+        yLeft = yRight = 0
+        #yLeft = (fullLeftPicSize[1])*((100-self.optWindow.ui.spinBoxRecouvrementV.value())/100)
+        #yRight = (fullRightPicSize[1])*((100-self.optWindow.ui.spinBoxRecouvrementV.value())/100)
+        
+        self.cropValueLeft = (xLeft, yLeft, int(fullLeftPicSize[0]), int(fullLeftPicSize[1]))
+        self.cropValueRight = (xRight, yRight, int(fullRightPicSize[0]), int(fullRightPicSize[1]))
+
+        self.leftPicSize = (fullLeftPicSize[0]-xLeft, fullLeftPicSize[1]-yLeft)
+        self.rightPicSize = (fullRightPicSize[0]-xRight, fullRightPicSize[1]-yRight)
+
+        self.leftRect = QRectF(0, 0, self.leftPicSize[0], self.leftPicSize[1])
+        self.rightRect = QRectF(0, 0, self.rightPicSize[0], self.rightPicSize[1]) 
+        self.graphWindowLeft.currentRect = self.leftRect
+        self.graphWindowRight.currentRect = self.rightRect
 
         self.leftPictureManager = pictureManager(self.leftPicSize, self.currentLeftPAR, "aa")
         self.rightPictureManager = pictureManager(self.rightPicSize, self.currentRightPAR, "aa")
 
         self.dualManager = dualManager(self.leftPictureManager, self.rightPictureManager)
-        Z = self.dualManager.calculateZ(self.centerPixelLeft, self.centerPixelRight)
         
+        #Il serait bien d'être capable d'ajuster les portions des images affichées selon les pourcentages de recouvrement 
+        #Image de gauche -> Le pourcentage commence à la fin de l'image 
+        #Image de droite -> Le pourcentage commence au début de l'image
+ 
+        self.getSceneFromPath(self.currentLeftTIF, self.leftMiroir, self.graphWindowLeft, self.cropValueLeft)
+        self.getSceneFromPath(self.currentRightTIF, self.rightMiroir, self.graphWindowRight, self.cropValueRight)
+
+        self.graphWindowLeft.ui.graphicsView.show()
+        self.graphWindowRight.ui.graphicsView.show()
+        self.graphWindowRight.show()
+        self.graphWindowLeft.show()
+       
+        
+        centerPointLeft = self.graphWindowLeft.ui.graphicsView.mapToScene(QPoint(self.panCenterLeft[0], self.panCenterLeft[1]))
+        centerPointRight = self.graphWindowRight.ui.graphicsView.mapToScene(QPoint(self.panCenterRight[0], self.panCenterRight[1]))
+
+        mirrorX = self.rightPicSize[0] - centerPointRight.x()
+        self.centerPixelLeft = (centerPointLeft.x()+self.cropValueLeft[0], centerPointLeft.y())            
+        self.centerPixelRight = (mirrorX, centerPointRight.y())
+
+        Z = self.dualManager.calculateZ(self.centerPixelLeft, self.centerPixelRight)
         #Seulement pour debug pour le moment
         self.optWindow.ui.lineEditCurrentZ.setText(str(round(Z,2)))
-
         self.initAltitude = Z
-        
         extentRect = self.getShowRect()
         self.canvas.setExtent(extentRect)
 
-        xLeft = (self.leftPicSize[0]/2)*((100-self.optWindow.ui.spinBoxRecouvrementH.value())/100)
-        xRight = (self.rightPicSize[0]/2)*((100-self.optWindow.ui.spinBoxRecouvrementH.value())/100)
-        yLeft = (self.leftPicSize[1]/2)*((100-self.optWindow.ui.spinBoxRecouvrementV.value())/100)
-        yRight = (self.rightPicSize[1]/2)*((100-self.optWindow.ui.spinBoxRecouvrementV.value())/100)
-        self.leftRect = QRectF(xLeft, yLeft, self.leftPicSize[0], self.leftPicSize[1])
-        self.rightRect = QRectF(xRight, yRight, self.rightPicSize[0], self.rightPicSize[1]) 
-        
-        self.graphWindowLeft.ui.graphicsView.fitInView(self.leftRect, Qt.KeepAspectRatio)
-        self.graphWindowRight.ui.graphicsView.fitInView(self.rightRect, Qt.KeepAspectRatio)
-        self.graphWindowLeft.ui.graphicsView.update()
-        self.graphWindowRight.ui.graphicsView.update()
+        self.polygonOnLeftScreen = []
+        self.polygonOnRightScreen = []
+        if self.enableDraw : 
+            self.addPolygonOnScreen()
 
-        #Retirer le seek(1) du traitement du thread -> inutile et perte de temps
-        #Rajuster les fonctions pour être capable de charger la région d'intérêt + buffer? en premier
-        #Il serait bien d'être capable d'ajuster les portions des images affichées selon les pourcentages de recouvrement 
- 
-        sceneLeft = self.getSceneFromPath(self.currentLeftTIF, self.leftMiroir)
-        self.graphWindowLeft.ui.graphicsView.setScene(sceneLeft)
-
-
-        sceneRight = self.getSceneFromPath(self.currentRightTIF, self.rightMiroir)
-        self.graphWindowRight.ui.graphicsView.setScene(sceneRight)
-
-        #Est-ce que ça fonctionne correctement? manquerait juste un buffer        
         leftTop = self.graphWindowLeft.ui.graphicsView.mapToScene(QPoint(0,0))
         LGV = self.graphWindowLeft.ui.graphicsView
         leftButtom = self.graphWindowLeft.ui.graphicsView.mapToScene(QPoint(LGV.width(),LGV.height()))
 
-
-        #Revoir toutes les fonctions seekThread -> que ce passe-t-il si on retire le seek(1)
-        #Maybe retirer même 1,0,1 si 1 seek unique
         if self.showThreadLeftInProcess == False :
             self.threadSeekLeft(leftTop, leftButtom, 1, 0, 1)
             self.showThreadLeftInProcess = True
@@ -430,40 +457,29 @@ class stereoPhoto(object):
             self.showThreadRightInProcess = True
         else :
             self.newRightRequest = True
+
         
-        self.graphWindowLeft.ui.graphicsView.show()
-        self.graphWindowRight.ui.graphicsView.show()
-        self.graphWindowLeft.ui.graphicsView.fitInView(self.leftRect, Qt.KeepAspectRatio)
-        self.graphWindowRight.ui.graphicsView.fitInView(self.rightRect, Qt.KeepAspectRatio)
-        self.graphWindowLeft.ui.graphicsView.update()
-        self.graphWindowRight.ui.graphicsView.update()
-        
-        #Ouvre les 2 graphicsViews -> remplace loads windows
-        #ajoute les fonctionnalités du bouton naviguer  
-        #escape doit fermé les deux graphicsViews
-        #rajouter wasd pour le déplacement de paire  
-        
-        
-    def getSceneFromPath(self,tifPath, miroir):
+    def getSceneFromPath(self, tifPath, miroir, graphWindow, cropValue):
 
         img = Image.open(tifPath)
         #Seek(3) est le facteur le plus petit qui permet un affichage immédiat d'une image
         img.seek(3)
+        divCropValue = map(lambda val : val/8, cropValue)
 
         thread = imageEnhancing(img, self.listParam)
         thread.start()
         retVal = thread.join()
 
         enhancePic = Image.merge("RGB", (retVal[0],retVal[1],retVal[2]))
-        QtImg = pictureLayout(enhancePic, 0, miroir, True)
+        QtImg = pictureLayout(enhancePic, 0, miroir, True, divCropValue)
 
         scene = QGraphicsScene()
-        scene.setSceneRect(-50000,-50000,50000,50000)
+        scene.setSceneRect(-100000,-100000,200000,200000)
 
         obj = scene.addPixmap(QPixmap.fromImage(QtImg))      
-        obj.setScale(8)        
+        obj.setScale(8)      
+        graphWindow.ui.graphicsView.setScene(scene)
         img.close()
-
         return scene
 
     #Fonction qui récupère la couche vectorielle et change le SIG de QGIS 
@@ -480,16 +496,16 @@ class stereoPhoto(object):
     def getShowRect(self) :
         
         if hasattr(self, "leftRect"): 
-            endLeft = [self.leftRect.x() + self.leftRect.width(), self.leftRect.y() + self.leftRect.height()]
-            
+
+            #endLeft = [self.leftRect.x() + self.leftRect.width(), self.leftRect.y() + self.leftRect.height()]
             #topXL, topYL = self.leftPictureManager.pixelToCoord([self.leftRect.x(),self.leftRect.y()],self.initAltitude)
             #botXL, botYL = self.leftPictureManager.pixelToCoord(endLeft,self.initAltitude)
             
 
             #Il a été montré que self.initAltitude peut avoir un trop grand écart avec des portions de l'image
             #Ainsi il est possible de manquer des polygones dans la zone
-            topXL, topYL = self.leftPictureManager.pixelToCoord([0,0],self.initAltitude)
-            botXL, botYL = self.leftPictureManager.pixelToCoord([self.leftRect.width(), self.leftRect.height()],self.initAltitude)
+            topXL, topYL = self.leftPictureManager.pixelToCoord([self.cropValueLeft[0],self.cropValueLeft[1]],self.initAltitude)
+            botXL, botYL = self.leftPictureManager.pixelToCoord([self.cropValueLeft[2], self.cropValueLeft[3]],self.initAltitude)
             
             rectL = QgsRectangle(QgsPointXY(topXL, topYL), QgsPointXY(botXL, botYL))
             return rectL
@@ -502,28 +518,10 @@ class stereoPhoto(object):
     #Retourne la valeur des coordonnées moyennées
     def dualPixelToCoord(self, QPointLeft, QPointRight):
         
-        if self.leftMiroir == 1 :
-            mirrorX = self.leftPicSize[0] - QPointLeft.x()
-            pixL = (mirrorX, QPointLeft.y())
-    
-        elif self.leftMiroir == 2 :
-            mirrorY = self.leftPicSize[1] - QPointLeft.y()
-            pixL = (QPointLeft.x(), mirrorY)
-    
-        else :
-            pixL = (QPointLeft.x(), QPointLeft.y())            
+        pixL = (QPointLeft.x(), QPointLeft.y())            
+        mirrorX = self.rightPicSize[0] - QPointRight.x()
+        pixR = (mirrorX, QPointRight.y())
 
-        if self.rightMiroir == 1 :
-            mirrorX = self.rightPicSize[0] - QPointRight.x()
-            pixR = (mirrorX, QPointRight.y())
-
-        elif self.rightMiroir == 2 :
-            mirrorY = self.rightPicSize[1] - QPointRight.y()
-            pixR = (QPointRight.x(), mirrorY)
-
-        else : 
-            pixR = (QPointRight.x(), QPointRight.y())
-        
         Z = self.dualManager.calculateZ(pixL, pixR)
         XL, YL = self.leftPictureManager.pixelToCoord(pixL, Z)
         XR, YR = self.rightPictureManager.pixelToCoord(pixR, Z)
@@ -573,43 +571,20 @@ class stereoPhoto(object):
         self.polygonOnRightScreen = []
             
         for item in listGeo : 
-            featureGeo = item.geometry() #-Fonctionnement différent pour Polygone Z et ZM? as MultiPolygon
+            featureGeo = item.geometry() 
             
             if featureGeo.isNull() == False :
 
-                #listQgsPoint = featureGeo.asMultiPolygon()[0][0]
-                lenGeo =  len(featureGeo.asPolygon()[0])
-                #listQgsPoint = featureGeo.vertexAt(int)
-                #len(featureGeo.asPolygon()[0])
                 polygonL = QPolygonF()
                 polygonR = QPolygonF()
-                for nb in range(lenGeo) :
-                    data = featureGeo.vertexAt(nb)
+                for vertex in featureGeo.vertices():
+                    data = vertex
                     xPixel, yPixel = self.leftPictureManager.coordToPixel((data.x() , data.y()), data.z())
-
-                    if self.leftMiroir == 1 :
-                        mirrorX = -xPixel + self.leftPicSize[0]
-                        pixL = (mirrorX, yPixel)
-                
-                    elif self.leftMiroir == 2 :
-                        mirrorY = -yPixel + self.leftPicSize[1] 
-                        pixL = (xPixel, mirrorY)
-                
-                    else :
-                        pixL = (xPixel, yPixel)            
+                    pixL = (xPixel-self.cropValueLeft[0], yPixel)            
 
                     xPixel, yPixel = self.rightPictureManager.coordToPixel((data.x() , data.y()), data.z())
-                    
-                    if self.rightMiroir == 1 :
-                        mirrorX = -xPixel + self.rightPicSize[0]
-                        pixR = (mirrorX, yPixel)
-
-                    elif self.rightMiroir == 2 :
-                        mirrorY = -yPixel + self.rightPicSize[1]
-                        pixR = (xPixel, mirrorY)
-
-                    else : 
-                        pixR = (xPixel, yPixel)
+                    mirrorX = self.rightPicSize[0] - xPixel
+                    pixR = (mirrorX, yPixel)
 
                     polygonL.append(QPointF(pixL[0], pixL[1]))
                     polygonR.append(QPointF(pixR[0], pixR[1]))
@@ -634,7 +609,7 @@ class stereoPhoto(object):
 
     #Fonction qui permet de lancer le thread d'affichage des images de plus grande qualité
     def threadSeekLeft(self, pointZero, pointMax, multiFactor, seekFactor, scaleFactor):
-        self.tSeekLeft = threadShow(self.currentLeftTIF, pointZero, pointMax, multiFactor, seekFactor, scaleFactor, self.listParam, self.leftOrientation, self.leftMiroir)
+        self.tSeekLeft = threadShow(self.currentLeftTIF, pointZero, pointMax, multiFactor, seekFactor, scaleFactor, self.listParam, self.leftOrientation, self.leftMiroir, self.cropValueLeft)
         self.tSeekLeft.newImage.connect(self.addLeftPixmap)
         self.tSeekLeft.finished.connect(self.seekLeftDone)
         self.showThreadLeftInProcess = True
@@ -643,7 +618,7 @@ class stereoPhoto(object):
 
     #IDEM à threadSeekLeft
     def threadSeekRight(self, pointZero, pointMax, multiFactor, seekFactor, scaleFactor):
-        self.tSeekRight = threadShow(self.currentRightTIF, pointZero, pointMax, multiFactor, seekFactor, scaleFactor, self.listParam, self.rightOrientation, self.rightMiroir)
+        self.tSeekRight = threadShow(self.currentRightTIF, pointZero, pointMax, multiFactor, seekFactor, scaleFactor, self.listParam, self.rightOrientation, self.rightMiroir, self.cropValueRight)
         self.tSeekRight.newImage.connect(self.addRightPixmap)
         self.tSeekRight.finished.connect(self.seekRightDone)
         self.showThreadRightInProcess = True
@@ -656,16 +631,10 @@ class stereoPhoto(object):
     #elle relance le thread avec une plus grande résolution d'image 
     def seekLeftDone(self):
 
-        if self.enableDraw and hasattr(self, "initAltitude"):
+        if self.enableDraw and hasattr(self, "initAltitude") and hasattr(self, "graphWindowLeft"):
             self.addPolygonOnScreen()
 
         if self.newLeftRequest : 
-            pointZero = self.graphWindowLeft.ui.graphicsView.mapToScene(QPoint(0,0))
-            GV = self.graphWindowLeft.ui.graphicsView
-            pointMax = self.graphWindowLeft.ui.graphicsView.mapToScene(QPoint(GV.width(),GV.height()))
-            self.threadSeekLeft(pointZero, pointMax, 0.5, 1, 2)
-
-        elif self.tSeekLeft.seekFactor == 1 :
             pointZero = self.graphWindowLeft.ui.graphicsView.mapToScene(QPoint(0,0))
             GV = self.graphWindowLeft.ui.graphicsView
             pointMax = self.graphWindowLeft.ui.graphicsView.mapToScene(QPoint(GV.width(),GV.height()))
@@ -677,16 +646,10 @@ class stereoPhoto(object):
     #IDEM à seekLeftDone
     def seekRightDone(self):
 
-        if self.enableDraw and hasattr(self, "initAltitude") :
+        if self.enableDraw and hasattr(self, "initAltitude") and hasattr(self, "graphWindowRight"):
             self.addPolygonOnScreen()
 
         if self.newRightRequest : 
-            pointZero = self.graphWindowRight.ui.graphicsView.mapToScene(QPoint(0,0))
-            GV = self.graphWindowRight.ui.graphicsView
-            pointMax = self.graphWindowRight.ui.graphicsView.mapToScene(QPoint(GV.width(),GV.height()))
-            self.threadSeekRight(pointZero, pointMax, 0.5, 1, 2)
-
-        elif self.tSeekRight.seekFactor == 1 :
             pointZero = self.graphWindowRight.ui.graphicsView.mapToScene(QPoint(0,0))
             GV = self.graphWindowRight.ui.graphicsView
             pointMax = self.graphWindowRight.ui.graphicsView.mapToScene(QPoint(GV.width(),GV.height()))
@@ -695,24 +658,6 @@ class stereoPhoto(object):
         else :
             self.showThreadRightInProcess = False
        
-    
-    #Place la souris en mode pan, active/désactive les boutons de dessin   
-    def panClick(self):
-
-        if self.optWindow.ui.pushButtonShowPicture.isChecked():
-            
-            #22 est la taille en pixel de la barre du haute de la fenetre
-            #Il y a toujours un petit pan lorsqu'on active le Pan sinon 
-            self.lastX = self.panCenterLeft[0]
-            self.lastY = self.panCenterLeft[1] - 22
-            win32api.SetCursorPos(self.leftScreenCenter)
-            self.graphWindowLeft.ui.widget.setMouseTracking(True)
-            self.graphWindowLeft.setCursor(self.graphWindowLeft.invisibleCursor)
-        
-        else : 
-            self.graphWindowLeft.ui.widget.setMouseTracking(False)
-            win32api.SetCursorPos((self.optWindow.pos().x(), self.optWindow.pos().y()))
-            self.graphWindowLeft.setCursor(self.graphWindowLeft.normalCursor)
     
     #Ouverture de la fenêtre de rehaussement
     def enhanceClick(self):
@@ -729,11 +674,25 @@ class stereoPhoto(object):
     #Possibilité d'ajouter d'autres fonctions plus tard
     def keyboardHandler(self, key):
         
-        if key in ['N','O','S','E'] :
+        if key == 'N' and self.optWindow.ui.toolButtonNord.isEnabled() :
             self.toolButtonPressEvent(key)
 
-        elif number == "ESC":
+        elif key == 'O' and self.optWindow.ui.toolButtonOuest.isEnabled() :
+            self.toolButtonPressEvent(key)
+        
+        elif key =='S' and self.optWindow.ui.toolButtonSud.isEnabled() :
+            self.toolButtonPressEvent(key)
+        
+        elif key =='E' and self.optWindow.ui.toolButtonEst.isEnabled() :
+            self.toolButtonPressEvent(key)
+
+        elif key == "ESC":
+            self.graphWindowLeft.ui.widget.setMouseTracking(False)
+            win32api.SetCursorPos((self.optWindow.pos().x(), self.optWindow.pos().y()))
+            self.graphWindowLeft.setCursor(self.graphWindowLeft.normalCursor)
+            self.enableShow = False
             self.closeAllSideWindows()
+            
             
 
     #Fonction qui réalise le pan 
@@ -741,28 +700,26 @@ class stereoPhoto(object):
     #Cette fonction s'assure que la souris reste sur l'écran conserné pendant le Pan afin de garder le curseur invisible  
     def mMoveEvent(self, ev):
 
-        if self.optWindow.ui.pushButtonShowPicture.isChecked() :
-            self.deltaX = int((ev.x()-self.lastX) / 2)
-            self.lastX = ev.x()
-            self.deltaY = int((ev.y()-self.lastY) / 2)
-            self.lastY = ev.y()
-            leftView = self.graphWindowLeft.ui.graphicsView
-            rightView = self.graphWindowRight.ui.graphicsView
-            pixRange = 400
-            if ev.x() > (self.screenLeft.width() - pixRange) or ev.x() < pixRange or ev.y() < pixRange or ev.y() > (self.screenLeft.height() - pixRange) :
-                self.graphWindowLeft.ui.widget.setMouseTracking(False)
-                win32api.SetCursorPos(self.leftScreenCenter)
-                self.lastX = self.panCenterLeft[0]
-                self.lastY = self.panCenterLeft[1]
-                self.graphWindowLeft.ui.widget.setMouseTracking(True)
-                
-            leftView.horizontalScrollBar().setValue(leftView.horizontalScrollBar().value() - self.deltaX)
-            leftView.verticalScrollBar().setValue(leftView.verticalScrollBar().value() + self.deltaY)
-            rightView.horizontalScrollBar().setValue(rightView.horizontalScrollBar().value() + self.deltaX)
-            rightView.verticalScrollBar().setValue(rightView.verticalScrollBar().value() + self.deltaY)
-        
+        #if self.optWindow.ui.pushButtonShowPicture.isChecked() :
+        self.deltaX = int((ev.x()-self.lastX) / 2)
+        self.lastX = ev.x()
+        self.deltaY = int((ev.y()-self.lastY) / 2)
+        self.lastY = ev.y()
+        leftView = self.graphWindowLeft.ui.graphicsView
+        rightView = self.graphWindowRight.ui.graphicsView
+        pixRange = 400
+        if ev.x() > (self.screenLeft.width() - pixRange) or ev.x() < pixRange or ev.y() < pixRange or ev.y() > (self.screenLeft.height() - pixRange) :
+            self.graphWindowLeft.ui.widget.setMouseTracking(False)
+            win32api.SetCursorPos(self.leftScreenCenter)
+            self.lastX = self.panCenterLeft[0]
+            self.lastY = self.panCenterLeft[1]
+            self.graphWindowLeft.ui.widget.setMouseTracking(True)
             
-    
+        leftView.horizontalScrollBar().setValue(leftView.horizontalScrollBar().value() - self.deltaX)
+        leftView.verticalScrollBar().setValue(leftView.verticalScrollBar().value() + self.deltaY)
+        rightView.horizontalScrollBar().setValue(rightView.horizontalScrollBar().value() + self.deltaX)
+        rightView.verticalScrollBar().setValue(rightView.verticalScrollBar().value() + self.deltaY)
+
 
     #Fonction activer par la roulette de la souris
     #Avec la touche CTRL, il est possible de zoom In/Out sur les photos 

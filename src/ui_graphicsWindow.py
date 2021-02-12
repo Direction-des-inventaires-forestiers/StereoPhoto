@@ -47,6 +47,8 @@ class graphicsWindow(QtWidgets.QMainWindow):
         QtWidgets.QMainWindow.__init__(self)
         self.ui = Ui_graphicsWindow()
         self.ui.setupUi(self, nom)
+        self.ui.graphicsView.resizeEvent = self.gwResizeEvent
+        self.currentRect = None
         self.ctrlClick = False
         self.shiftClick = False
         self.altClick = False
@@ -69,12 +71,14 @@ class graphicsWindow(QtWidgets.QMainWindow):
             self.shiftClick = True
         elif event.key() == QtCore.Qt.Key_Z :   
             self.altClick = True
-        elif event.key() == QtCore.Qt.Key_1:
-            self.keyDrawEvent.emit("1")
-        elif event.key() == QtCore.Qt.Key_2 :
-            self.keyDrawEvent.emit("2") 
-        elif event.key() == QtCore.Qt.Key_3:
-            self.keyDrawEvent.emit("3")
+        elif event.key() == QtCore.Qt.Key_W:
+            self.keyDrawEvent.emit("N")
+        elif event.key() == QtCore.Qt.Key_A :
+            self.keyDrawEvent.emit("O") 
+        elif event.key() == QtCore.Qt.Key_S :
+            self.keyDrawEvent.emit("S") 
+        elif event.key() == QtCore.Qt.Key_D :
+            self.keyDrawEvent.emit("E") 
         elif event.key() == QtCore.Qt.Key_Escape:
             self.keyDrawEvent.emit("ESC")
 
@@ -106,3 +110,8 @@ class graphicsWindow(QtWidgets.QMainWindow):
         p.drawLine(self.vLine) 
         p.drawLine(self.hLine)
         p.end()
+
+    def gwResizeEvent(self, event):
+        if self.currentRect :
+            self.ui.graphicsView.fitInView(self.currentRect, Qt.KeepAspectRatio)
+        QtWidgets.QGraphicsView.resizeEvent(self.ui.graphicsView,event)

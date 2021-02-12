@@ -436,7 +436,7 @@ class enhanceManager(QObject):
 #Il concidère toujours la vue courante dans la priorité d'affichage
 class threadShow(QThread):
     newImage = pyqtSignal(QPixmap, float, int, int)
-    def __init__(self, picture, pointZero, pointMax, multiFactor, seekFactor, scaleFactor, listParam, rotation=0, miroir=0):
+    def __init__(self, picture, pointZero, pointMax, multiFactor, seekFactor, scaleFactor, listParam, rotation=0, miroir=0, cropValue=None):
         QThread.__init__(self)
         self.picture = Image.open(picture)
         self.pointZero = pointZero
@@ -448,6 +448,7 @@ class threadShow(QThread):
         self.keepRunning = True
         self.rotation = rotation
         self.miroir = miroir
+        self.cropValue = cropValue
     
     #Optimisation possible : Offrir le placement selon la proximité 
     def run(self):
@@ -462,6 +463,9 @@ class threadShow(QThread):
         pictureEnhance = Image.merge("RGB",(r[0],r[1],r[2]))
 
         pictureAdjust = pictureLayout(pictureEnhance, self.rotation, self.miroir, False) 
+        
+        if self.cropValue:
+            pictureAdjust = pictureAdjust.crop(self.cropValue)
 
         topX = round(self.pointZero.x()*self.multiFactor) if round(self.pointZero.x()*self.multiFactor) >= 0 else 0
         topY = round(self.pointZero.y()*self.multiFactor) if round(self.pointZero.y()*self.multiFactor) >= 0 else 0
@@ -700,7 +704,7 @@ class imageEnhancing(threading.Thread):
 
 #Fonction qui réalise une rotation et/ou un effet miroir d'une photo PIL
 #Elle retourne une photo PIL ou une QImage selon le choix retQImage (True/False) 
-def pictureLayout(picture, rotation, miroir, retQImage):
+def pictureLayout(picture, rotation, miroir, retQImage, cropValue=None):
     
     if rotation == 0 and miroir == 0 :
         pic = picture
@@ -718,6 +722,10 @@ def pictureLayout(picture, rotation, miroir, retQImage):
             pic = pic.transpose(Image.FLIP_LEFT_RIGHT)
         elif miroir == 2 :
             pic = pic.transpose(Image.FLIP_TOP_BOTTOM)
+
+    if cropValue:
+            pic = pic.crop(cropValue)
+        
 
     if retQImage : 
         npPicture = np.array(pic)

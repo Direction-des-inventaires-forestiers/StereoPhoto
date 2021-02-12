@@ -15,10 +15,9 @@ def getParDict(path) :
                 f = open(fullpath)
                 s = f.read()
             except : 
-                f.close()
                 f = open(fullpath, encoding='ANSI')
                 s = f.read() 
-
+            
             v1 = s.find('XYZ00')
             v2 = s.find("\n", v1)
             w = s[v1:v2].split(' ')
@@ -56,11 +55,11 @@ def createShapePoint():
     fields = QgsFields()
     fields.append(QgsField("id", QVariant.Int))
     fields.append(QgsField("name", QVariant.String))
-    shapeName = 'U:/Photos/pointFromPicture.shp'
-    epsg = 'EPSG:32188'
+    shapeName = 'C:\\Users\\pinfr1\\Downloads\\Photos/pointFromPicture.shp'
+    epsg = 'EPSG:32187'
     
     vectorWriter = QgsVectorFileWriter(shapeName, "System", fields, QgsWkbTypes.MultiPoint, QgsCoordinateReferenceSystem(epsg), "ESRI Shapefile")
-    points = getDict()
+    points = getParDict('C:\\Users\\pinfr1\\Downloads\\Photos')
     for key, value in points.items() :
         
         feature = QgsFeature(fields)
@@ -70,8 +69,7 @@ def createShapePoint():
         vectorWriter.addFeature(feature)
     #return vectorWriter
     
-
-
+    
 
 def findNeighbour(parID, currentDict):
     #path = 'U:/Photos\\q18067_226_rgb.par'
