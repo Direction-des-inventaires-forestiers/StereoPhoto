@@ -1,6 +1,7 @@
 *.db
 *.spec
 *.tif
+*.zip
 /.vscode/
 /__pycache__/
 /build/

@@ -32,6 +32,8 @@ Plusieurs autres outils seront intégrés à cette application dans le futur :
     - Gestion de projet
     
     et bien d'autre
+Dans EFOTO, il semble avoir un décalage de 16 pixels en x et en y pour la photo de droite right/leftcursoroffset -> pourrait s'appliquer pour le curseur
+
 
 '''
 
@@ -50,7 +52,8 @@ from PIL import Image
 import numpy as np
 from . import resources
 
-from .ui_optWindowCleaner import optionWindow
+#from .ui_optWindowCleaner import optionWindow
+from .ui_optWindow_DockVersion import optionWindow
 from .ui_graphicsWindow import graphicsWindow 
 from .ui_getVectorLayer import getVectorLayer
 from .worldManager import pictureManager, dualManager
@@ -58,6 +61,7 @@ from .enhanceManager import enhanceManager, threadShow, imageEnhancing, pictureL
 from .drawFunction import *
 from .folderManager import getParDict, findPossiblePair, findNeighbour
 import sys, os, time, math, qimage2ndarray, win32api
+from osgeo import gdal
 
 #Permet l'ouverture avec PIL de fichier énorme!
 Image.MAX_IMAGE_PIXELS = 1000000000 
@@ -74,7 +78,8 @@ class stereoPhoto(object):
         urlPicture = ":/Anaglyph/Icons/icon.png"
         self.action = QAction(QIcon(urlPicture), "StereoPhoto", self.iface.mainWindow())
         
-        self.action.triggered.connect(self.run)
+        self.action.setCheckable(True)
+        self.action.toggled.connect(self.run)
          
         self.iface.addToolBarIcon(self.action)
         self.iface.addPluginToMenu("&StereoPhoto", self.action)
@@ -84,77 +89,75 @@ class stereoPhoto(object):
         self.iface.removePluginMenu("&StereoPhoto", self.action)
         self.iface.removeToolBarIcon(self.action)
 
-    def run2(self):
-        pass
-        '''
-        from .dock import dockWindow
-        self.d = dockWindow(self.iface)
-        self.iface.addDockWidget(Qt.RightDockWidgetArea, self.d)
-        class dockWindow(QtWidgets.QDockWidget): 
-            def __init__(self, iface):
-                QtWidgets.QMainWindow.__init__(self, iface.mainWindow())
-                self.ui = Ui_StereoDockWidget()
-                self.ui.setupUi(self)'''
-        
     #Initialisation de l'application et des variables
     #Connection entre les boutons du menu d'options (mOpt) et leurs fonctions attitrées
     #Ouverture du menu d'options
     def run(self):
 
-        self.showThreadLeftInProcess = False
-        self.newLeftRequest = False
-        self.showThreadRightInProcess = False
-        self.newRightRequest = False
-        self.enableDraw = False
-        self.enableShow = False
+        if self.action.isChecked() :
 
-        self.isEstPicture = False
+            self.showThreadLeftInProcess = False
+            self.newLeftRequest = False
+            self.showThreadRightInProcess = False
+            self.newRightRequest = False
+            self.enableDraw = False
+            self.enableShow = False
 
-        self.polygonOnLeftScreen = []
-        self.polygonOnRightScreen = []
+            self.isEstPicture = False
 
-        self.listParam = [0, 0, 0, 0, 0, 0, 0, False, False, []]
+            self.polygonOnLeftScreen = []
+            self.polygonOnRightScreen = []
 
-        #Je garde ces variables par simplicité et compréhension 
-        self.leftOrientation = self.rightOrientation = self.leftMiroir = 0
-        self.rightMiroir = 1
+            self.listParam = [0, 0, 0, 0, 0, 0, 0, False, False, []]
 
-        self.optWindow = optionWindow()
-        
+            #Je garde ces variables par simplicité et compréhension 
+            self.leftOrientation = self.rightOrientation = self.leftMiroir = 0
+            self.rightMiroir = 1
 
-        self.optWindow.ui.importLineProject.textChanged.connect(self.newPictureFile)
-        self.optWindow.ui.importLineVectorLayer.textChanged.connect(self.mNewVectorLayer)
-        self.optWindow.ui.pushButtonShowPicture.clicked.connect(self.createGraphicsWindows)
-        self.optWindow.ui.pushButtonShowIDList.clicked.connect(self.showIDList)
-        self.optWindow.ui.enhanceButton.clicked.connect(self.enhanceClick)
+            self.optWindow = optionWindow(self.iface)
+            
+            self.optWindow.ui.importLineProject.textChanged.connect(self.newPictureFile)
+            self.optWindow.ui.importLineVectorLayer.textChanged.connect(self.mNewVectorLayer)
+            self.optWindow.ui.pushButtonShowPicture.clicked.connect(self.createGraphicsWindows)
+            self.optWindow.ui.pushButtonShowIDList.clicked.connect(self.showIDList)
+            self.optWindow.ui.enhanceButton.clicked.connect(self.enhanceClick)
 
-        self.optWindow.ui.toolButtonNord.clicked.connect(lambda : self.toolButtonPressEvent('N'))
-        self.optWindow.ui.toolButtonOuest.clicked.connect(lambda : self.toolButtonPressEvent('O'))
-        self.optWindow.ui.toolButtonSud.clicked.connect(lambda : self.toolButtonPressEvent('S'))
-        self.optWindow.ui.toolButtonEst.clicked.connect(lambda : self.toolButtonPressEvent('E'))
-        
-        
-        self.optWindow.ui.pushButtonRemoveShape.clicked.connect(self.removePolygonOnScreen)
-        self.optWindow.keyDrawEvent.connect(self.keyboardHandler)
-        self.optWindow.closeWindow.connect(self.optWindowClose)
+            self.optWindow.ui.toolButtonNord.clicked.connect(lambda : self.toolButtonPressEvent('N'))
+            self.optWindow.ui.toolButtonOuest.clicked.connect(lambda : self.toolButtonPressEvent('O'))
+            self.optWindow.ui.toolButtonSud.clicked.connect(lambda : self.toolButtonPressEvent('S'))
+            self.optWindow.ui.toolButtonEst.clicked.connect(lambda : self.toolButtonPressEvent('E'))
+            
+            
+            self.optWindow.ui.pushButtonRemoveShape.clicked.connect(self.removePolygonOnScreen)
+            self.optWindow.keyDrawEvent.connect(self.keyboardHandler)
+            self.optWindow.closeWindow.connect(self.optWindowClose)
 
-        nbScreen = QApplication.desktop().screenCount()-1
-        self.optWindow.ui.spinBoxLeftScreen.setMaximum(nbScreen)
-        self.optWindow.ui.spinBoxRightScreen.setMaximum(nbScreen)
+            nbScreen = QApplication.desktop().screenCount()-1
+            self.optWindow.ui.spinBoxLeftScreen.setMaximum(nbScreen)
+            self.optWindow.ui.spinBoxRightScreen.setMaximum(nbScreen)
 
-        self.optWindow.show()
-        
+            self.iface.addDockWidget(Qt.RightDockWidgetArea, self.optWindow)
+        else :
+            self.iface.removeDockWidget(self.optWindow)
+            self.closeAllSideWindows()
+            del self.optWindow
+            try : del self.currentParDict
+            except: pass
 
     #Fonction appelée lors de la fermeture du mOpt
     #Si l'on ferme le mOpt toutes les autres fenêtres Qt se ferment
     def closeAllSideWindows(self) :
         scene = QGraphicsScene()
         if hasattr(self, "tSeekLeft"): 
-            try : self.tSeekLeft.newImage.disconnect(self.addLeftPixmap)
+            try : 
+                self.tSeekLeft.newImage.disconnect(self.addLeftPixmap)
+                self.tSeekLeft.terminate() 
             except: pass
             self.tSeekLeft.keepRunning = False
         if hasattr(self, "tSeekRight"): 
-            try : self.tSeekRight.newImage.disconnect(self.addRightPixmap)
+            try : 
+                self.tSeekRight.newImage.disconnect(self.addRightPixmap)
+                self.tSeekRight.terminate() 
             except: pass
             self.tSeekRight.keepRunning = False
         if hasattr(self, "graphWindowLeft"):
@@ -264,39 +267,6 @@ class stereoPhoto(object):
             self.currentEstID = ''
         
 
-        self.demoLeftPic = Image.open(self.currentLeftTIF)
-        self.demoRightPic = Image.open(self.currentRightTIF)
-
-        if hasattr(self.demoLeftPic, "n_frames"): 
-            for i in range(self.demoLeftPic.n_frames):
-                self.demoLeftPic.seek(i)
-                if self.demoLeftPic.size < (200,200) :
-                    self.demoLeftPic.seek(i-1)
-                    leftPic = pictureLayout(self.demoLeftPic, self.leftOrientation, self.leftMiroir, True)
-                    sceneLeft = QGraphicsScene()
-                    sceneLeft.addPixmap(QPixmap.fromImage(leftPic))
-                    
-                    self.optWindow.ui.graphicsViewLeft.setScene(sceneLeft)
-                    self.optWindow.ui.graphicsViewLeft.show()
-                    self.optWindow.ui.graphicsViewLeft.fitInView(self.optWindow.ui.graphicsViewLeft.sceneRect(), Qt.KeepAspectRatio)
-                    break
-        
-        if hasattr(self.demoRightPic, "n_frames"): 
-            for i in range(self.demoRightPic.n_frames):
-                self.demoRightPic.seek(i)
-                if self.demoRightPic.size < (200,200) :
-                    self.demoRightPic.seek(i-1)
-                    rightPic = pictureLayout(self.demoRightPic, self.rightOrientation, self.rightMiroir, True)
-                    sceneRight = QGraphicsScene()
-                    sceneRight.addPixmap(QPixmap.fromImage(rightPic))
-                    
-                    self.optWindow.ui.graphicsViewRight.setScene(sceneRight)
-                    self.optWindow.ui.graphicsViewRight.show()
-                    self.optWindow.ui.graphicsViewRight.fitInView(self.optWindow.ui.graphicsViewRight.sceneRect(), Qt.KeepAspectRatio)
-                    break
- 
-        self.demoLeftPic.close()
-        self.demoRightPic.close()
     
     def toolButtonPressEvent(self, ori):
 
@@ -364,13 +334,17 @@ class stereoPhoto(object):
     def loadNewPair(self):
 
         if hasattr(self, "tSeekLeft"): 
-            try : self.tSeekLeft.newImage.disconnect(self.addLeftPixmap)
+            try : 
+                self.tSeekLeft.newImage.disconnect(self.addLeftPixmap)
+                self.tSeekLeft.terminate() 
             except: pass
             self.tSeekLeft.keepRunning = False
 
 
         if hasattr(self, "tSeekRight"): 
-            try : self.tSeekRight.newImage.disconnect(self.addRightPixmap)
+            try : 
+                self.tSeekRight.newImage.disconnect(self.addRightPixmap)
+                self.tSeekRight.terminate() 
             except: pass
             self.tSeekRight.keepRunning = False
 
@@ -383,8 +357,8 @@ class stereoPhoto(object):
         self.leftPic.close()
         self.rightPic.close()
 
-        xLeft = (fullLeftPicSize[0])*((100-self.optWindow.ui.spinBoxRecouvrementH.value())/100)
-        xRight = (fullRightPicSize[0])*((100-self.optWindow.ui.spinBoxRecouvrementH.value())/100)
+        xLeft = (fullLeftPicSize[0])*(self.optWindow.ui.spinBoxRecouvrementH.value()/100)
+        xRight = (fullRightPicSize[0])*(self.optWindow.ui.spinBoxRecouvrementH.value()/100)
         
         yLeft = yRight = 0
         #yLeft = (fullLeftPicSize[1])*((100-self.optWindow.ui.spinBoxRecouvrementV.value())/100)
@@ -427,8 +401,6 @@ class stereoPhoto(object):
         self.centerPixelRight = (mirrorX, centerPointRight.y())
 
         Z = self.dualManager.calculateZ(self.centerPixelLeft, self.centerPixelRight)
-        #Seulement pour debug pour le moment
-        self.optWindow.ui.lineEditCurrentZ.setText(str(round(Z,2)))
         self.initAltitude = Z
         extentRect = self.getShowRect()
         self.canvas.setExtent(extentRect)
@@ -595,6 +567,36 @@ class stereoPhoto(object):
                 self.polygonOnLeftScreen.append(leftObj)
                 self.polygonOnRightScreen.append(rightObj)
 
+    def getCoordFromMNTAltitude(self, pixLeft, pixRight):
+
+        if not self.optWindow.currentMNTPath : return None
+
+        cL = QtCore.QPoint(pixLeft)
+        cR = QtCore.QPoint(pixRight)
+        x,y = self.dualPixelToCoord(cL, cR)
+
+        mntDS = gdal.Open(self.optWindow.currentMNTPath)
+        mntBand = mntDS.GetRasterBand(1)
+        mntGeo = mntDS.GetGeoTransform()
+        px = math.floor((x - mntGeo[0]) / mntGeo[1]) 
+        py = math.floor((y - mntGeo[3]) / mntGeo[5])
+
+        try : mntAlt = mntBand.ReadAsArray(px,py,1,1)[0][0]
+        except : return None
+
+        XL, YL = self.leftPictureManager.pixelToCoord(pixLeft, mntAlt)
+        XR, YR = self.rightPictureManager.pixelToCoord(pixRight, mntAlt)
+
+        mntLong = (XL + XR) / 2
+        mntLat = (YL + YR) / 2
+
+        return (mntLong,mntLat,mntAlt)
+
+
+
+
+
+
     #Utiliser par threadShow pour afficher une portion de l'image à une certaine position
     def addLeftPixmap(self, pixmap, scaleFactor, topX, topY) :
         d = self.graphWindowLeft.ui.graphicsView.scene().addPixmap(pixmap)
@@ -700,7 +702,6 @@ class stereoPhoto(object):
     #Cette fonction s'assure que la souris reste sur l'écran conserné pendant le Pan afin de garder le curseur invisible  
     def mMoveEvent(self, ev):
 
-        #if self.optWindow.ui.pushButtonShowPicture.isChecked() :
         self.deltaX = int((ev.x()-self.lastX) / 2)
         self.lastX = ev.x()
         self.deltaY = int((ev.y()-self.lastY) / 2)
@@ -719,6 +720,147 @@ class stereoPhoto(object):
         leftView.verticalScrollBar().setValue(leftView.verticalScrollBar().value() + self.deltaY)
         rightView.horizontalScrollBar().setValue(rightView.horizontalScrollBar().value() + self.deltaX)
         rightView.verticalScrollBar().setValue(rightView.verticalScrollBar().value() + self.deltaY)
+
+        if True :
+                
+                pointL = QPoint(self.panCenterLeft[0], self.panCenterLeft[1])
+                pointR = QPoint(self.panCenterRight[0], self.panCenterRight[1])
+                self.endDrawPointLeft = self.graphWindowLeft.ui.graphicsView.mapToScene(pointL)
+                self.endDrawPointRight = self.graphWindowRight.ui.graphicsView.mapToScene(pointR)
+                
+
+                lineL = QLineF(self.startDrawPointLeft, self.endDrawPointLeft)            
+
+                xStartPoint = -self.startDrawPointRight.x() + self.rightPicSize[0]
+                startRightPoint = QPointF(xStartPoint, self.startDrawPointRight.y())
+            
+                xEndPoint = -self.endDrawPointRight.x() + self.rightPicSize[0]
+                endRightPoint = QPointF(xEndPoint, self.endDrawPointRight.y())
+            
+                lineR = QLineF(startRightPoint, endRightPoint)   
+
+                m_pen = QPen(QColor(0, 255, 255),10, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin)
+
+                if self.currentLeftLineObj:
+                    self.graphWindowLeft.ui.graphicsView.scene().removeItem(self.currentLeftLineObj)
+                
+                if self.currentRightLineObj:
+                    self.graphWindowRight.ui.graphicsView.scene().removeItem(self.currentRightLineObj)
+                    
+                self.currentLeftLineObj = self.graphWindowLeft.ui.graphicsView.scene().addLine(lineL, m_pen)
+                self.currentRightLineObj = self.graphWindowRight.ui.graphicsView.scene().addLine(lineR, m_pen)
+
+
+    def mPressEvent(self, ev):
+
+        if self.optWindow.ui.panButton.isChecked():
+
+            pointLeft = QPoint(self.panCenterLeft[0], self.panCenterLeft[1])
+            pointRight = QPoint(self.panCenterRight[0], self.panCenterRight[1])
+            centerPointLeft = self.graphWindowLeft.ui.graphicsView.mapToScene(pointLeft)
+            centerPointRight = self.graphWindowRight.ui.graphicsView.mapToScene(pointRight)
+
+
+            pixL = (centerPointLeft.x(), centerPointLeft.y())            
+
+            mirrorX = self.rightPicSize[0] - centerPointRight.x()
+            pixR = (mirrorX, centerPointRight.y())
+
+            coordTuple = self.getCoordFromMNTAltitude(pixL,pixR)
+            
+            if (self.optWindow.ui.drawButton.isChecked() or self.optWindow.ui.cutButton.isChecked()) and self.optWindow.ui.radioPolygonLayer.isChecked() :
+
+                if ev.button() == Qt.LeftButton:
+                    if self.firstDrawClick :
+                        pointL = QPoint(self.panCenterLeft[0], self.panCenterLeft[1])
+                        pointR = QPoint(self.panCenterRight[0], self.panCenterRight[1])
+                        self.startDrawPointLeft = self.graphWindowLeft.ui.graphicsView.mapToScene(pointL)
+                        self.startDrawPointRight = self.graphWindowRight.ui.graphicsView.mapToScene(pointR)
+                        self.firstDrawClick = False
+                    else : 
+                        self.startDrawPointLeft = self.endDrawPointLeft
+                        self.startDrawPointRight = self.endDrawPointRight
+                        self.listLeftLineObj.append(self.currentLeftLineObj)
+                        self.listRightLineObj.append(self.currentRightLineObj)
+                        self.currentLeftLineObj = None
+                        self.currentRightLineObj = None
+                    
+                    X, Y = self.dualPixelToCoord(self.startDrawPointLeft, self.startDrawPointRight)
+                    self.listDrawCoord.append(QgsPointXY(X,Y))
+
+                elif ev.button() == Qt.RightButton:
+
+                    self.firstDrawClick = True
+                    if self.currentLeftLineObj :
+                        self.graphWindowLeft.ui.graphicsView.scene().removeItem(self.currentLeftLineObj)
+                        self.currentLeftLineObj = None
+
+                    if self.currentRightLineObj :
+                        self.graphWindowRight.ui.graphicsView.scene().removeItem(self.currentRightLineObj)
+                        self.currentRightLineObj = None
+                    
+                    for item in self.listLeftLineObj:
+                        self.graphWindowLeft.ui.graphicsView.scene().removeItem(item)
+                    self.listLeftLineObj = []
+
+                    for item in self.listRightLineObj:
+                        self.graphWindowRight.ui.graphicsView.scene().removeItem(item)
+                    self.listRightLineObj = []
+                    
+                    if self.optWindow.ui.drawButton.isChecked():
+                        newGeo = QgsGeometry.fromMultiPolygonXY([[self.listDrawCoord]])
+                        currentVectorLayer = self.vectorLayer
+                        
+                        rectCoord = self.getShowRect()
+                        listGeo = list(currentVectorLayer.getFeatures(rectCoord))
+                        #Gestion des plusieurs intersections à faire
+                        for item in listGeo : 
+                            featureGeo = item.geometry()
+                            
+                            if newGeo.intersects(featureGeo) :
+                                if self.optWindow.ui.radioButtonMerge.isChecked() :
+                                    mergePolygon(featureGeo, item.id(), newGeo, currentVectorLayer)
+                                else :
+                                    automaticPolygon(featureGeo, item.id(), newGeo, currentVectorLayer)
+                                break
+                                
+                        else :
+                            addPolygon(currentVectorLayer, newGeo)
+                    else :
+                        currentVectorLayer = self.vectorLayer    
+                        cutPolygon(currentVectorLayer, self.listDrawCoord)
+                    
+                    self.listDrawCoord = []
+                    
+                    self.addPolygonOnScreen()
+                    
+            elif self.optWindow.ui.radioPointLayer.isChecked() and self.optWindow.ui.drawButton.isChecked() :
+                
+                if ev.button() == Qt.LeftButton:
+                    pointL = QPoint(self.panCenterLeft[0], self.panCenterLeft[1])
+                    pointR = QPoint(self.panCenterRight[0], self.panCenterRight[1])
+                    self.startDrawPointLeft = self.graphWindowLeft.ui.graphicsView.mapToScene(pointL)
+                    self.startDrawPointRight = self.graphWindowRight.ui.graphicsView.mapToScene(pointR)
+                    
+                    X, Y = self.dualPixelToCoord(self.startDrawPointLeft, self.startDrawPointRight)
+                    
+                    point = QgsPointXY(X,Y)
+                    geometry =  QgsGeometry.fromPointXY(point)
+                    self.vectorLayer.startEditing()
+                    feat = QgsFeature()
+                    feat.setGeometry(geometry)
+                    self.vectorLayer.dataProvider().addFeature(feat)
+                    self.vectorLayer.commitChanges()
+                    self.addPointOnScreen()
+
+
+            elif ev.button() == Qt.RightButton :
+                self.optWindow.ui.panButton.setChecked(False)
+                self.panClick()
+
+        else :
+            self.optWindow.ui.panButton.setChecked(True)
+            self.panClick()
 
 
     #Fonction activer par la roulette de la souris
@@ -750,8 +892,6 @@ class stereoPhoto(object):
             diffY = aPoint.y() - bPoint.y()
 
             self.centerPixelRight = (self.centerPixelRight[0], self.centerPixelRight[1]-diffY) 
-            Z = self.dualManager.calculateZ(self.centerPixelLeft, self.centerPixelRight)
-            self.optWindow.ui.lineEditCurrentZ.setText(str(round(Z,2)))
 
         elif self.optWindow.altClick or self.graphWindowLeft.altClick or self.graphWindowRight.altClick : 
             valX = self.optWindow.ui.spinBoxMoveInX.value()
@@ -790,9 +930,7 @@ class stereoPhoto(object):
             aPoint = self.graphWindowRight.ui.graphicsView.mapToScene(QPoint(self.panCenterRight[0], self.panCenterRight[1]))
             diffX = aPoint.x() - bPoint.x()
 
-            self.centerPixelRight = (self.centerPixelRight[0]-diffX, self.centerPixelRight[1]) 
-            Z = self.dualManager.calculateZ(self.centerPixelLeft, self.centerPixelRight)
-            self.optWindow.ui.lineEditCurrentZ.setText(str(round(Z,2)))
+            self.centerPixelRight = (self.centerPixelRight[0]-diffX, self.centerPixelRight[1])
 
 
 if __name__ == "__main__":
