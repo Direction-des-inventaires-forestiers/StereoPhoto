@@ -103,6 +103,13 @@ class stereoPhoto(object):
             self.enableDraw = False
             self.enableShow = False
 
+            self.firstDrawClick = True
+            self.listDrawCoord = []
+            self.listLeftLineObj = []
+            self.listRightLineObj = []
+            self.currentLeftLineObj = None
+            self.currentRightLineObj = None
+
             self.isEstPicture = False
 
             self.polygonOnLeftScreen = []
@@ -305,6 +312,7 @@ class stereoPhoto(object):
         
 
         self.graphWindowLeft.ui.widget.mouseMoveEvent = self.mMoveEvent
+        self.graphWindowLeft.ui.widget.mousePressEvent = self.mPressEvent
         self.graphWindowLeft.ui.widget.wheelEvent = self.wheelEvent
 
         
@@ -490,9 +498,8 @@ class stereoPhoto(object):
     #Retourne la valeur des coordonnées moyennées
     def dualPixelToCoord(self, QPointLeft, QPointRight):
         
-        pixL = (QPointLeft.x(), QPointLeft.y())            
-        mirrorX = self.rightPicSize[0] - QPointRight.x()
-        pixR = (mirrorX, QPointRight.y())
+        pixL = (QPointLeft.x(), QPointLeft.y())   
+        pixR = (QPointRight.x(), QPointRight.y())
 
         Z = self.dualManager.calculateZ(pixL, pixR)
         XL, YL = self.leftPictureManager.pixelToCoord(pixL, Z)
@@ -503,6 +510,30 @@ class stereoPhoto(object):
         
         return X, Y
 
+    def getCoordFromMNTAltitude(self, pixLeft, pixRight):
+
+        if not self.optWindow.currentMNTPath : return None
+
+        cL = QtCore.QPoint(pixLeft[0],pixLeft[1])
+        cR = QtCore.QPoint(pixRight[0],pixRight[1])
+        x,y = self.dualPixelToCoord(cL, cR)
+
+        mntDS = gdal.Open(self.optWindow.currentMNTPath)
+        mntBand = mntDS.GetRasterBand(1)
+        mntGeo = mntDS.GetGeoTransform()
+        px = math.floor((x - mntGeo[0]) / mntGeo[1]) 
+        py = math.floor((y - mntGeo[3]) / mntGeo[5])
+
+        try : mntAlt = mntBand.ReadAsArray(px,py,1,1)[0][0]
+        except : return None
+
+        XL, YL = self.leftPictureManager.pixelToCoord(pixLeft, mntAlt)
+        XR, YR = self.rightPictureManager.pixelToCoord(pixRight, mntAlt)
+
+        mntLong = (XL + XR) / 2
+        mntLat = (YL + YR) / 2
+
+        return (mntLong,mntLat,mntAlt)
 
     def removePolygonOnScreen(self) :
         if self.polygonOnLeftScreen :
@@ -566,35 +597,6 @@ class stereoPhoto(object):
                 rightObj = self.graphWindowRight.ui.graphicsView.scene().addPolygon(polygonR, m_pen)
                 self.polygonOnLeftScreen.append(leftObj)
                 self.polygonOnRightScreen.append(rightObj)
-
-    def getCoordFromMNTAltitude(self, pixLeft, pixRight):
-
-        if not self.optWindow.currentMNTPath : return None
-
-        cL = QtCore.QPoint(pixLeft)
-        cR = QtCore.QPoint(pixRight)
-        x,y = self.dualPixelToCoord(cL, cR)
-
-        mntDS = gdal.Open(self.optWindow.currentMNTPath)
-        mntBand = mntDS.GetRasterBand(1)
-        mntGeo = mntDS.GetGeoTransform()
-        px = math.floor((x - mntGeo[0]) / mntGeo[1]) 
-        py = math.floor((y - mntGeo[3]) / mntGeo[5])
-
-        try : mntAlt = mntBand.ReadAsArray(px,py,1,1)[0][0]
-        except : return None
-
-        XL, YL = self.leftPictureManager.pixelToCoord(pixLeft, mntAlt)
-        XR, YR = self.rightPictureManager.pixelToCoord(pixRight, mntAlt)
-
-        mntLong = (XL + XR) / 2
-        mntLat = (YL + YR) / 2
-
-        return (mntLong,mntLat,mntAlt)
-
-
-
-
 
 
     #Utiliser par threadShow pour afficher une portion de l'image à une certaine position
@@ -716,19 +718,18 @@ class stereoPhoto(object):
             self.lastY = self.panCenterLeft[1]
             self.graphWindowLeft.ui.widget.setMouseTracking(True)
             
-        leftView.horizontalScrollBar().setValue(leftView.horizontalScrollBar().value() - self.deltaX)
+        leftView.horizontalScrollBar().setValue(leftView.horizontalScrollBar().value() + self.deltaX)
         leftView.verticalScrollBar().setValue(leftView.verticalScrollBar().value() + self.deltaY)
-        rightView.horizontalScrollBar().setValue(rightView.horizontalScrollBar().value() + self.deltaX)
+        rightView.horizontalScrollBar().setValue(rightView.horizontalScrollBar().value() - self.deltaX)
         rightView.verticalScrollBar().setValue(rightView.verticalScrollBar().value() + self.deltaY)
 
-        if True :
+        if not self.firstDrawClick:
                 
                 pointL = QPoint(self.panCenterLeft[0], self.panCenterLeft[1])
                 pointR = QPoint(self.panCenterRight[0], self.panCenterRight[1])
                 self.endDrawPointLeft = self.graphWindowLeft.ui.graphicsView.mapToScene(pointL)
                 self.endDrawPointRight = self.graphWindowRight.ui.graphicsView.mapToScene(pointR)
                 
-
                 lineL = QLineF(self.startDrawPointLeft, self.endDrawPointLeft)            
 
                 xStartPoint = -self.startDrawPointRight.x() + self.rightPicSize[0]
@@ -740,6 +741,7 @@ class stereoPhoto(object):
                 lineR = QLineF(startRightPoint, endRightPoint)   
 
                 m_pen = QPen(QColor(0, 255, 255),10, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin)
+                #isCosmetic pour le Qpen pourrait aider avec le niveau de zoom
 
                 if self.currentLeftLineObj:
                     self.graphWindowLeft.ui.graphicsView.scene().removeItem(self.currentLeftLineObj)
@@ -753,115 +755,84 @@ class stereoPhoto(object):
 
     def mPressEvent(self, ev):
 
-        if self.optWindow.ui.panButton.isChecked():
+        if self.optWindow.currentMNTPath :
 
             pointLeft = QPoint(self.panCenterLeft[0], self.panCenterLeft[1])
             pointRight = QPoint(self.panCenterRight[0], self.panCenterRight[1])
             centerPointLeft = self.graphWindowLeft.ui.graphicsView.mapToScene(pointLeft)
             centerPointRight = self.graphWindowRight.ui.graphicsView.mapToScene(pointRight)
 
-
-            pixL = (centerPointLeft.x(), centerPointLeft.y())            
+            pixL = (centerPointLeft.x()+self.cropValueLeft[0], centerPointLeft.y())            
 
             mirrorX = self.rightPicSize[0] - centerPointRight.x()
             pixR = (mirrorX, centerPointRight.y())
 
             coordTuple = self.getCoordFromMNTAltitude(pixL,pixR)
-            
-            if (self.optWindow.ui.drawButton.isChecked() or self.optWindow.ui.cutButton.isChecked()) and self.optWindow.ui.radioPolygonLayer.isChecked() :
-
-                if ev.button() == Qt.LeftButton:
-                    if self.firstDrawClick :
-                        pointL = QPoint(self.panCenterLeft[0], self.panCenterLeft[1])
-                        pointR = QPoint(self.panCenterRight[0], self.panCenterRight[1])
-                        self.startDrawPointLeft = self.graphWindowLeft.ui.graphicsView.mapToScene(pointL)
-                        self.startDrawPointRight = self.graphWindowRight.ui.graphicsView.mapToScene(pointR)
-                        self.firstDrawClick = False
-                    else : 
-                        self.startDrawPointLeft = self.endDrawPointLeft
-                        self.startDrawPointRight = self.endDrawPointRight
-                        self.listLeftLineObj.append(self.currentLeftLineObj)
-                        self.listRightLineObj.append(self.currentRightLineObj)
-                        self.currentLeftLineObj = None
-                        self.currentRightLineObj = None
-                    
-                    X, Y = self.dualPixelToCoord(self.startDrawPointLeft, self.startDrawPointRight)
-                    self.listDrawCoord.append(QgsPointXY(X,Y))
-
-                elif ev.button() == Qt.RightButton:
-
-                    self.firstDrawClick = True
-                    if self.currentLeftLineObj :
-                        self.graphWindowLeft.ui.graphicsView.scene().removeItem(self.currentLeftLineObj)
-                        self.currentLeftLineObj = None
-
-                    if self.currentRightLineObj :
-                        self.graphWindowRight.ui.graphicsView.scene().removeItem(self.currentRightLineObj)
-                        self.currentRightLineObj = None
-                    
-                    for item in self.listLeftLineObj:
-                        self.graphWindowLeft.ui.graphicsView.scene().removeItem(item)
-                    self.listLeftLineObj = []
-
-                    for item in self.listRightLineObj:
-                        self.graphWindowRight.ui.graphicsView.scene().removeItem(item)
-                    self.listRightLineObj = []
-                    
-                    if self.optWindow.ui.drawButton.isChecked():
-                        newGeo = QgsGeometry.fromMultiPolygonXY([[self.listDrawCoord]])
-                        currentVectorLayer = self.vectorLayer
-                        
-                        rectCoord = self.getShowRect()
-                        listGeo = list(currentVectorLayer.getFeatures(rectCoord))
-                        #Gestion des plusieurs intersections à faire
-                        for item in listGeo : 
-                            featureGeo = item.geometry()
-                            
-                            if newGeo.intersects(featureGeo) :
-                                if self.optWindow.ui.radioButtonMerge.isChecked() :
-                                    mergePolygon(featureGeo, item.id(), newGeo, currentVectorLayer)
-                                else :
-                                    automaticPolygon(featureGeo, item.id(), newGeo, currentVectorLayer)
-                                break
-                                
-                        else :
-                            addPolygon(currentVectorLayer, newGeo)
-                    else :
-                        currentVectorLayer = self.vectorLayer    
-                        cutPolygon(currentVectorLayer, self.listDrawCoord)
-                    
-                    self.listDrawCoord = []
-                    
-                    self.addPolygonOnScreen()
-                    
-            elif self.optWindow.ui.radioPointLayer.isChecked() and self.optWindow.ui.drawButton.isChecked() :
-                
-                if ev.button() == Qt.LeftButton:
+            if ev.button() == Qt.LeftButton:
+                if self.firstDrawClick :
                     pointL = QPoint(self.panCenterLeft[0], self.panCenterLeft[1])
                     pointR = QPoint(self.panCenterRight[0], self.panCenterRight[1])
                     self.startDrawPointLeft = self.graphWindowLeft.ui.graphicsView.mapToScene(pointL)
                     self.startDrawPointRight = self.graphWindowRight.ui.graphicsView.mapToScene(pointR)
+                    self.firstDrawClick = False
+                else : 
+                    self.startDrawPointLeft = self.endDrawPointLeft
+                    self.startDrawPointRight = self.endDrawPointRight
+                    self.listLeftLineObj.append(self.currentLeftLineObj)
+                    self.listRightLineObj.append(self.currentRightLineObj)
+                    self.currentLeftLineObj = None
+                    self.currentRightLineObj = None
+                
+                self.listDrawCoord.append(coordTuple)
+
+            elif ev.button() == Qt.RightButton:
+
+                self.firstDrawClick = True
+                if self.currentLeftLineObj :
+                    self.graphWindowLeft.ui.graphicsView.scene().removeItem(self.currentLeftLineObj)
+                self.currentLeftLineObj = None
+
+                if self.currentRightLineObj :
+                    self.graphWindowRight.ui.graphicsView.scene().removeItem(self.currentRightLineObj)
+                self.currentRightLineObj = None
+                
+                for item in self.listLeftLineObj:
+                    self.graphWindowLeft.ui.graphicsView.scene().removeItem(item)
+                self.listLeftLineObj = []
+
+                for item in self.listRightLineObj:
+                    self.graphWindowRight.ui.graphicsView.scene().removeItem(item)
+                self.listRightLineObj = []
+                
+                if True: #self.optWindow.ui.drawButton.isChecked():
+                    #newGeo = QgsGeometry.fromMultiPolygonXY([[self.listDrawCoord]])
+                    polyZstr = self.createWKTString(self.listDrawCoord,'PolygonZ')
+                    newGeo = QgsGeometry.fromWkt(polyZstr)
+                    currentVectorLayer = self.vectorLayer
                     
-                    X, Y = self.dualPixelToCoord(self.startDrawPointLeft, self.startDrawPointRight)
+                    rectCoord = self.getShowRect()
+                    listGeo = list(currentVectorLayer.getFeatures(rectCoord))
+                    #Gestion des plusieurs intersections à faire
+                    for item in listGeo : 
+                        featureGeo = item.geometry()
+                        
+                        if newGeo.intersects(featureGeo) :
+                            if True: #self.optWindow.ui.radioButtonMerge.isChecked() :
+                                mergePolygon(featureGeo, item.id(), newGeo, currentVectorLayer)
+                            else :
+                                automaticPolygon(featureGeo, item.id(), newGeo, currentVectorLayer)
+                            break
+                            
+                    else :
+                        addPolygon(currentVectorLayer, newGeo)
+                else :
+                    currentVectorLayer = self.vectorLayer    
+                    cutPolygon(currentVectorLayer, self.listDrawCoord)
+                
+                self.listDrawCoord = []
+                
+                self.addPolygonOnScreen()
                     
-                    point = QgsPointXY(X,Y)
-                    geometry =  QgsGeometry.fromPointXY(point)
-                    self.vectorLayer.startEditing()
-                    feat = QgsFeature()
-                    feat.setGeometry(geometry)
-                    self.vectorLayer.dataProvider().addFeature(feat)
-                    self.vectorLayer.commitChanges()
-                    self.addPointOnScreen()
-
-
-            elif ev.button() == Qt.RightButton :
-                self.optWindow.ui.panButton.setChecked(False)
-                self.panClick()
-
-        else :
-            self.optWindow.ui.panButton.setChecked(True)
-            self.panClick()
-
 
     #Fonction activer par la roulette de la souris
     #Avec la touche CTRL, il est possible de zoom In/Out sur les photos 
@@ -931,6 +902,20 @@ class stereoPhoto(object):
             diffX = aPoint.x() - bPoint.x()
 
             self.centerPixelRight = (self.centerPixelRight[0]-diffX, self.centerPixelRight[1])
+
+    def createWKTString(self,coordList,strName) :
+        if strName == 'PolygonZ' :
+            retSTR = strName + '(('
+            for coord in coordList:
+                retSTR += str(coord[0])
+                retSTR += ' '
+                retSTR += str(coord[1])
+                retSTR += ' '
+                retSTR += str(coord[2])
+                retSTR += ','
+            retSTR += '))'
+
+            return retSTR
 
 
 if __name__ == "__main__":

@@ -354,7 +354,7 @@ class optionWindow(QtWidgets.QDockWidget):
         if fname:
             self.currentMNTPath = fname
             nameMNT = os.path.basename(fname)
-            self.ui.importLineProject.setText(nameMNT)
+            self.ui.importLineMNT.setText(nameMNT)
         else : 
             self.currentMNTPath = ''
 

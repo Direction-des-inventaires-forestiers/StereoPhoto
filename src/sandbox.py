@@ -13,6 +13,22 @@ import math, time, threading, win32api
 from PIL import Image, ImageOps, ImageEnhance, ImageStat
 #print(pen.)
 
+def createWKTString(coordList,strName) :
+    if strName == 'PolygonZ' :
+        retSTR = strName + '(('
+        for coord in coordList:
+            retSTR += str(coord[0])
+            retSTR += ' '
+            retSTR += str(coord[1])
+            retSTR += ' '
+            retSTR += str(coord[2])
+            retSTR += ','
+        retSTR += '))'
+
+        return retSTR
+l = [(1,1,1),(2,2,2),(3,3,3),(4,4,4)]
+print(createWKTString(l,'PolygonZ'))
+
 #cropV = (2000,0,11310,17310)
 #i = Image.open('C:\\Users\\pinfr1\\Downloads\\Photos\\AP13052_0930_RGB.tif')
 #i.seek(3)

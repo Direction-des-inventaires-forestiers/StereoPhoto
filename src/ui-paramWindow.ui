@@ -17,14 +17,14 @@
    <widget class="QLabel" name="label">
     <property name="geometry">
      <rect>
-      <x>220</x>
-      <y>150</y>
-      <width>131</width>
+      <x>260</x>
+      <y>190</y>
+      <width>241</width>
       <height>16</height>
      </rect>
     </property>
     <property name="text">
-     <string>Touche pour pan et zoom</string>
+     <string>Touche pour pan et zoom, tout autre keybinding</string>
     </property>
    </widget>
    <widget class="QLabel" name="label_2">
@@ -37,33 +37,20 @@
      </rect>
     </property>
     <property name="text">
-     <string>Numéro des Écran des fenêtre de gauche et droite</string>
-    </property>
-   </widget>
-   <widget class="QLabel" name="label_3">
-    <property name="geometry">
-     <rect>
-      <x>290</x>
-      <y>280</y>
-      <width>121</width>
-      <height>16</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Résolution des écrans? </string>
+     <string>Numéro des Écran</string>
     </property>
    </widget>
    <widget class="QLabel" name="label_4">
     <property name="geometry">
      <rect>
-      <x>290</x>
-      <y>320</y>
-      <width>46</width>
-      <height>13</height>
+      <x>260</x>
+      <y>270</y>
+      <width>231</width>
+      <height>16</height>
      </rect>
     </property>
     <property name="text">
-     <string>Curseur</string>
+     <string>Curseur, couleur des traits, altitude ajouter</string>
     </property>
    </widget>
   </widget>
@@ -73,7 +60,7 @@
      <x>0</x>
      <y>0</y>
      <width>800</width>
-     <height>21</height>
+     <height>20</height>
     </rect>
    </property>
   </widget>
