@@ -3,9 +3,13 @@
 name=StereoPhoto
 email=Frederick.Pineault@mffp.gouv.qc.ca
 author=Frédérick Pineault
-qgisMinimumVersion=3.4
-description=Do 3D
-about=Use two pictures to recreate a 3D effect with the right computer setup
-version=version 0.1
+qgisMinimumVersion=3.10
+description= Permet la visualisation d'images avec un système stéréoscopique
+about=En utilisant un dossier d'images TIF, l'application permet de visualiser des images en stéréoscopie. Il est possible d'ajouter une couche polygonale 3D sur l'image. La couche en question peut être modifier via l'ajout de nouveaux polygones ainsi que par du découpage. L'utilisation d'un modèle numérique de terrain est recommandé. L'application fonctionne sans une carte graphique stéréoscopique. 
+version=version 1.0.0
 repository=https://github.com/frpin33
 ; end of mandatory metadata
+
+tags = stéréoscopie, 3D, Planar, TIFF
+experimental=True
+deprecated=False

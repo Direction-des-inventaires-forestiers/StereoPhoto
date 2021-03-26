@@ -1,548 +1,281 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
- <class>optionWindow</class>
- <widget class="QWidget" name="optionWindow">
+ <class>StereoDockWidget</class>
+ <widget class="QDockWidget" name="StereoDockWidget">
   <property name="geometry">
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>440</width>
-    <height>723</height>
+    <width>434</width>
+    <height>342</height>
    </rect>
   </property>
-  <property name="windowTitle">
-   <string>Menu des options</string>
+  <property name="minimumSize">
+   <size>
+    <width>165</width>
+    <height>200</height>
+   </size>
   </property>
-  <widget class="QLabel" name="label_5">
-   <property name="geometry">
-    <rect>
-     <x>70</x>
-     <y>10</y>
-     <width>91</width>
-     <height>16</height>
-    </rect>
-   </property>
-   <property name="font">
-    <font>
-     <pointsize>10</pointsize>
-     <weight>75</weight>
-     <bold>true</bold>
-    </font>
-   </property>
-   <property name="text">
-    <string>Image Gauche</string>
-   </property>
-  </widget>
-  <widget class="QLabel" name="label_6">
-   <property name="geometry">
-    <rect>
-     <x>270</x>
-     <y>10</y>
-     <width>91</width>
-     <height>16</height>
-    </rect>
-   </property>
-   <property name="font">
-    <font>
-     <pointsize>10</pointsize>
-     <weight>75</weight>
-     <bold>true</bold>
-    </font>
-   </property>
-   <property name="text">
-    <string>Image Droite</string>
-   </property>
-  </widget>
-  <widget class="QGroupBox" name="groupBoxLeft">
-   <property name="geometry">
-    <rect>
-     <x>10</x>
-     <y>30</y>
-     <width>201</width>
-     <height>301</height>
-    </rect>
-   </property>
-   <property name="title">
-    <string/>
-   </property>
-   <widget class="QLineEdit" name="importLineLeft">
+  <property name="windowTitle">
+   <string>StereoPhoto</string>
+  </property>
+  <widget class="QWidget" name="dockWidgetContents">
+   <widget class="QGroupBox" name="groupBoxMainPath">
     <property name="geometry">
      <rect>
-      <x>10</x>
-      <y>57</y>
-      <width>161</width>
-      <height>20</height>
+      <x>20</x>
+      <y>10</y>
+      <width>401</width>
+      <height>45</height>
      </rect>
     </property>
-    <property name="text">
-     <string/>
+    <property name="font">
+     <font>
+      <weight>75</weight>
+      <bold>true</bold>
+     </font>
     </property>
-    <property name="readOnly">
-     <bool>true</bool>
+    <property name="title">
+     <string>Chemin vers les photos</string>
     </property>
+    <widget class="QLineEdit" name="importLineProject">
+     <property name="geometry">
+      <rect>
+       <x>40</x>
+       <y>20</y>
+       <width>311</width>
+       <height>20</height>
+      </rect>
+     </property>
+     <property name="font">
+      <font>
+       <weight>50</weight>
+       <bold>false</bold>
+      </font>
+     </property>
+     <property name="text">
+      <string/>
+     </property>
+     <property name="readOnly">
+      <bool>true</bool>
+     </property>
+    </widget>
+    <widget class="QToolButton" name="importToolProject">
+     <property name="geometry">
+      <rect>
+       <x>350</x>
+       <y>20</y>
+       <width>25</width>
+       <height>19</height>
+      </rect>
+     </property>
+     <property name="font">
+      <font>
+       <weight>50</weight>
+       <bold>false</bold>
+      </font>
+     </property>
+     <property name="text">
+      <string>...</string>
+     </property>
+    </widget>
    </widget>
-   <widget class="QToolButton" name="importToolLeft">
-    <property name="geometry">
-     <rect>
-      <x>170</x>
-      <y>57</y>
-      <width>25</width>
-      <height>19</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>...</string>
-    </property>
-   </widget>
-   <widget class="QComboBox" name="boxOrientationLeft">
+   <widget class="QToolButton" name="toolButtonEst">
     <property name="enabled">
      <bool>false</bool>
     </property>
     <property name="geometry">
      <rect>
-      <x>85</x>
-      <y>87</y>
-      <width>101</width>
-      <height>22</height>
-     </rect>
-    </property>
-    <item>
-     <property name="text">
-      <string>0°</string>
-     </property>
-    </item>
-    <item>
-     <property name="text">
-      <string>90°</string>
-     </property>
-    </item>
-    <item>
-     <property name="text">
-      <string>180°</string>
-     </property>
-    </item>
-    <item>
-     <property name="text">
-      <string>270°</string>
-     </property>
-    </item>
-   </widget>
-   <widget class="QLabel" name="label">
-    <property name="enabled">
-     <bool>false</bool>
-    </property>
-    <property name="geometry">
-     <rect>
-      <x>10</x>
-      <y>87</y>
-      <width>61</width>
-      <height>20</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Rotation</string>
-    </property>
-   </widget>
-   <widget class="QLabel" name="label_2">
-    <property name="enabled">
-     <bool>false</bool>
-    </property>
-    <property name="geometry">
-     <rect>
-      <x>10</x>
-      <y>127</y>
-      <width>61</width>
-      <height>16</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Effet miroir</string>
-    </property>
-   </widget>
-   <widget class="QComboBox" name="boxMiroirLeft">
-    <property name="enabled">
-     <bool>false</bool>
-    </property>
-    <property name="geometry">
-     <rect>
-      <x>85</x>
-      <y>127</y>
-      <width>101</width>
-      <height>22</height>
-     </rect>
-    </property>
-    <property name="currentIndex">
-     <number>1</number>
-    </property>
-    <item>
-     <property name="text">
-      <string>Aucun</string>
-     </property>
-    </item>
-    <item>
-     <property name="text">
-      <string>Horizontal</string>
-     </property>
-    </item>
-    <item>
-     <property name="text">
-      <string>Vertical</string>
-     </property>
-    </item>
-   </widget>
-   <widget class="QPushButton" name="importButtonLeft">
-    <property name="enabled">
-     <bool>false</bool>
-    </property>
-    <property name="geometry">
-     <rect>
-      <x>65</x>
-      <y>257</y>
-      <width>75</width>
+      <x>350</x>
+      <y>90</y>
+      <width>66</width>
       <height>23</height>
      </rect>
     </property>
     <property name="text">
-     <string>Import</string>
+     <string>Est (D)</string>
+    </property>
+    <property name="toolButtonStyle">
+     <enum>Qt::ToolButtonTextBesideIcon</enum>
+    </property>
+    <property name="autoRaise">
+     <bool>false</bool>
+    </property>
+    <property name="arrowType">
+     <enum>Qt::RightArrow</enum>
     </property>
    </widget>
-   <widget class="QGraphicsView" name="graphicsViewLeft">
+   <widget class="QToolButton" name="toolButtonOuest">
+    <property name="enabled">
+     <bool>false</bool>
+    </property>
+    <property name="geometry">
+     <rect>
+      <x>260</x>
+      <y>90</y>
+      <width>81</width>
+      <height>23</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Ouest (A)</string>
+    </property>
+    <property name="toolButtonStyle">
+     <enum>Qt::ToolButtonTextBesideIcon</enum>
+    </property>
+    <property name="autoRaise">
+     <bool>false</bool>
+    </property>
+    <property name="arrowType">
+     <enum>Qt::LeftArrow</enum>
+    </property>
+   </widget>
+   <widget class="QToolButton" name="toolButtonSud">
+    <property name="enabled">
+     <bool>false</bool>
+    </property>
+    <property name="geometry">
+     <rect>
+      <x>310</x>
+      <y>120</y>
+      <width>71</width>
+      <height>23</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Sud (S)</string>
+    </property>
+    <property name="toolButtonStyle">
+     <enum>Qt::ToolButtonTextBesideIcon</enum>
+    </property>
+    <property name="autoRaise">
+     <bool>false</bool>
+    </property>
+    <property name="arrowType">
+     <enum>Qt::DownArrow</enum>
+    </property>
+   </widget>
+   <widget class="QToolButton" name="toolButtonNord">
+    <property name="enabled">
+     <bool>false</bool>
+    </property>
+    <property name="geometry">
+     <rect>
+      <x>300</x>
+      <y>60</y>
+      <width>81</width>
+      <height>23</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Nord (W)</string>
+    </property>
+    <property name="toolButtonStyle">
+     <enum>Qt::ToolButtonTextBesideIcon</enum>
+    </property>
+    <property name="autoRaise">
+     <bool>false</bool>
+    </property>
+    <property name="arrowType">
+     <enum>Qt::UpArrow</enum>
+    </property>
+   </widget>
+   <widget class="QLabel" name="label_10">
     <property name="geometry">
      <rect>
       <x>10</x>
-      <y>157</y>
-      <width>181</width>
-      <height>91</height>
-     </rect>
-    </property>
-    <property name="verticalScrollBarPolicy">
-     <enum>Qt::ScrollBarAlwaysOff</enum>
-    </property>
-    <property name="horizontalScrollBarPolicy">
-     <enum>Qt::ScrollBarAlwaysOff</enum>
-    </property>
-   </widget>
-   <widget class="QLabel" name="importDoneLeft">
-    <property name="geometry">
-     <rect>
-      <x>150</x>
-      <y>260</y>
-      <width>21</width>
-      <height>16</height>
-     </rect>
-    </property>
-    <property name="styleSheet">
-     <string notr="true">image: url(:/Anaglyph/Icons/redCross.png);</string>
-    </property>
-    <property name="text">
-     <string/>
-    </property>
-   </widget>
-   <widget class="QLabel" name="label_8">
-    <property name="geometry">
-     <rect>
-      <x>20</x>
-      <y>25</y>
-      <width>91</width>
+      <y>190</y>
+      <width>111</width>
       <height>16</height>
      </rect>
     </property>
     <property name="text">
-     <string>Numéro de l'écran :</string>
+     <string>Pourcentage à retirer : </string>
     </property>
    </widget>
-   <widget class="QSpinBox" name="spinBoxLeftScreen">
+   <widget class="QPushButton" name="pushButtonShowIDList">
+    <property name="enabled">
+     <bool>false</bool>
+    </property>
     <property name="geometry">
      <rect>
-      <x>131</x>
-      <y>25</y>
+      <x>290</x>
+      <y>150</y>
+      <width>101</width>
+      <height>23</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Parcourir la liste</string>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="enhanceButton">
+    <property name="enabled">
+     <bool>false</bool>
+    </property>
+    <property name="geometry">
+     <rect>
+      <x>30</x>
+      <y>230</y>
+      <width>71</width>
+      <height>23</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Rehausser</string>
+    </property>
+    <property name="checkable">
+     <bool>false</bool>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="pushButtonShowPicture">
+    <property name="enabled">
+     <bool>false</bool>
+    </property>
+    <property name="geometry">
+     <rect>
+      <x>60</x>
+      <y>270</y>
+      <width>81</width>
+      <height>23</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <pointsize>8</pointsize>
+      <weight>50</weight>
+      <bold>false</bold>
+     </font>
+    </property>
+    <property name="text">
+     <string>Naviguer</string>
+    </property>
+   </widget>
+   <widget class="QSpinBox" name="spinBoxRecouvrementH">
+    <property name="geometry">
+     <rect>
+      <x>140</x>
+      <y>190</y>
       <width>51</width>
       <height>22</height>
      </rect>
     </property>
     <property name="maximum">
-     <number>0</number>
+     <number>100</number>
+    </property>
+    <property name="value">
+     <number>40</number>
     </property>
    </widget>
-  </widget>
-  <widget class="QGroupBox" name="groupBoxRight">
-   <property name="geometry">
-    <rect>
-     <x>220</x>
-     <y>30</y>
-     <width>201</width>
-     <height>301</height>
-    </rect>
-   </property>
-   <property name="title">
-    <string/>
-   </property>
-   <widget class="QLineEdit" name="importLineRight">
-    <property name="geometry">
-     <rect>
-      <x>10</x>
-      <y>60</y>
-      <width>161</width>
-      <height>20</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string/>
-    </property>
-    <property name="readOnly">
-     <bool>true</bool>
-    </property>
-   </widget>
-   <widget class="QToolButton" name="importToolRight">
-    <property name="geometry">
-     <rect>
-      <x>170</x>
-      <y>60</y>
-      <width>25</width>
-      <height>19</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>...</string>
-    </property>
-   </widget>
-   <widget class="QLabel" name="label_4">
-    <property name="enabled">
-     <bool>false</bool>
-    </property>
-    <property name="geometry">
-     <rect>
-      <x>10</x>
-      <y>130</y>
-      <width>61</width>
-      <height>16</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Effet miroir</string>
-    </property>
-   </widget>
-   <widget class="QLabel" name="label_3">
-    <property name="enabled">
-     <bool>false</bool>
-    </property>
-    <property name="geometry">
-     <rect>
-      <x>10</x>
-      <y>90</y>
-      <width>61</width>
-      <height>20</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Rotation</string>
-    </property>
-   </widget>
-   <widget class="QComboBox" name="boxMiroirRight">
-    <property name="enabled">
-     <bool>false</bool>
-    </property>
-    <property name="geometry">
-     <rect>
-      <x>85</x>
-      <y>130</y>
-      <width>101</width>
-      <height>22</height>
-     </rect>
-    </property>
-    <property name="currentIndex">
-     <number>0</number>
-    </property>
-    <item>
-     <property name="text">
-      <string>Aucun</string>
-     </property>
-    </item>
-    <item>
-     <property name="text">
-      <string>Horizontal</string>
-     </property>
-    </item>
-    <item>
-     <property name="text">
-      <string>Vertical</string>
-     </property>
-    </item>
-   </widget>
-   <widget class="QComboBox" name="boxOrientationRight">
-    <property name="enabled">
-     <bool>false</bool>
-    </property>
-    <property name="geometry">
-     <rect>
-      <x>85</x>
-      <y>90</y>
-      <width>101</width>
-      <height>22</height>
-     </rect>
-    </property>
-    <item>
-     <property name="text">
-      <string>0°</string>
-     </property>
-    </item>
-    <item>
-     <property name="text">
-      <string>90°</string>
-     </property>
-    </item>
-    <item>
-     <property name="text">
-      <string>180°</string>
-     </property>
-    </item>
-    <item>
-     <property name="text">
-      <string>270°</string>
-     </property>
-    </item>
-   </widget>
-   <widget class="QPushButton" name="importButtonRight">
-    <property name="enabled">
-     <bool>false</bool>
-    </property>
-    <property name="geometry">
-     <rect>
-      <x>65</x>
-      <y>260</y>
-      <width>75</width>
-      <height>23</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Import</string>
-    </property>
-   </widget>
-   <widget class="QGraphicsView" name="graphicsViewRight">
-    <property name="geometry">
-     <rect>
-      <x>10</x>
-      <y>160</y>
-      <width>181</width>
-      <height>91</height>
-     </rect>
-    </property>
-    <property name="verticalScrollBarPolicy">
-     <enum>Qt::ScrollBarAlwaysOff</enum>
-    </property>
-    <property name="horizontalScrollBarPolicy">
-     <enum>Qt::ScrollBarAlwaysOff</enum>
-    </property>
-   </widget>
-   <widget class="QLabel" name="importDoneRight">
-    <property name="geometry">
-     <rect>
-      <x>150</x>
-      <y>263</y>
-      <width>21</width>
-      <height>16</height>
-     </rect>
-    </property>
-    <property name="styleSheet">
-     <string notr="true">image: url(:/Anaglyph/Icons/redCross.png);</string>
-    </property>
-    <property name="text">
-     <string/>
-    </property>
-   </widget>
-   <widget class="QLabel" name="label_9">
-    <property name="geometry">
-     <rect>
-      <x>20</x>
-      <y>25</y>
-      <width>91</width>
-      <height>16</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Numéro de l'écran :</string>
-    </property>
-   </widget>
-   <widget class="QSpinBox" name="spinBoxRightScreen">
-    <property name="geometry">
-     <rect>
-      <x>131</x>
-      <y>25</y>
-      <width>51</width>
-      <height>22</height>
-     </rect>
-    </property>
-    <property name="maximum">
-     <number>0</number>
-    </property>
-   </widget>
-  </widget>
-  <widget class="QPushButton" name="enhanceButton">
-   <property name="enabled">
-    <bool>false</bool>
-   </property>
-   <property name="geometry">
-    <rect>
-     <x>360</x>
-     <y>340</y>
-     <width>71</width>
-     <height>23</height>
-    </rect>
-   </property>
-   <property name="text">
-    <string>Rehausser</string>
-   </property>
-   <property name="checkable">
-    <bool>false</bool>
-   </property>
-  </widget>
-  <widget class="QPushButton" name="affichageButton">
-   <property name="enabled">
-    <bool>false</bool>
-   </property>
-   <property name="geometry">
-    <rect>
-     <x>280</x>
-     <y>340</y>
-     <width>71</width>
-     <height>23</height>
-    </rect>
-   </property>
-   <property name="text">
-    <string>Afficher</string>
-   </property>
-  </widget>
-  <widget class="QGroupBox" name="groupBoxShape">
-   <property name="enabled">
-    <bool>true</bool>
-   </property>
-   <property name="geometry">
-    <rect>
-     <x>170</x>
-     <y>450</y>
-     <width>251</width>
-     <height>261</height>
-    </rect>
-   </property>
-   <property name="font">
-    <font>
-     <pointsize>10</pointsize>
-     <weight>75</weight>
-     <bold>true</bold>
-    </font>
-   </property>
-   <property name="title">
-    <string>Traçage</string>
-   </property>
    <widget class="QLineEdit" name="importLineVectorLayer">
     <property name="enabled">
      <bool>true</bool>
     </property>
     <property name="geometry">
      <rect>
-      <x>10</x>
-      <y>40</y>
-      <width>206</width>
+      <x>70</x>
+      <y>130</y>
+      <width>141</width>
       <height>20</height>
      </rect>
     </property>
@@ -563,8 +296,8 @@
    <widget class="QToolButton" name="importToolVectorLayer">
     <property name="geometry">
      <rect>
-      <x>215</x>
-      <y>40</y>
+      <x>210</x>
+      <y>130</y>
       <width>25</width>
       <height>19</height>
      </rect>
@@ -580,242 +313,15 @@
      <string>...</string>
     </property>
    </widget>
-   <widget class="QPushButton" name="drawButton">
-    <property name="enabled">
-     <bool>false</bool>
-    </property>
-    <property name="geometry">
-     <rect>
-      <x>10</x>
-      <y>90</y>
-      <width>111</width>
-      <height>23</height>
-     </rect>
-    </property>
-    <property name="font">
-     <font>
-      <pointsize>8</pointsize>
-      <weight>50</weight>
-      <bold>false</bold>
-     </font>
-    </property>
-    <property name="text">
-     <string>Ajouter Polygon (1)</string>
-    </property>
-    <property name="checkable">
-     <bool>true</bool>
-    </property>
-   </widget>
-   <widget class="QPushButton" name="cutButton">
-    <property name="enabled">
-     <bool>false</bool>
-    </property>
-    <property name="geometry">
-     <rect>
-      <x>130</x>
-      <y>90</y>
-      <width>111</width>
-      <height>23</height>
-     </rect>
-    </property>
-    <property name="font">
-     <font>
-      <pointsize>8</pointsize>
-      <weight>50</weight>
-      <bold>false</bold>
-     </font>
-    </property>
-    <property name="text">
-     <string>Couper Polygon (2)</string>
-    </property>
-    <property name="checkable">
-     <bool>true</bool>
-    </property>
-   </widget>
-   <widget class="QRadioButton" name="radioButtonMerge">
-    <property name="enabled">
-     <bool>true</bool>
-    </property>
-    <property name="geometry">
-     <rect>
-      <x>45</x>
-      <y>120</y>
-      <width>121</width>
-      <height>17</height>
-     </rect>
-    </property>
-    <property name="font">
-     <font>
-      <pointsize>8</pointsize>
-      <weight>50</weight>
-      <bold>false</bold>
-     </font>
-    </property>
-    <property name="text">
-     <string>Merge Polygon (3)</string>
-    </property>
-    <property name="checked">
-     <bool>true</bool>
-    </property>
-   </widget>
-   <widget class="QRadioButton" name="radioButtonAuto">
-    <property name="geometry">
-     <rect>
-      <x>45</x>
-      <y>140</y>
-      <width>131</width>
-      <height>17</height>
-     </rect>
-    </property>
-    <property name="font">
-     <font>
-      <pointsize>8</pointsize>
-      <weight>50</weight>
-      <bold>false</bold>
-     </font>
-    </property>
-    <property name="text">
-     <string>Automatic Polygon (3)</string>
-    </property>
-   </widget>
-   <widget class="QLabel" name="label_11">
-    <property name="geometry">
-     <rect>
-      <x>30</x>
-      <y>230</y>
-      <width>91</width>
-      <height>16</height>
-     </rect>
-    </property>
-    <property name="font">
-     <font>
-      <pointsize>8</pointsize>
-      <weight>50</weight>
-      <bold>false</bold>
-     </font>
-    </property>
-    <property name="text">
-     <string>Valeur Z du clic : </string>
-    </property>
-   </widget>
-   <widget class="QLineEdit" name="lineEditXClic">
-    <property name="geometry">
-     <rect>
-      <x>120</x>
-      <y>170</y>
-      <width>111</width>
-      <height>20</height>
-     </rect>
-    </property>
-    <property name="font">
-     <font>
-      <pointsize>8</pointsize>
-      <weight>50</weight>
-      <bold>false</bold>
-     </font>
-    </property>
-    <property name="text">
-     <string/>
-    </property>
-    <property name="readOnly">
-     <bool>true</bool>
-    </property>
-   </widget>
-   <widget class="QLineEdit" name="lineEditYClic">
-    <property name="geometry">
-     <rect>
-      <x>120</x>
-      <y>200</y>
-      <width>111</width>
-      <height>20</height>
-     </rect>
-    </property>
-    <property name="font">
-     <font>
-      <pointsize>8</pointsize>
-      <weight>50</weight>
-      <bold>false</bold>
-     </font>
-    </property>
-    <property name="text">
-     <string/>
-    </property>
-    <property name="readOnly">
-     <bool>true</bool>
-    </property>
-   </widget>
-   <widget class="QLineEdit" name="lineEditZClic">
-    <property name="geometry">
-     <rect>
-      <x>120</x>
-      <y>230</y>
-      <width>111</width>
-      <height>20</height>
-     </rect>
-    </property>
-    <property name="font">
-     <font>
-      <pointsize>8</pointsize>
-      <weight>50</weight>
-      <bold>false</bold>
-     </font>
-    </property>
-    <property name="text">
-     <string/>
-    </property>
-    <property name="readOnly">
-     <bool>true</bool>
-    </property>
-   </widget>
-   <widget class="QLabel" name="label_12">
-    <property name="geometry">
-     <rect>
-      <x>30</x>
-      <y>200</y>
-      <width>91</width>
-      <height>16</height>
-     </rect>
-    </property>
-    <property name="font">
-     <font>
-      <pointsize>8</pointsize>
-      <weight>50</weight>
-      <bold>false</bold>
-     </font>
-    </property>
-    <property name="text">
-     <string>Valeur Y du clic : </string>
-    </property>
-   </widget>
-   <widget class="QLabel" name="label_13">
-    <property name="geometry">
-     <rect>
-      <x>30</x>
-      <y>170</y>
-      <width>91</width>
-      <height>16</height>
-     </rect>
-    </property>
-    <property name="font">
-     <font>
-      <pointsize>8</pointsize>
-      <weight>50</weight>
-      <bold>false</bold>
-     </font>
-    </property>
-    <property name="text">
-     <string>Valeur X du clic : </string>
-    </property>
-   </widget>
    <widget class="QPushButton" name="pushButtonRemoveShape">
     <property name="enabled">
      <bool>false</bool>
     </property>
     <property name="geometry">
      <rect>
-      <x>140</x>
-      <y>65</y>
-      <width>101</width>
+      <x>10</x>
+      <y>160</y>
+      <width>91</width>
       <height>23</height>
      </rect>
     </property>
@@ -830,356 +336,212 @@
      <string>Retirer la couche</string>
     </property>
    </widget>
-  </widget>
-  <widget class="QPushButton" name="panButton">
-   <property name="enabled">
-    <bool>false</bool>
-   </property>
-   <property name="geometry">
-    <rect>
-     <x>40</x>
-     <y>450</y>
-     <width>81</width>
-     <height>23</height>
-    </rect>
-   </property>
-   <property name="font">
-    <font>
-     <pointsize>8</pointsize>
-     <weight>50</weight>
-     <bold>false</bold>
-    </font>
-   </property>
-   <property name="text">
-    <string>Naviguer</string>
-   </property>
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-  </widget>
-  <widget class="QLabel" name="label_7">
-   <property name="geometry">
-    <rect>
-     <x>10</x>
-     <y>340</y>
-     <width>91</width>
-     <height>16</height>
-    </rect>
-   </property>
-   <property name="text">
-    <string>Valeur Z du centre: </string>
-   </property>
-  </widget>
-  <widget class="QLineEdit" name="lineEditCurrentZ">
-   <property name="geometry">
-    <rect>
-     <x>105</x>
-     <y>340</y>
-     <width>81</width>
-     <height>20</height>
-    </rect>
-   </property>
-   <property name="readOnly">
-    <bool>true</bool>
-   </property>
-  </widget>
-  <widget class="QLabel" name="label_10">
-   <property name="geometry">
-    <rect>
-     <x>10</x>
-     <y>380</y>
-     <width>141</width>
-     <height>16</height>
-    </rect>
-   </property>
-   <property name="text">
-    <string>Recouvrement Horizontal :</string>
-   </property>
-  </widget>
-  <widget class="QSpinBox" name="spinBoxRecouvrementH">
-   <property name="geometry">
-    <rect>
-     <x>140</x>
-     <y>380</y>
-     <width>51</width>
-     <height>22</height>
-    </rect>
-   </property>
-   <property name="maximum">
-    <number>100</number>
-   </property>
-   <property name="value">
-    <number>60</number>
-   </property>
-  </widget>
-  <widget class="QGroupBox" name="groupBox">
-   <property name="geometry">
-    <rect>
-     <x>30</x>
-     <y>480</y>
-     <width>111</width>
-     <height>101</height>
-    </rect>
-   </property>
-   <property name="title">
-    <string>Type de couche</string>
-   </property>
-   <widget class="QRadioButton" name="radioPointLayer">
-    <property name="enabled">
-     <bool>false</bool>
-    </property>
-    <property name="geometry">
-     <rect>
-      <x>20</x>
-      <y>70</y>
-      <width>82</width>
-      <height>17</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Points</string>
-    </property>
-   </widget>
-   <widget class="QRadioButton" name="radioPolygonLayer">
-    <property name="geometry">
-     <rect>
-      <x>20</x>
-      <y>30</y>
-      <width>82</width>
-      <height>17</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Polygones</string>
-    </property>
-    <property name="checked">
-     <bool>true</bool>
-    </property>
-   </widget>
-   <widget class="QRadioButton" name="radioLineLayer">
-    <property name="enabled">
-     <bool>false</bool>
-    </property>
-    <property name="geometry">
-     <rect>
-      <x>20</x>
-      <y>50</y>
-      <width>82</width>
-      <height>17</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Lignes</string>
-    </property>
-   </widget>
-  </widget>
-  <widget class="QLabel" name="label_14">
-   <property name="geometry">
-    <rect>
-     <x>200</x>
-     <y>380</y>
-     <width>171</width>
-     <height>20</height>
-    </rect>
-   </property>
-   <property name="text">
-    <string>Recouvrement Vertical (SHIFT) :</string>
-   </property>
-  </widget>
-  <widget class="QSpinBox" name="spinBoxRecouvrementV">
-   <property name="geometry">
-    <rect>
-     <x>350</x>
-     <y>380</y>
-     <width>51</width>
-     <height>22</height>
-    </rect>
-   </property>
-   <property name="maximum">
-    <number>100</number>
-   </property>
-   <property name="value">
-    <number>100</number>
-   </property>
-  </widget>
-  <widget class="QLabel" name="label_15">
-   <property name="enabled">
-    <bool>false</bool>
-   </property>
-   <property name="geometry">
-    <rect>
-     <x>10</x>
-     <y>420</y>
-     <width>151</width>
-     <height>16</height>
-    </rect>
-   </property>
-   <property name="text">
-    <string>Modèle numérique de terrain : </string>
-   </property>
-  </widget>
-  <widget class="QLineEdit" name="lineEditMNT">
-   <property name="enabled">
-    <bool>false</bool>
-   </property>
-   <property name="geometry">
-    <rect>
-     <x>160</x>
-     <y>420</y>
-     <width>221</width>
-     <height>20</height>
-    </rect>
-   </property>
-  </widget>
-  <widget class="QToolButton" name="toolButtonMNT">
-   <property name="enabled">
-    <bool>false</bool>
-   </property>
-   <property name="geometry">
-    <rect>
-     <x>380</x>
-     <y>420</y>
-     <width>25</width>
-     <height>19</height>
-    </rect>
-   </property>
-   <property name="text">
-    <string>...</string>
-   </property>
-  </widget>
-  <widget class="QGroupBox" name="groupBoxMoveLine">
-   <property name="geometry">
-    <rect>
-     <x>20</x>
-     <y>590</y>
-     <width>141</width>
-     <height>121</height>
-    </rect>
-   </property>
-   <property name="title">
-    <string>Déplacement Lignes (Z)</string>
-   </property>
-   <widget class="QSpinBox" name="spinBoxMoveInY">
-    <property name="geometry">
-     <rect>
-      <x>75</x>
-      <y>90</y>
-      <width>51</width>
-      <height>22</height>
-     </rect>
-    </property>
-   </widget>
-   <widget class="QSpinBox" name="spinBoxMoveInX">
-    <property name="geometry">
-     <rect>
-      <x>75</x>
-      <y>60</y>
-      <width>51</width>
-      <height>22</height>
-     </rect>
-    </property>
-    <property name="value">
-     <number>5</number>
-    </property>
-   </widget>
-   <widget class="QCheckBox" name="checkBoxMoveLeft">
+   <widget class="QLabel" name="label_11">
     <property name="geometry">
      <rect>
       <x>10</x>
-      <y>30</y>
-      <width>61</width>
-      <height>18</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Gauche</string>
-    </property>
-    <property name="checked">
-     <bool>true</bool>
-    </property>
-   </widget>
-   <widget class="QCheckBox" name="checkBoxMoveRight">
-    <property name="geometry">
-     <rect>
-      <x>70</x>
-      <y>30</y>
-      <width>51</width>
-      <height>18</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Droite</string>
-    </property>
-    <property name="checked">
-     <bool>true</bool>
-    </property>
-   </widget>
-   <widget class="QLabel" name="label_16">
-    <property name="geometry">
-     <rect>
-      <x>5</x>
-      <y>60</y>
+      <y>130</y>
       <width>71</width>
       <height>16</height>
      </rect>
     </property>
     <property name="text">
-     <string>Horizontal (X)</string>
+     <string>Polygones</string>
     </property>
    </widget>
-   <widget class="QLabel" name="label_17">
+   <widget class="QGroupBox" name="groupBoxMNT">
+    <property name="enabled">
+     <bool>true</bool>
+    </property>
     <property name="geometry">
      <rect>
-      <x>10</x>
-      <y>90</y>
-      <width>61</width>
+      <x>210</x>
+      <y>190</y>
+      <width>201</width>
+      <height>91</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <weight>75</weight>
+      <bold>true</bold>
+     </font>
+    </property>
+    <property name="title">
+     <string>Modèle numérique de terrrain</string>
+    </property>
+    <widget class="QRadioButton" name="radioButtonDraw">
+     <property name="enabled">
+      <bool>false</bool>
+     </property>
+     <property name="geometry">
+      <rect>
+       <x>20</x>
+       <y>60</y>
+       <width>71</width>
+       <height>17</height>
+      </rect>
+     </property>
+     <property name="font">
+      <font>
+       <pointsize>8</pointsize>
+       <weight>50</weight>
+       <bold>false</bold>
+      </font>
+     </property>
+     <property name="text">
+      <string>Dessiner</string>
+     </property>
+     <property name="checked">
+      <bool>true</bool>
+     </property>
+    </widget>
+    <widget class="QRadioButton" name="radioButtonCut">
+     <property name="enabled">
+      <bool>false</bool>
+     </property>
+     <property name="geometry">
+      <rect>
+       <x>90</x>
+       <y>60</y>
+       <width>81</width>
+       <height>17</height>
+      </rect>
+     </property>
+     <property name="font">
+      <font>
+       <pointsize>8</pointsize>
+       <weight>50</weight>
+       <bold>false</bold>
+      </font>
+     </property>
+     <property name="text">
+      <string>Découper</string>
+     </property>
+    </widget>
+    <widget class="QToolButton" name="importToolMNT">
+     <property name="geometry">
+      <rect>
+       <x>170</x>
+       <y>20</y>
+       <width>25</width>
+       <height>19</height>
+      </rect>
+     </property>
+     <property name="font">
+      <font>
+       <pointsize>8</pointsize>
+       <weight>50</weight>
+       <bold>false</bold>
+      </font>
+     </property>
+     <property name="text">
+      <string>...</string>
+     </property>
+    </widget>
+    <widget class="QLineEdit" name="importLineMNT">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>20</y>
+       <width>161</width>
+       <height>20</height>
+      </rect>
+     </property>
+     <property name="font">
+      <font>
+       <pointsize>8</pointsize>
+       <weight>50</weight>
+       <bold>false</bold>
+      </font>
+     </property>
+     <property name="text">
+      <string/>
+     </property>
+     <property name="readOnly">
+      <bool>true</bool>
+     </property>
+    </widget>
+   </widget>
+   <widget class="QPushButton" name="pushButtonOpenParam">
+    <property name="geometry">
+     <rect>
+      <x>110</x>
+      <y>230</y>
+      <width>75</width>
+      <height>23</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Paramètres</string>
+    </property>
+   </widget>
+   <widget class="QLabel" name="labelRightName">
+    <property name="geometry">
+     <rect>
+      <x>110</x>
+      <y>100</y>
+      <width>141</width>
       <height>16</height>
      </rect>
     </property>
     <property name="text">
-     <string>Vertical (Y)</string>
+     <string/>
+    </property>
+   </widget>
+   <widget class="QLabel" name="labelLeftName">
+    <property name="geometry">
+     <rect>
+      <x>110</x>
+      <y>70</y>
+      <width>141</width>
+      <height>20</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string/>
+    </property>
+   </widget>
+   <widget class="QLabel" name="label">
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>70</y>
+      <width>101</width>
+      <height>16</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <weight>75</weight>
+      <bold>true</bold>
+     </font>
+    </property>
+    <property name="text">
+     <string>Image Gauche :</string>
+    </property>
+   </widget>
+   <widget class="QLabel" name="label_2">
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>100</y>
+      <width>101</width>
+      <height>16</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <weight>75</weight>
+      <bold>true</bold>
+     </font>
+    </property>
+    <property name="text">
+     <string>Image Droite :</string>
     </property>
    </widget>
   </widget>
-  <widget class="QPushButton" name="pushButtonReverseImage">
-   <property name="enabled">
-    <bool>false</bool>
-   </property>
-   <property name="geometry">
-    <rect>
-     <x>195</x>
-     <y>340</y>
-     <width>75</width>
-     <height>23</height>
-    </rect>
-   </property>
-   <property name="text">
-    <string>Inverser</string>
-   </property>
-  </widget>
-  <zorder>groupBoxRight</zorder>
-  <zorder>label_5</zorder>
-  <zorder>label_6</zorder>
-  <zorder>groupBoxLeft</zorder>
-  <zorder>enhanceButton</zorder>
-  <zorder>affichageButton</zorder>
-  <zorder>groupBoxShape</zorder>
-  <zorder>panButton</zorder>
-  <zorder>label_7</zorder>
-  <zorder>lineEditCurrentZ</zorder>
-  <zorder>label_10</zorder>
-  <zorder>spinBoxRecouvrementH</zorder>
-  <zorder>groupBox</zorder>
-  <zorder>label_14</zorder>
-  <zorder>spinBoxRecouvrementV</zorder>
-  <zorder>label_15</zorder>
-  <zorder>lineEditMNT</zorder>
-  <zorder>toolButtonMNT</zorder>
-  <zorder>groupBoxMoveLine</zorder>
-  <zorder>pushButtonReverseImage</zorder>
  </widget>
- <resources>
-  <include location="resources.qrc"/>
- </resources>
+ <resources/>
  <connections/>
 </ui>

@@ -50,7 +50,7 @@ from qgis.PyQt.QtCore import *
 from qgis.PyQt.QtGui import *
 import math
 
-def createShapePoint():
+def createShapePoint(shapeName, epsg, photoPath):
     #
     fields = QgsFields()
     fields.append(QgsField("id", QVariant.Int))

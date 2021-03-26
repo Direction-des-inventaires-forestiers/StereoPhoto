@@ -42,16 +42,13 @@ class Ui_graphicsWindow(object):
         graphicsWindow.setWindowTitle(_translate("graphicsWindow", nom))
 
 class graphicsWindow(QtWidgets.QMainWindow): 
-    keyDrawEvent = QtCore.pyqtSignal(str)
+    keyPressed = QtCore.pyqtSignal(QtGui.QKeyEvent)
     def __init__(self, nom):
         QtWidgets.QMainWindow.__init__(self)
         self.ui = Ui_graphicsWindow()
         self.ui.setupUi(self, nom)
         self.ui.graphicsView.resizeEvent = self.gwResizeEvent
         self.currentRect = None
-        self.ctrlClick = False
-        self.shiftClick = False
-        self.altClick = False
         self.myRect = QtCore.QRect()
         self.myPen = QtGui.QPen()
         self.rayon = 20
@@ -65,28 +62,10 @@ class graphicsWindow(QtWidgets.QMainWindow):
         #self.setWindowFlags(Qt.Window | Qt.WindowTitleHint | Qt.CustomizeWindowHint | Qt.WindowMaximizeButtonHint | Qt.WindowMinimizeButtonHint)
 
     def keyPressEvent(self, event):
-        if event.key() == QtCore.Qt.Key_Control:
-            self.ctrlClick = True
-        elif event.key() == QtCore.Qt.Key_Shift :
-            self.shiftClick = True
-        elif event.key() == QtCore.Qt.Key_Z :   
-            self.altClick = True
-        elif event.key() == QtCore.Qt.Key_W:
-            self.keyDrawEvent.emit("N")
-        elif event.key() == QtCore.Qt.Key_A :
-            self.keyDrawEvent.emit("O") 
-        elif event.key() == QtCore.Qt.Key_S :
-            self.keyDrawEvent.emit("S") 
-        elif event.key() == QtCore.Qt.Key_D :
-            self.keyDrawEvent.emit("E") 
-        elif event.key() == QtCore.Qt.Key_Escape:
-            self.keyDrawEvent.emit("ESC")
-
+        self.keyPressed.emit(event)
 
     def keyReleaseEvent(self, event):
-        self.ctrlClick = False
-        self.shiftClick = False
-        self.altClick = False
+        self.keyPressed.emit(event)
 
     #Détermine la position du curseur 
     def cursorRectInit(self, x, y):
