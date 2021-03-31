@@ -102,6 +102,7 @@ class stereoPhoto(object):
 
             self.firstDrawClick = True
             self.listDrawCoord = []
+            self.listCutCoord = []
             self.listLeftLineObj = []
             self.listRightLineObj = []
             self.currentLeftLineObj = None
@@ -693,7 +694,7 @@ class stereoPhoto(object):
             elif event.key() == int(self.paramMenu.currentDictParam['BindLong']) : self.longClick = True
             elif event.key() == int(self.paramMenu.currentDictParam['BindPoly']) : self.polyClick = True
             elif event.key() == int(self.paramMenu.currentDictParam['BindDraw']) : 
-                if self.optWindow.ui.radioButtonDraw.isEnabled() : self.optWindow.ui.radioButtonCut.setChecked(True)
+                if self.optWindow.ui.radioButtonDraw.isChecked() : self.optWindow.ui.radioButtonCut.setChecked(True)
                 else : self.optWindow.ui.radioButtonDraw.setChecked(True)
             
         else : 
@@ -786,6 +787,7 @@ class stereoPhoto(object):
                     self.currentRightLineObj = None
                 
                 self.listDrawCoord.append(coordTuple)
+                self.listCutCoord.append(QgsPointXY(coordTuple[0],coordTuple[1]))
 
             elif ev.button() == Qt.RightButton:
 
@@ -829,9 +831,10 @@ class stereoPhoto(object):
                         addPolygon(currentVectorLayer, newGeo)
                 else :
                     currentVectorLayer = self.vectorLayer    
-                    cutPolygon(currentVectorLayer, self.listDrawCoord)
+                    cutPolygon(currentVectorLayer, self.listCutCoord)
                 
                 self.listDrawCoord = []
+                self.listCutCoord = []
                 
                 self.addPolygonOnScreen()
                     

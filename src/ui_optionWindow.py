@@ -130,7 +130,7 @@ class Ui_StereoDockWidget(object):
         self.label_11 = QtWidgets.QLabel(self.dockWidgetContents)
         self.label_11.setGeometry(QtCore.QRect(10, 130, 71, 16))
         self.label_11.setObjectName("label_11")
-        self.groupBoxMNT = QtWidgets.QGroupBox(self.dockWidgetContents)
+        self.groupBoxMNT = dropEventMNT(self.dockWidgetContents)
         self.groupBoxMNT.setGeometry(QtCore.QRect(210, 190, 201, 91))
         font = QtGui.QFont()
         font.setBold(True)
@@ -229,6 +229,30 @@ class Ui_StereoDockWidget(object):
         self.label.setText(_translate("StereoDockWidget", "Image Gauche :"))
         self.label_2.setText(_translate("StereoDockWidget", "Image Droite :"))
 
+class dropEventMNT(QtWidgets.QGroupBox): 
+    validMNT = pyqtSignal()
+    def __init__(self, parent=None):
+        QtWidgets.QGroupBox.__init__(self, parent)
+        self.setAcceptDrops(True)
+
+    def dragEnterEvent(self, event):
+        event.accept()
+        
+    def dropEvent(self, event):
+        fileURL = event.mimeData().urls()[0].toString()
+        try :
+            fileName = fileURL.split('file:///')[1]
+        except :
+            fileName = fileURL.split('file:')[1]
+        
+        
+        if fileName.split('.')[-1] == 'tif':
+            self.MNTPath = fileName
+            self.MNTName = os.path.basename(fileName)
+            self.validMNT.emit()
+        else : 
+            self.MNTPath = ''
+            self.MNTName = ''
 
 class dropedit(QtWidgets.QGroupBox):   
 
@@ -260,6 +284,7 @@ class optionWindow(QtWidgets.QDockWidget):
         self.ui.importToolProject.clicked.connect(self.showImportDirectory)
         self.ui.importToolVectorLayer.clicked.connect(self.showImportVector)
         self.ui.importToolMNT.clicked.connect(self.showImportMNT)
+        self.ui.groupBoxMNT.validMNT.connect(self.dropImportMNT)
         self.vLayer = None
         self.currentMNTPath = ''
 
@@ -308,6 +333,12 @@ class optionWindow(QtWidgets.QDockWidget):
             self.currentMNTPath = ''
             self.ui.radioButtonCut.setEnabled(False)
             self.ui.radioButtonDraw.setEnabled(False)
+    
+    def dropImportMNT(self):
+        self.currentMNTPath = self.ui.groupBoxMNT.MNTPath
+        self.ui.importLineMNT.setText(self.ui.groupBoxMNT.MNTName)
+        self.ui.radioButtonCut.setEnabled(True)
+        self.ui.radioButtonDraw.setEnabled(True)
 
     def closeEvent(self,event):
         self.closeWindow.emit()
