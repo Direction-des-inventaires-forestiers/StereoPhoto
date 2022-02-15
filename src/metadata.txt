@@ -3,7 +3,7 @@
 name=StereoPhoto
 email=Frederick.Pineault@mffp.gouv.qc.ca
 author=Frédérick Pineault
-qgisMinimumVersion=3.10
+qgisMinimumVersion=3.4
 description= Permet la visualisation d'images avec un système stéréoscopique
 about=En utilisant un dossier d'images TIF, l'application permet de visualiser des images en stéréoscopie. Il est possible d'ajouter une couche polygonale 3D sur l'image. La couche en question peut être modifier via l'ajout de nouveaux polygones ainsi que par du découpage. L'utilisation d'un modèle numérique de terrain est recommandé. L'application fonctionne sans une carte graphique stéréoscopique. 
 version=version 1.0.0

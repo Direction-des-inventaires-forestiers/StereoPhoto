@@ -100,6 +100,10 @@ class stereoPhoto(object):
             self.enableDraw = False
             self.enableShow = False
 
+            self.zoomClick = False
+            self.longClick = False
+            self.polyClick = False
+
             self.firstDrawClick = True
             self.listDrawCoord = []
             self.listCutCoord = []
@@ -112,6 +116,10 @@ class stereoPhoto(object):
 
             self.polygonOnLeftScreen = []
             self.polygonOnRightScreen = []
+            
+            self.greyRectOnLeftScreen = []
+            self.greyRectOnRightScreen = []
+            self.oldMNTPath = ''
 
             self.listParam = [0, 0, 0, 0, 0, 0, 0, False, False, []]
 
@@ -286,6 +294,8 @@ class stereoPhoto(object):
 
         self.intLeftScreen = self.paramMenu.ui.spinBoxScreenLeft.value()
         self.intRightScreen = self.paramMenu.ui.spinBoxScreenRight.value()
+        self.rightMiroir = 0 if self.paramMenu.ui.checkBoxFlip.isChecked() else 1
+
 
         self.screenLeft = QApplication.desktop().screenGeometry(self.intLeftScreen)
         self.screenRight = QApplication.desktop().screenGeometry(self.intRightScreen)
@@ -367,7 +377,8 @@ class stereoPhoto(object):
         yLeft = yRight = 0
         
         self.cropValueLeft = (xLeft, yLeft, int(fullLeftPicSize[0]), int(fullLeftPicSize[1]))
-        self.cropValueRight = (xRight, yRight, int(fullRightPicSize[0]), int(fullRightPicSize[1]))
+        if self.rightMiroir == 1 : self.cropValueRight = (xRight, yRight, int(fullRightPicSize[0]), int(fullRightPicSize[1]))
+        else : self.cropValueRight = (0, yRight, int(fullRightPicSize[0])-xRight, int(fullRightPicSize[1]))
 
         self.leftPicSize = (fullLeftPicSize[0]-xLeft, fullLeftPicSize[1]-yLeft)
         self.rightPicSize = (fullRightPicSize[0]-xRight, fullRightPicSize[1]-yRight)
@@ -394,9 +405,12 @@ class stereoPhoto(object):
         centerPointLeft = self.graphWindowLeft.ui.graphicsView.mapToScene(QPoint(self.panCenterLeft[0], self.panCenterLeft[1]))
         centerPointRight = self.graphWindowRight.ui.graphicsView.mapToScene(QPoint(self.panCenterRight[0], self.panCenterRight[1]))
 
-        mirrorX = self.rightPicSize[0] - centerPointRight.x()
+        
         self.centerPixelLeft = (centerPointLeft.x()+self.cropValueLeft[0], centerPointLeft.y())            
-        self.centerPixelRight = (mirrorX, centerPointRight.y())
+        if self.rightMiroir == 1 :
+            mirrorX = self.rightPicSize[0] - centerPointRight.x()
+            self.centerPixelRight = (mirrorX, centerPointRight.y())
+        else : self.centerPixelRight = (centerPointRight.x()+self.cropValueRight[1], centerPointRight.y())  
 
 
         Z = self.dualManager.calculateZ(self.centerPixelLeft, self.centerPixelRight)
@@ -478,7 +492,7 @@ class stereoPhoto(object):
             topXL, topYL = self.leftPictureManager.pixelToCoord([self.cropValueLeft[0],self.cropValueLeft[1]],self.initAltitude)
             botXL, botYL = self.leftPictureManager.pixelToCoord([self.cropValueLeft[2], self.cropValueLeft[3]],self.initAltitude)
             
-            rectL = QgsRectangle(QgsPointXY(topXL, topYL), QgsPointXY(botXL, botYL))
+            rectL = QgsRectangle(QgsPointXY(topXL-1000, topYL+1000), QgsPointXY(botXL+1000, botYL-1000))
             return rectL
         
         else :
@@ -501,6 +515,45 @@ class stereoPhoto(object):
         
         return X, Y
 
+    
+    def getAltitude(self,x,y,z=None) : 
+        #Idéalement la fonction est appelé lorsqu'on utilise la geo du shp
+        #intrant : les points x et y avec le z=None 
+        #problème : shp peut avoir 2d ou 3d, possible d'avoir le mnt aussi comme ref
+        mntAlt = None
+
+        if self.optWindow.currentMNTPath != '' :
+            if self.optWindow.currentMNTPath != self.oldMNTPath :
+                    self.mntDS = gdal.Open(self.optWindow.currentMNTPath)
+                    self.mntBand = self.mntDS.GetRasterBand(1)
+                    self.mntGeo = self.mntDS.GetGeoTransform()
+                    self.mntSize = (self.mntDS.RasterXSize, self.mntDS.RasterYSize)
+                    self.oldMNTPath = self.optWindow.currentMNTPath
+            else: pass
+            ''' 
+            x_min = min(self.mntGeo[0],self.mntGeo[0]+(self.mntGeo[1]*self.mntSize[0]))
+            x_max = max(self.mntGeo[0],self.mntGeo[0]+(self.mntGeo[1]*self.mntSize[0]))
+            y_min = min(self.mntGeo[3],self.mntGeo[3]+(self.mntGeo[5]*self.mntSize[1]))
+            y_max = max(self.mntGeo[3],self.mntGeo[3]+(self.mntGeo[5]*self.mntSize[1]))
+            if x_min<= x <= x_max and  y_min<= y <= y_max :'''
+            px = math.floor((x - self.mntGeo[0]) / self.mntGeo[1]) 
+            py = math.floor((y - self.mntGeo[3]) / self.mntGeo[5])
+            try : 
+                mntAlt = self.mntBand.ReadAsArray(px,py,1,1)[0][0]
+                if mntAlt >= 1 : 
+                    return mntAlt
+
+            except : pass
+        
+        if z is None  :
+            pl = self.leftPictureManager.coordToPixel((x,y), self.initAltitude)
+            pr = self.rightPictureManager.coordToPixel((x,y), self.initAltitude) 
+            mntAlt = self.dualManager.calculateZ(pl,pr)
+        else : mntAlt = z
+        
+        return mntAlt
+
+    
     def getCoordFromMNTAltitude(self, pixLeft, pixRight):
 
         if not self.optWindow.currentMNTPath : return None
@@ -515,6 +568,7 @@ class stereoPhoto(object):
         px = math.floor((x - mntGeo[0]) / mntGeo[1]) 
         py = math.floor((y - mntGeo[3]) / mntGeo[5])
 
+        #comparer mnt vs alt via photogram -> intéressant d'avoir la précision
         try : mntAlt = mntBand.ReadAsArray(px,py,1,1)[0][0]
         except : return None
 
@@ -554,7 +608,7 @@ class stereoPhoto(object):
     #les polygones de la région sur la couche vectorielle
     def addPolygonOnScreen(self) :
         rectCoord = self.getShowRect()
-
+        
         listGeo = list(self.vectorLayer.getFeatures(rectCoord))
 
         if self.polygonOnLeftScreen :
@@ -566,7 +620,9 @@ class stereoPhoto(object):
             for item in self.polygonOnRightScreen :
                 self.graphWindowRight.ui.graphicsView.scene().removeItem(item)
         self.polygonOnRightScreen = []
-            
+        
+        a = True
+        count = 68
         for item in listGeo : 
             featureGeo = item.geometry() 
             
@@ -574,22 +630,69 @@ class stereoPhoto(object):
 
                 polygonL = QPolygonF()
                 polygonR = QPolygonF()
+                listPoint = []
                 for vertex in featureGeo.vertices():
                     data = vertex
-                    xPixel, yPixel = self.leftPictureManager.coordToPixel((data.x() , data.y()), data.z())
+    
+                    if data.is3D() : z = self.getAltitude(data.x(), data.y(),z=data.z()) 
+                    else :  z = self.getAltitude(data.x(), data.y())
+                            
+                    xPixel, yPixel = self.leftPictureManager.coordToPixel((data.x() , data.y()), z)
+                    
                     pixL = (xPixel-self.cropValueLeft[0], yPixel)            
 
-                    xPixel, yPixel = self.rightPictureManager.coordToPixel((data.x() , data.y()), data.z())
-                    mirrorX = self.rightPicSize[0] - xPixel
-                    pixR = (mirrorX, yPixel)
-
+                    xPixel, yPixel = self.rightPictureManager.coordToPixel((data.x() , data.y()), z)          
+                    if self.rightMiroir == 1 :
+                        mirrorX = self.rightPicSize[0] - xPixel
+                        pixR = (mirrorX, yPixel)
+                    else : pixR = (xPixel-self.cropValueRight[0], yPixel)  
+                    
                     polygonL.append(QPointF(pixL[0], pixL[1]))
                     polygonR.append(QPointF(pixR[0], pixR[1]))
+
+                    if (data.x(),data.y()) in listPoint :
+                        leftObj = self.graphWindowLeft.ui.graphicsView.scene().addPolygon(polygonL, self.my_pen)
+                        rightObj = self.graphWindowRight.ui.graphicsView.scene().addPolygon(polygonR, self.my_pen)
+                        self.polygonOnLeftScreen.append(leftObj)
+                        self.polygonOnRightScreen.append(rightObj)
+                        polygonL = QPolygonF()
+                        polygonR = QPolygonF()
+                        listPoint = []
+
+                    else : listPoint.append((data.x(),data.y()))
 
                 leftObj = self.graphWindowLeft.ui.graphicsView.scene().addPolygon(polygonL, self.my_pen)
                 rightObj = self.graphWindowRight.ui.graphicsView.scene().addPolygon(polygonR, self.my_pen)
                 self.polygonOnLeftScreen.append(leftObj)
                 self.polygonOnRightScreen.append(rightObj)
+
+        #add the gray rectangle QtGui.QColor(182,182,182)
+        if self.greyRectOnLeftScreen : 
+            for item in self.greyRectOnLeftScreen :
+                self.graphWindowLeft.ui.graphicsView.scene().removeItem(item)
+
+        if self.greyRectOnRightScreen :
+            for item in self.greyRectOnRightScreen :
+                self.graphWindowRight.ui.graphicsView.scene().removeItem(item)
+        
+        dval =15000
+        gr1 = QtCore.QRectF(-dval,-dval,dval,(2*dval)+self.leftPicSize[1])
+        self.greyRectOnRightScreen.append(self.graphWindowRight.ui.graphicsView.scene().addRect(gr1, QColor(182,182,182),QColor(182,182,182)))
+        self.greyRectOnLeftScreen.append(self.graphWindowLeft.ui.graphicsView.scene().addRect(gr1,QColor(182,182,182),QColor(182,182,182)))
+        
+        gr2 = QtCore.QRectF(self.leftPicSize[0],-dval,dval,(2*dval)+self.leftPicSize[1])
+        self.greyRectOnRightScreen.append(self.graphWindowRight.ui.graphicsView.scene().addRect(gr2,QColor(182,182,182),QColor(182,182,182)))
+        self.greyRectOnLeftScreen.append(self.graphWindowLeft.ui.graphicsView.scene().addRect(gr2,QColor(182,182,182),QColor(182,182,182)))
+        
+        gr3= QtCore.QRectF(0,-dval,self.leftPicSize[0],dval)
+        self.greyRectOnRightScreen.append(self.graphWindowRight.ui.graphicsView.scene().addRect(gr3,QColor(182,182,182),QColor(182,182,182)))
+        self.greyRectOnLeftScreen.append(self.graphWindowLeft.ui.graphicsView.scene().addRect(gr3,QColor(182,182,182),QColor(182,182,182)))
+        
+        gr4 = QtCore.QRectF(0,self.leftPicSize[1],self.leftPicSize[0],dval)
+        self.greyRectOnRightScreen.append(self.graphWindowRight.ui.graphicsView.scene().addRect(gr4,QColor(182,182,182),QColor(182,182,182)))
+        self.greyRectOnLeftScreen.append(self.graphWindowLeft.ui.graphicsView.scene().addRect(gr4,QColor(182,182,182),QColor(182,182,182)))
+        
+
 
 
     #Utiliser par threadShow pour afficher une portion de l'image à une certaine position
@@ -683,12 +786,14 @@ class stereoPhoto(object):
             elif event.key() == QtCore.Qt.Key_D and self.optWindow.ui.toolButtonEst.isEnabled() :
                 self.toolButtonPressEvent('E')
 
-            elif event.key() == QtCore.Qt.Key_Escape :
+            elif event.key() == QtCore.Qt.Key_Escape and self.enableShow :
+
                 self.graphWindowLeft.ui.widget.setMouseTracking(False)
                 win32api.SetCursorPos((self.optWindow.pos().x(), self.optWindow.pos().y()))
                 self.graphWindowLeft.setCursor(self.graphWindowLeft.normalCursor)
-                self.enableShow = False
                 self.closeAllSideWindows()
+                self.enableShow = False
+
 
             elif event.key() == int(self.paramMenu.currentDictParam['BindZoom']) : self.zoomClick = True
             elif event.key() == int(self.paramMenu.currentDictParam['BindLong']) : self.longClick = True
@@ -725,7 +830,8 @@ class stereoPhoto(object):
             
         leftView.horizontalScrollBar().setValue(leftView.horizontalScrollBar().value() + self.deltaX)
         leftView.verticalScrollBar().setValue(leftView.verticalScrollBar().value() + self.deltaY)
-        rightView.horizontalScrollBar().setValue(rightView.horizontalScrollBar().value() - self.deltaX)
+        if self.rightMiroir == 0 : rightView.horizontalScrollBar().setValue(rightView.horizontalScrollBar().value() + self.deltaX)
+        else : rightView.horizontalScrollBar().setValue(rightView.horizontalScrollBar().value() - self.deltaX)
         rightView.verticalScrollBar().setValue(rightView.verticalScrollBar().value() + self.deltaY)
 
         
@@ -766,9 +872,13 @@ class stereoPhoto(object):
             centerPointRight = self.graphWindowRight.ui.graphicsView.mapToScene(pointRight)
 
             pixL = (centerPointLeft.x()+self.cropValueLeft[0], centerPointLeft.y())            
-
-            mirrorX = self.rightPicSize[0] - centerPointRight.x()
-            pixR = (mirrorX, centerPointRight.y())
+            
+            if self.rightMiroir == 1 :
+                mirrorX = self.rightPicSize[0] - centerPointRight.x()
+                pixR = (mirrorX, centerPointRight.y())
+            else : pixR = (centerPointRight.x()+self.cropValueRight[1], centerPointRight.y())  
+            
+           
 
             coordTuple = self.getCoordFromMNTAltitude(pixL,pixR)
             if ev.button() == Qt.LeftButton:

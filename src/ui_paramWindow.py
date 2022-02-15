@@ -237,6 +237,9 @@ class Ui_editParamWindow(object):
         self.pushButtonAccept = QtWidgets.QPushButton(self.centralwidget)
         self.pushButtonAccept.setGeometry(QtCore.QRect(240, 420, 75, 23))
         self.pushButtonAccept.setObjectName("pushButtonAccept")
+        self.checkBoxFlip = QtWidgets.QCheckBox(self.centralwidget)
+        self.checkBoxFlip.setGeometry(QtCore.QRect(250, 220, 91, 17))
+        self.checkBoxFlip.setObjectName("checkBoxFlip")
         editParamWindow.setCentralWidget(self.centralwidget)
         self.menubar = QtWidgets.QMenuBar(editParamWindow)
         self.menubar.setGeometry(QtCore.QRect(0, 0, 428, 21))
@@ -296,6 +299,9 @@ class Ui_editParamWindow(object):
         self.label_17.setText(_translate("editParamWindow", "Vertical (Y)"))
         self.pushButtonCancel.setText(_translate("editParamWindow", "Annuler"))
         self.pushButtonAccept.setText(_translate("editParamWindow", "OK"))
+        self.checkBoxFlip.setText(_translate("editParamWindow", "Flip Card"))
+        self.checkBoxFlip.setAccessibleName(_translate("editParamWindow", "Flip"))
+
 
 
         
@@ -341,6 +347,8 @@ class paramWindow(QtWidgets.QMainWindow):
                 value.setValue(int(dictParam[key]))
             elif type(value) == QtWidgets.QComboBox :
                 value.setCurrentText(dictParam[key])
+            elif type(value) == QtWidgets.QCheckBox : 
+                value.setCheckState(int(dictParam[key]))
         
         self.currentDictParam = dictParam
     
@@ -360,6 +368,8 @@ class paramWindow(QtWidgets.QMainWindow):
                 JSON2Save[key] = str(value.value())
             elif type(value) == QtWidgets.QComboBox :
                 JSON2Save[key] = value.currentText()
+            elif type(value) == QtWidgets.QCheckBox: 
+                JSON2Save[key] = str(value.checkState())   
 
         with open(self.JSONPath, 'w') as f : 
             json.dump(JSON2Save, f)
