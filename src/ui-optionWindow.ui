@@ -377,7 +377,7 @@
      <property name="geometry">
       <rect>
        <x>20</x>
-       <y>60</y>
+       <y>45</y>
        <width>71</width>
        <height>17</height>
       </rect>
@@ -402,8 +402,8 @@
      </property>
      <property name="geometry">
       <rect>
-       <x>90</x>
-       <y>60</y>
+       <x>20</x>
+       <y>65</y>
        <width>81</width>
        <height>17</height>
       </rect>
@@ -460,6 +460,29 @@
      </property>
      <property name="readOnly">
       <bool>true</bool>
+     </property>
+    </widget>
+    <widget class="QPushButton" name="pushButtonRemoveMNT">
+     <property name="enabled">
+      <bool>false</bool>
+     </property>
+     <property name="geometry">
+      <rect>
+       <x>100</x>
+       <y>50</y>
+       <width>91</width>
+       <height>23</height>
+      </rect>
+     </property>
+     <property name="font">
+      <font>
+       <pointsize>8</pointsize>
+       <weight>50</weight>
+       <bold>false</bold>
+      </font>
+     </property>
+     <property name="text">
+      <string>Retirer le modèle</string>
      </property>
     </widget>
    </widget>
@@ -538,6 +561,22 @@
     </property>
     <property name="text">
      <string>Image Droite :</string>
+    </property>
+   </widget>
+   <widget class="QCheckBox" name="checkBoxUseLayerZ">
+    <property name="enabled">
+     <bool>false</bool>
+    </property>
+    <property name="geometry">
+     <rect>
+      <x>110</x>
+      <y>160</y>
+      <width>141</width>
+      <height>17</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Afficher avec l'altitude</string>
     </property>
    </widget>
   </widget>

@@ -29,6 +29,10 @@ from qgis.PyQt.QtGui import *
 #from PyQt5.QtCore import *
 #from PyQt5.QtGui import *
 
+import math, threading
+from osgeo import gdal
+from .worldManager import pictureManager, dualManager
+
 #rect signifie la zone d'inspection désirer (QgsRectangle de coordonnée)
 #un feature partiellement dans le rectangle se considérer dans la liste -> ce qu'on désire
 #list(QgsVectorLayer.getFeatures(rect))[0] -> retourne le premier feature de la liste .geometry()
@@ -72,6 +76,19 @@ def mergePolygon(currentGeo, currentIndex, extraGeo, vectorLayer):
     vectorLayer.commitChanges()
     return newGeo
 
+def reshapeLayer(lineString,listFeatures,vectorLayer) :
+    vectorLayer.startEditing()
+    for feat in listFeatures :
+        geo = feat.geometry()
+        print(geo)
+        retval = geo.reshapeGeometry(lineString)
+        if retval == 0 : 
+            print(geo)
+            vectorLayer.changeGeometry(feat.id(),geo)
+        else : print(retval)
+    vectorLayer.commitChanges()
+        
+
 #Découpe la couche en fonction d'une ligne tracer par l'utilisateur
 #Si les lignes tracées se croisent aucune coupe à lieu (IDEM à QGIS)
 def cutPolygon(vectorLayer, line):
@@ -102,3 +119,107 @@ def automaticPolygon(oldGeo, currentIndex, newGeo, vectorLayer):
     feat.setGeometry(newGeo)
     vectorLayer.dataProvider().addFeature(feat)
     vectorLayer.commitChanges()
+
+
+class calculatePolygon(QThread):
+    def __init__(self, featList, rectCoord, leftPicMan, rightPicMan, value, mntPath, useLayerZ=False):
+        QThread.__init__(self)
+        #self.features = featList
+        self.featName = featList
+        self.rectCoord = rectCoord
+        self.leftManager = pictureManager(leftPicMan[0], leftPicMan[1], 'aa')
+        self.rightManager = pictureManager(rightPicMan[0], rightPicMan[1], 'aa')
+        self.dualManag = dualManager(self.leftManager,self.rightManager)
+        self.keyVal = value #cropValueLeft[0],rightMiroir,rightPicSize[0],cropValueRight[0],initAltitude
+        self.mntPath = mntPath 
+        self.mntPath = ''
+        self.useLayerZ = useLayerZ
+        self.oldMNTPath = ''
+        self.listPolyL = []
+        self.listPolyR = []
+
+    def run(self):
+        
+        for layer in iface.mapCanvas().layers():
+            if layer.type() == QgsMapLayerType.VectorLayer and layer.name() == self.featName: 
+                #print(self.rectCoord)
+                features = layer.getFeatures(self.rectCoord)
+                break
+    
+        for item in features : 
+            try : 
+                featureGeo = item.geometry() 
+                
+                if featureGeo.isNull() == False :
+
+                    polygonL = QPolygonF()
+                    polygonR = QPolygonF()
+                    listPoint = []
+                    for vertex in featureGeo.vertices():
+                        data = vertex
+        
+                        if data.is3D() : z = self.getAltitude(data.x(), data.y(),z=data.z()) 
+                        elif data.is3D() and self.useLayerZ : z = data.z()
+                        else :  z = self.getAltitude(data.x(), data.y())
+                                
+                        xPixel, yPixel = self.leftManager.coordToPixel((data.x() , data.y()), z)
+                        
+                        pixL = (xPixel-self.keyVal[0], yPixel)            
+
+                        xPixel, yPixel = self.rightManager.coordToPixel((data.x() , data.y()), z)          
+                        if self.keyVal[1] == 1 :
+                            mirrorX = self.keyVal[2] - xPixel
+                            pixR = (mirrorX, yPixel)
+                        else : pixR = (xPixel-self.keyVal[3], yPixel)  
+                        
+                        polygonL.append(QPointF(pixL[0], pixL[1]))
+                        polygonR.append(QPointF(pixR[0], pixR[1]))
+
+                        if (data.x(),data.y()) in listPoint :
+                            self.listPolyL.append(polygonL)
+                            self.listPolyR.append(polygonR)
+                            polygonL = QPolygonF()
+                            polygonR = QPolygonF()
+                            listPoint = []
+
+                        else : listPoint.append((data.x(),data.y()))
+
+                    self.listPolyL.append(polygonL)
+                    self.listPolyR.append(polygonR)
+            except : pass
+        #self.completed() #calculationDone.emit(self.listPolyL,self.listPolyR)
+           
+    #def join(self) : 
+        #threading.Thread.join(self)
+        #return (self.listPolyL, self.listPolyR)
+
+    def getAltitude(self,x,y,z=None) : 
+        mntAlt = None
+
+        if self.mntPath != '' :
+            if self.oldMNTPath != self.mntPath :
+                    self.mntDS = gdal.Open(self.mntPath)
+                    self.mntBand = self.mntDS.GetRasterBand(1)
+                    self.mntGeo = self.mntDS.GetGeoTransform()
+                    self.mntSize = (self.mntDS.RasterXSize, self.mntDS.RasterYSize)
+                    self.oldMNTPath = self.mntPath
+            else: pass
+
+            px = math.floor((x - self.mntGeo[0]) / self.mntGeo[1]) 
+            py = math.floor((y - self.mntGeo[3]) / self.mntGeo[5])
+            try : 
+                mntAlt = self.mntBand.ReadAsArray(px,py,1,1)[0][0]
+                if mntAlt >= 1 : 
+                    return mntAlt
+
+            except : pass
+        
+        if z is None  :
+            pl = self.leftManager.coordToPixel((x,y), self.keyVal[4])
+            pr = self.rightManager.coordToPixel((x,y), self.keyVal[4]) 
+            mntAlt = self.dualManag.calculateZ(pl,pr)
+        else : mntAlt = z
+        
+        return mntAlt
+
+

@@ -10,7 +10,7 @@
 
 from qgis.PyQt import QtCore, QtGui, QtWidgets
 import json, sys, os
-
+from .ui_graphicsWindow import Ui_graphicsWindow 
 
 class Ui_editParamWindow(object):
     def setupUi(self, editParamWindow):
@@ -66,7 +66,7 @@ class Ui_editParamWindow(object):
         self.spinBoxAltitude.setObjectName("spinBoxAltitude")
         self.spinBoxAltitude.setSingleStep(5)
         self.radioButtonMerge = QtWidgets.QRadioButton(self.groupBoxPen)
-        self.radioButtonMerge.setEnabled(True)
+        self.radioButtonMerge.setEnabled(False)
         self.radioButtonMerge.setGeometry(QtCore.QRect(20, 110, 121, 17))
         font = QtGui.QFont()
         font.setPointSize(8)
@@ -76,6 +76,7 @@ class Ui_editParamWindow(object):
         self.radioButtonMerge.setChecked(True)
         self.radioButtonMerge.setObjectName("radioButtonMerge")
         self.radioButtonAuto = QtWidgets.QRadioButton(self.groupBoxPen)
+        self.radioButtonAuto.setEnabled(False)
         self.radioButtonAuto.setGeometry(QtCore.QRect(20, 130, 131, 17))
         font = QtGui.QFont()
         font.setPointSize(8)
@@ -97,7 +98,7 @@ class Ui_editParamWindow(object):
         self.label_9.setGeometry(QtCore.QRect(20, 50, 47, 13))
         self.label_9.setObjectName("label_9")
         self.spinBoxScreenLeft = QtWidgets.QSpinBox(self.groupBoxScreen)
-        self.spinBoxScreenLeft.setGeometry(QtCore.QRect(120, 20, 42, 22))
+        self.spinBoxScreenLeft.setGeometry(QtCore.QRect(70, 20, 42, 22))
         font = QtGui.QFont()
         font.setBold(False)
         font.setWeight(50)
@@ -105,13 +106,21 @@ class Ui_editParamWindow(object):
         self.spinBoxScreenLeft.setMaximum(10)
         self.spinBoxScreenLeft.setObjectName("spinBoxScreenLeft")
         self.spinBoxScreenRight = QtWidgets.QSpinBox(self.groupBoxScreen)
-        self.spinBoxScreenRight.setGeometry(QtCore.QRect(120, 50, 42, 22))
+        self.spinBoxScreenRight.setGeometry(QtCore.QRect(70, 50, 42, 22))
         font = QtGui.QFont()
         font.setBold(False)
         font.setWeight(50)
         self.spinBoxScreenRight.setFont(font)
         self.spinBoxScreenRight.setMaximum(10)
         self.spinBoxScreenRight.setObjectName("spinBoxScreenRight")
+        self.pushButtonShow = QtWidgets.QPushButton(self.groupBoxScreen)
+        self.pushButtonShow.setGeometry(QtCore.QRect(120, 30, 41, 23))
+        self.pushButtonShow.setCheckable(True)
+        font = QtGui.QFont()
+        font.setBold(False)
+        font.setWeight(50)
+        self.pushButtonShow.setFont(font)
+        self.pushButtonShow.setObjectName("pushButtonShow")
         self.groupBox = QtWidgets.QGroupBox(self.centralwidget)
         self.groupBox.setGeometry(QtCore.QRect(30, 250, 341, 151))
         font = QtGui.QFont()
@@ -275,6 +284,7 @@ class Ui_editParamWindow(object):
         self.label_9.setText(_translate("editParamWindow", "Droite :"))
         self.spinBoxScreenLeft.setAccessibleName(_translate("editParamWindow", "ScreenLeft"))
         self.spinBoxScreenRight.setAccessibleName(_translate("editParamWindow", "ScreenRight"))
+        self.pushButtonShow.setText(_translate("editParamWindow", "Show"))
         self.groupBox.setTitle(_translate("editParamWindow", "Raccourci clavier"))
         self.lineEditZoom.setAccessibleName(_translate("editParamWindow", "BindZoom"))
         self.lineEditZoom.setText(_translate("editParamWindow", "CTRL"))
@@ -311,6 +321,7 @@ class paramWindow(QtWidgets.QMainWindow):
         self.ui = Ui_editParamWindow()
         self.ui.setupUi(self)
         self.paramList = {}
+        self.listGraphWinObj = []
         for item in dir(self.ui) :
             attr = getattr(self.ui, item)
             try : 
@@ -328,6 +339,9 @@ class paramWindow(QtWidgets.QMainWindow):
         self.ui.toolButtonEditLong.toggled.connect(lambda: self.editKeyToggle(True,self.ui.toolButtonEditLong, self.ui.lineEditMoveLong, 'BindLong'))
         self.ui.toolButtonEditPoly.toggled.connect(lambda: self.editKeyToggle(True,self.ui.toolButtonEditPoly, self.ui.lineEditMovePoly, 'BindPoly'))
         self.ui.toolButtonDrawCut.toggled.connect(lambda: self.editKeyToggle(True,self.ui.toolButtonDrawCut, self.ui.lineEditDrawCut, 'BindDraw'))
+
+        self.ui.pushButtonShow.toggled.connect(self.actionShowScreenNumber)
+        #self.ui.pushButtonShow.released.connect(self.releaseShowScreenNumber)
 
     def setFromJSON(self):
         with open(self.JSONPath) as f : 
@@ -406,6 +420,47 @@ class paramWindow(QtWidgets.QMainWindow):
         self.currentToolButton.setChecked(False)
         self.releaseKeyboard()
         self.keyPressEvent = QtWidgets.QMainWindow.keyPressEvent
+
+    def actionShowScreenNumber(self,val) :
+        if val > 0 : 
+            self.listGraphWinObj = []
+            for i in range(QtWidgets.QApplication.desktop().screenCount()) :
+
+                screenGeo = QtWidgets.QApplication.desktop().screenGeometry(i)
+                center = (int(screenGeo.width()/2), int(screenGeo.height()/2))
+                #rect = QtCore.QRect(center[0]-50,center[1]-50,center[0]+50,center[1]+50)
+                rect = QtCore.QRect(0,0,125,175)
+                graphWin = graphicsWindow("Numéro de l'écran")
+                graphWin.resize(125,175)
+                graphWin.ui.graphicsView.setGeometry(rect)
+                graphWin.move(QtCore.QPoint(screenGeo.x()+center[0]-50,screenGeo.y()+center[1]-50))                
+                
+                
+                scene = QtWidgets.QGraphicsScene()
+                font = QtGui.QFont('Times',80)
+                rect = QtCore.QRectF(0,0,125,175)
+                scene.setSceneRect(rect)
+                scene.addText(str(i),font) 
+                graphWin.ui.graphicsView.setScene(scene)
+                
+                graphWin.ui.graphicsView.show()
+                graphWin.show()
+                
+                self.listGraphWinObj.append(graphWin)
+            
+
+
+    #def releaseShowScreenNumber(self) : 
+        else :
+            for graphWin in self.listGraphWinObj :
+                graphWin.close()
+        
+class graphicsWindow(QtWidgets.QMainWindow): 
+    def __init__(self, nom):
+        QtWidgets.QMainWindow.__init__(self)
+        self.ui = Ui_graphicsWindow()
+        self.ui.setupUi(self, nom)
+
 
 if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)

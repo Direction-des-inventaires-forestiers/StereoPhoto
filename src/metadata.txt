@@ -7,9 +7,10 @@ qgisMinimumVersion=3.4
 description= Permet la visualisation d'images avec un système stéréoscopique
 about=En utilisant un dossier d'images TIF, l'application permet de visualiser des images en stéréoscopie. Il est possible d'ajouter une couche polygonale 3D sur l'image. La couche en question peut être modifier via l'ajout de nouveaux polygones ainsi que par du découpage. L'utilisation d'un modèle numérique de terrain est recommandé. L'application fonctionne sans une carte graphique stéréoscopique. 
 version=version 1.0.0
-repository=https://github.com/frpin33
+tracker=https://github.com/frpin33/StereoPhoto/issues
+repository=https://github.com/frpin33/StereoPhoto
 ; end of mandatory metadata
 
-tags = stéréoscopie, 3D, Planar, TIFF
+tags = stereoscopy, 3D, PLANAR, tif, stereoimaging, display
 experimental=True
 deprecated=False

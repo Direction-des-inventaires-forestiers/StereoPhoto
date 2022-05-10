@@ -264,7 +264,7 @@
     <widget class="QSpinBox" name="spinBoxScreenLeft">
      <property name="geometry">
       <rect>
-       <x>120</x>
+       <x>70</x>
        <y>20</y>
        <width>42</width>
        <height>22</height>
@@ -286,7 +286,7 @@
     <widget class="QSpinBox" name="spinBoxScreenRight">
      <property name="geometry">
       <rect>
-       <x>120</x>
+       <x>70</x>
        <y>50</y>
        <width>42</width>
        <height>22</height>
@@ -303,6 +303,28 @@
      </property>
      <property name="maximum">
       <number>10</number>
+     </property>
+    </widget>
+    <widget class="QPushButton" name="pushButtonShow">
+     <property name="geometry">
+      <rect>
+       <x>120</x>
+       <y>30</y>
+       <width>41</width>
+       <height>23</height>
+      </rect>
+     </property>
+     <property name="font">
+      <font>
+       <weight>50</weight>
+       <bold>false</bold>
+      </font>
+     </property>
+     <property name="text">
+      <string>Show</string>
+     </property>
+     <property name="checkable">
+      <bool>true</bool>
      </property>
     </widget>
    </widget>

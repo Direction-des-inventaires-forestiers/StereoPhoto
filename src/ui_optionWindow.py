@@ -19,7 +19,7 @@ class Ui_StereoDockWidget(object):
     def setupUi(self, StereoDockWidget):
         StereoDockWidget.setObjectName("StereoDockWidget")
         StereoDockWidget.resize(434, 342)
-        StereoDockWidget.setMinimumSize(QtCore.QSize(165, 200))
+        StereoDockWidget.setMinimumSize(QtCore.QSize(165, 330))
         self.dockWidgetContents = QtWidgets.QWidget()
         self.dockWidgetContents.setObjectName("dockWidgetContents")
         self.groupBoxMainPath = dropedit(self.dockWidgetContents)
@@ -139,7 +139,7 @@ class Ui_StereoDockWidget(object):
         self.groupBoxMNT.setObjectName("groupBox")
         self.radioButtonDraw = QtWidgets.QRadioButton(self.groupBoxMNT)
         self.radioButtonDraw.setEnabled(False)
-        self.radioButtonDraw.setGeometry(QtCore.QRect(20, 60, 71, 17))
+        self.radioButtonDraw.setGeometry(QtCore.QRect(20, 45, 71, 17))
         font = QtGui.QFont()
         font.setPointSize(8)
         font.setBold(False)
@@ -149,7 +149,7 @@ class Ui_StereoDockWidget(object):
         self.radioButtonDraw.setEnabled(False)
         self.radioButtonDraw.setObjectName("radioButtonDraw")
         self.radioButtonCut = QtWidgets.QRadioButton(self.groupBoxMNT)
-        self.radioButtonCut.setGeometry(QtCore.QRect(90, 60, 81, 17))
+        self.radioButtonCut.setGeometry(QtCore.QRect(20, 65, 81, 17))
         font = QtGui.QFont()
         font.setPointSize(8)
         font.setBold(False)
@@ -175,6 +175,15 @@ class Ui_StereoDockWidget(object):
         self.importLineMNT.setText("")
         self.importLineMNT.setReadOnly(True)
         self.importLineMNT.setObjectName("importLineMNT")
+        self.pushButtonRemoveMNT = QtWidgets.QPushButton(self.groupBoxMNT)
+        self.pushButtonRemoveMNT.setEnabled(False)
+        self.pushButtonRemoveMNT.setGeometry(QtCore.QRect(100, 50, 91, 23))
+        font = QtGui.QFont()
+        font.setPointSize(8)
+        font.setBold(False)
+        font.setWeight(50)
+        self.pushButtonRemoveMNT.setFont(font)
+        self.pushButtonRemoveMNT.setObjectName("pushButtonRemoveMNT")
         self.pushButtonOpenParam = QtWidgets.QPushButton(self.dockWidgetContents)
         self.pushButtonOpenParam.setGeometry(QtCore.QRect(110, 230, 75, 23))
         self.pushButtonOpenParam.setObjectName("pushButtonOpenParam")
@@ -200,6 +209,10 @@ class Ui_StereoDockWidget(object):
         font.setWeight(75)
         self.label_2.setFont(font)
         self.label_2.setObjectName("label_2")
+        self.checkBoxUseLayerZ = QtWidgets.QCheckBox(self.dockWidgetContents)
+        self.checkBoxUseLayerZ.setEnabled(False)
+        self.checkBoxUseLayerZ.setGeometry(QtCore.QRect(110, 160, 141, 17))
+        self.checkBoxUseLayerZ.setObjectName("checkBoxUseLayerZ")
         StereoDockWidget.setWidget(self.dockWidgetContents)
 
         self.retranslateUi(StereoDockWidget)
@@ -224,10 +237,12 @@ class Ui_StereoDockWidget(object):
         self.groupBoxMNT.setTitle(_translate("StereoDockWidget", "Modèle numérique de terrrain"))
         self.radioButtonDraw.setText(_translate("StereoDockWidget", "Dessiner"))
         self.radioButtonCut.setText(_translate("StereoDockWidget", "Découper"))
+        self.pushButtonRemoveMNT.setText(_translate("StereoDockWidget", "Retirer le modèle"))
         self.importToolMNT.setText(_translate("StereoDockWidget", "..."))
         self.pushButtonOpenParam.setText(_translate("StereoDockWidget", "Paramètres"))
         self.label.setText(_translate("StereoDockWidget", "Image Gauche :"))
         self.label_2.setText(_translate("StereoDockWidget", "Image Droite :"))
+        self.checkBoxUseLayerZ.setText(_translate("StereoDockWidget", "Afficher avec l\'altitude"))
 
 class dropEventMNT(QtWidgets.QGroupBox): 
     validMNT = pyqtSignal()
@@ -285,6 +300,7 @@ class optionWindow(QtWidgets.QDockWidget):
         self.ui.importToolVectorLayer.clicked.connect(self.showImportVector)
         self.ui.importToolMNT.clicked.connect(self.showImportMNT)
         self.ui.groupBoxMNT.validMNT.connect(self.dropImportMNT)
+        self.ui.pushButtonRemoveMNT.clicked.connect(self.removeImportMNT)
         self.vLayer = None
         self.currentMNTPath = ''
 
@@ -313,9 +329,9 @@ class optionWindow(QtWidgets.QDockWidget):
 
     #Création de l'objet qui réprésente la couche vectorielle
     def importVectorAccept(self):
-        vLayerName = self.vectorWindow.ui.listWidget.selectedItems()[0].text()
-        self.vLayer = self.dictLayerName[vLayerName]
-        self.ui.importLineVectorLayer.setText(vLayerName)
+        self.vLayerName = self.vectorWindow.ui.listWidget.selectedItems()[0].text()
+        self.vLayer = self.dictLayerName[self.vLayerName]
+        self.ui.importLineVectorLayer.setText(self.vLayerName)
         self.vectorWindow.close()
 
     def importVectorCancel(self):
@@ -329,16 +345,26 @@ class optionWindow(QtWidgets.QDockWidget):
             self.ui.importLineMNT.setText(nameMNT)
             self.ui.radioButtonCut.setEnabled(True)
             self.ui.radioButtonDraw.setEnabled(True)
+            self.ui.pushButtonRemoveMNT.setEnabled(True)
         else : 
             self.currentMNTPath = ''
             self.ui.radioButtonCut.setEnabled(False)
             self.ui.radioButtonDraw.setEnabled(False)
+            self.ui.pushButtonRemoveMNT.setEnabled(False)
     
     def dropImportMNT(self):
         self.currentMNTPath = self.ui.groupBoxMNT.MNTPath
         self.ui.importLineMNT.setText(self.ui.groupBoxMNT.MNTName)
         self.ui.radioButtonCut.setEnabled(True)
         self.ui.radioButtonDraw.setEnabled(True)
+        self.ui.pushButtonRemoveMNT.setEnabled(True)
+    
+    def removeImportMNT(self) : 
+        self.currentMNTPath = ''
+        self.ui.radioButtonCut.setEnabled(False)
+        self.ui.radioButtonDraw.setEnabled(False)
+        self.ui.pushButtonRemoveMNT.setEnabled(False)
+        self.ui.importLineMNT.setText("")
 
     def closeEvent(self,event):
         self.closeWindow.emit()
