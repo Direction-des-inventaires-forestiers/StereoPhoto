@@ -68,13 +68,13 @@ class graphicsWindow(QtWidgets.QMainWindow):
         self.keyPressed.emit(event)
 
     #Détermine la position du curseur 
-    def cursorRectInit(self, x, y):
-        x = int(x/2)
+    def cursorRectInit(self, x, y, extra=0):
+        x = int(x/2) 
         y = int(y/2)
         r = self.rayon
         self.myRect = QtCore.QRect(x-r, y-r, 2*r, 2*r)
-        self.vLine = QtCore.QLineF(x-r, y, x+r, y)
-        self.hLine = QtCore.QLineF(x, y-r, x, y+r)
+        self.vLine = QtCore.QLineF(x-r+int(extra), y, x+r+int(extra), y)
+        self.hLine = QtCore.QLineF(x+int(extra), y-r, x+int(extra), y+r)
         self.ui.widget.update()
 
     #Fonction qui dessine le curseur au centre de l'image

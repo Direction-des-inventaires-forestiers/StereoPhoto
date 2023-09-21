@@ -34,11 +34,11 @@ class pictureManager():
     def initPAR(self):
 
         try :
-            f = open(self.pathPAR) 
-            s = f.read()
+            with open(self.pathPAR) as f :
+                s = f.read()
         except : 
-            f = open(self.pathPAR, encoding='ANSI')
-            s = f.read() 
+            with open(self.pathPAR, encoding='ANSI') as f :
+                s = f.read() 
         a = []
         for i in range(len(self.paramPAR)) : 
             v1 = s.find(self.paramPAR[i])

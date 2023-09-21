@@ -52,7 +52,7 @@ Image.MAX_IMAGE_PIXELS = 1000000000
 #Gestionnaire de la QMainWindow qui permet le rehaussement d'image
 class enhanceManager(QObject):
     listParamSignal = pyqtSignal(list)
-    def __init__(self, pathLeft, pathRight, listParam=[]):
+    def __init__(self, pathLeft, pathRight, listParam=[],nameLeft='',nameRight=''):
         QObject.__init__(self)
         self.pathLeft = pathLeft
         self.pathRight = pathRight
@@ -60,6 +60,8 @@ class enhanceManager(QObject):
         self.prevListParam = listParam
     
         self.colorWindow = enhanceWindow()
+        self.colorWindow.ui.radioButtonPremiere.setText(nameLeft)
+        self.colorWindow.ui.radioButtonDeuxieme.setText(nameRight)
         self.colorWindow.ui.radioButtonCurrent.toggled.connect(self.currentViewActivate)
         self.colorWindow.ui.radioButtonPremiere.toggled.connect(self.switchPicture)
         self.colorWindow.ui.currentStatusButton.pressed.connect(self.keepCurrentView)
@@ -724,7 +726,7 @@ def pictureLayout(picture, rotation, miroir, retQImage, cropValue=None):
             pic = pic.transpose(Image.FLIP_TOP_BOTTOM)
 
     if cropValue:
-            pic = pic.crop(cropValue)
+        pic = pic.crop(cropValue)
         
 
     if retQImage : 

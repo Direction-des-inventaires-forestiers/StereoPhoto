@@ -54,7 +54,7 @@ from .ui_paramWindow import paramWindow
 from .worldManager import pictureManager, dualManager, createWKTString
 from .enhanceManager import enhanceManager, threadShow, imageEnhancing, pictureLayout
 from .drawFunction import *
-from .folderManager import getParDict, findPossiblePair, findNeighbour
+from .folderManager import getParDict, findPossiblePair, findNeighbour, findPairWithCoord
 import sys, os, time, math, qimage2ndarray, win32api
 from osgeo import gdal
 
@@ -102,7 +102,7 @@ class stereoPhoto(object):
 
             self.zoomClick = False
             self.longClick = False
-            self.polyClick = False
+            self.curseurClick = False
 
             self.firstDrawClick = True
             self.listDrawCoord = []
@@ -126,9 +126,11 @@ class stereoPhoto(object):
             
             self.greyRectOnLeftScreen = []
             self.greyRectOnRightScreen = []
-            self.oldMNTPath = ''
 
             self.listParam = [0, 0, 0, 0, 0, 0, 0, False, False, []]
+            self.lastEnhanceParam = [0, 0, 0, 0, 0, 0, 0, False, False, []]
+
+            self.buttonPosition = None
 
             #Je garde ces variables par simplicité et compréhension 
             self.leftOrientation = self.rightOrientation = self.leftMiroir = 0
@@ -141,23 +143,30 @@ class stereoPhoto(object):
             self.optWindow.ui.pushButtonShowPicture.clicked.connect(self.createGraphicsWindows)
             self.optWindow.ui.pushButtonShowIDList.clicked.connect(self.showIDList)
             self.optWindow.ui.enhanceButton.clicked.connect(self.enhanceClick)
+            self.optWindow.ui.pushButtonFindBestPair.clicked.connect(self.findPairWithPosition)
             self.optWindow.ui.pushButtonOpenParam.clicked.connect(lambda : self.paramMenu.show())
 
-            self.optWindow.ui.toolButtonNord.clicked.connect(lambda : self.toolButtonPressEvent('N'))
-            self.optWindow.ui.toolButtonOuest.clicked.connect(lambda : self.toolButtonPressEvent('O'))
-            self.optWindow.ui.toolButtonSud.clicked.connect(lambda : self.toolButtonPressEvent('S'))
-            self.optWindow.ui.toolButtonEst.clicked.connect(lambda : self.toolButtonPressEvent('E'))
-            
             
             self.optWindow.ui.pushButtonRemoveShape.clicked.connect(self.removePolygonOnScreen)
-            self.optWindow.keyPressed.connect(self.keyboardHandler)
             self.optWindow.closeWindow.connect(self.optWindowClose)
+            self.optWindow.ui.pushButtonCloseWindow.clicked.connect(self.closeAllSideWindows)
 
             nbScreen = QApplication.desktop().screenCount()-1
             self.paramMenu.ui.spinBoxScreenLeft.setMaximum(nbScreen)
             self.paramMenu.ui.spinBoxScreenRight.setMaximum(nbScreen)
 
             self.iface.addDockWidget(Qt.RightDockWidgetArea, self.optWindow)
+
+            if self.paramMenu.currentDictParam['LastPath'] : self.optWindow.ui.importLineProject.setText(self.paramMenu.currentDictParam['LastPath'])
+            
+            if self.paramMenu.currentDictParam['MNTPath'] : 
+                self.optWindow.currentMNTPath = self.paramMenu.currentDictParam['MNTPath']
+                self.optWindow.ui.importLineMNT.setText(os.path.basename(self.optWindow.currentMNTPath))
+                self.optWindow.ui.radioButtonCut.setEnabled(True)
+                self.optWindow.ui.radioButtonDraw.setEnabled(True)
+                self.optWindow.ui.pushButtonRemoveMNT.setEnabled(True)
+            else : self.optWindow.currentMNTPath = ''
+
         else :
             self.iface.removeDockWidget(self.optWindow)
             self.closeAllSideWindows()
@@ -168,6 +177,7 @@ class stereoPhoto(object):
     #Fonction appelée lors de la fermeture du mOpt
     #Si l'on ferme le mOpt toutes les autres fenêtres Qt se ferment
     def closeAllSideWindows(self) :
+        self.enableShow = False
         scene = QGraphicsScene()
         if hasattr(self, "tSeekLeft"): 
             try : self.tSeekLeft.newImage.disconnect(self.addLeftPixmap)
@@ -190,23 +200,46 @@ class stereoPhoto(object):
             self.enhanceManager.colorWindow.close()
             del self.enhanceManager 
         self.manageQGISCursor([0,0],True)
+        self.optWindow.ui.pushButtonCloseWindow.setEnabled(False)
+        self.paramMenu.currentDictParam['MNTPath'] = self.optWindow.currentMNTPath
+        self.paramMenu.saveToJSON()
     
     def optWindowClose(self):
         self.closeAllSideWindows()
         self.optWindow.close()
     
     def newPictureFile(self):
+        
         self.currentMainPath = self.optWindow.ui.importLineProject.text()
         self.currentParDict = getParDict(self.currentMainPath)
-        for key in self.currentParDict :
-            if self.setPairID(key) : break
-        else : return 
+
+        if self.paramMenu.currentDictParam['LastName'] in self.currentParDict.keys() : 
+            self.setPairID(self.paramMenu.currentDictParam['LastName'])
+            if float(self.paramMenu.currentDictParam['LastX']) != 0.0 :
+                x = float(self.paramMenu.currentDictParam['LastX'])
+                y = float(self.paramMenu.currentDictParam['LastY'])
+                z = float(self.paramMenu.currentDictParam['LastZ'])
+                scaleX = float(self.paramMenu.currentDictParam['ScaleX'])
+                scaleY = float(self.paramMenu.currentDictParam['ScaleY'])
+                self.lastCurrentView = (x,y,z,scaleX,scaleY)
+            else : self.lastCurrentView = ()
+        
+        else : 
+            self.lastCurrentView = ()
+            self.optWindow.removeImportMNT()
+            self.removePolygonOnScreen()
+            for key in self.currentParDict :
+                if self.setPairID(key) : break
+            else : return 
 
         self.optWindow.ui.pushButtonShowIDList.setEnabled(True)
         self.optWindow.ui.enhanceButton.setEnabled(True)
         self.optWindow.ui.pushButtonShowPicture.setEnabled(True)
+        self.optWindow.ui.pushButtonFindBestPair.setEnabled(True)
+        
+        self.paramMenu.currentDictParam['LastPath'] = self.currentMainPath
 
-        self.closeAllSideWindows()
+        if self.enableShow : self.closeAllSideWindows()
         self.addNewPair()
 
     def showIDList(self) : 
@@ -221,6 +254,8 @@ class stereoPhoto(object):
     def pictureSelectionAccept(self):
         pictureID = self.pictureSelectWindow.ui.listWidget.selectedItems()[0].text()
         if self.setPairID(pictureID) :  self.addNewPair()
+        if self.enableShow : self.loadNewPair()
+        self.lastCurrentView = ()
         self.pictureSelectWindow.close()
 
     def setPairID(self, pictureID) :
@@ -242,7 +277,8 @@ class stereoPhoto(object):
 
         self.optWindow.ui.labelLeftName.setText(self.leftParID)
         self.optWindow.ui.labelRightName.setText(self.rightParID)
-        
+        self.paramMenu.currentDictParam['LastName'] = self.leftParID
+
         self.currentLeftTIF = self.currentMainPath + '/' + self.leftParID + '.tif'
         self.currentLeftPAR = self.currentMainPath  + '/' + self.leftParID + '.par'
         self.currentRightTIF = self.currentMainPath  + '/' + self.rightParID + '.tif'
@@ -250,41 +286,38 @@ class stereoPhoto(object):
 
         neighbour = findNeighbour(self.leftParID, self.currentParDict)
 
-        if neighbour[0] : 
-            self.optWindow.ui.toolButtonNord.setEnabled(True)
-            self.currentNordID = neighbour[0]
+        if neighbour[0] : self.currentNordID = neighbour[0]
+        else : self.currentNordID = ''
 
-        else : 
-            self.optWindow.ui.toolButtonNord.setEnabled(False)
-            self.currentNordID = ''
-
-        if neighbour[1] :
-            self.optWindow.ui.toolButtonSud.setEnabled(True)
-            self.currentSudID = neighbour[1]
-
-        else : 
-            self.optWindow.ui.toolButtonSud.setEnabled(False)
-            self.currentSudID = ''
+        if neighbour[1] : self.currentSudID = neighbour[1]
+        else : self.currentSudID = ''
   
-        if neighbour[2] :
-            self.optWindow.ui.toolButtonOuest.setEnabled(True)
-            self.currentOuestID = neighbour[2]
+        if neighbour[2] : self.currentOuestID = neighbour[2]
+        else : self.currentOuestID = ''
 
-        else : 
-            self.optWindow.ui.toolButtonOuest.setEnabled(False)
-            self.currentOuestID = ''
-
-        if neighbour[3] and self.isEstPicture :
-            self.optWindow.ui.toolButtonEst.setEnabled(True)
-            self.currentEstID = neighbour[3]
-
-        else : 
-            self.optWindow.ui.toolButtonEst.setEnabled(False)
-            self.currentEstID = ''
+        if neighbour[3] and self.isEstPicture : self.currentEstID = neighbour[3]
+        else : self.currentEstID = ''
         
 
+    def setLastView(self) :
+        rectViewPort = self.graphWindowRight.ui.graphicsView.viewport().rect()
+        rightCV = self.graphWindowRight.ui.graphicsView.mapToScene(rectViewPort).boundingRect() 
+        windowSize = (rightCV.width(),rightCV.height()) 
+
+        point = (0,0,rectViewPort.width(),0)
+        coord = self.pointTranslator(point)
+        
+        self.lastCurrentView = coord + windowSize
+
+        self.paramMenu.currentDictParam['LastX'] = str(self.lastCurrentView[0])
+        self.paramMenu.currentDictParam['LastY'] = str(self.lastCurrentView[1])
+        self.paramMenu.currentDictParam['LastZ'] = str(self.lastCurrentView[2])
+        self.paramMenu.currentDictParam['ScaleX'] = str(self.lastCurrentView[3])
+        self.paramMenu.currentDictParam['ScaleY'] = str(self.lastCurrentView[4])
+
     
-    def toolButtonPressEvent(self, ori):
+    def findNextPair(self, ori):
+        self.setLastView()
 
         if ori == 'N': newID = self.currentNordID
         elif ori == 'O': newID = self.currentOuestID
@@ -294,11 +327,32 @@ class stereoPhoto(object):
 
         if self.setPairID(newID) :  self.addNewPair()
 
-        if self.enableShow:
-            self.loadNewPair()
+        self.loadNewPair()
 
+    def findPairWithPosition(self) :
 
+        qgisExtent = self.canvas.extent()
+        centerCoord = (qgisExtent.xMinimum()+qgisExtent.width()/2,qgisExtent.yMinimum()+qgisExtent.height()/2)
+        bestFit = findPairWithCoord(self.currentParDict,centerCoord)
+
+        width = qgisExtent.width()
+        height = qgisExtent.height()
+        imageID = bestFit[0] 
+        distance = bestFit[1]
+
+        #Zone de 3 km pour être proche de la photo le plus possible
+        if max(width,height,distance) < 3000 : 
+            self.buttonPosition = centerCoord
+            if self.setPairID(imageID) :  self.addNewPair()
+            if self.enableShow : self.loadNewPair()
+        else : self.buttonPosition = None
+
+    
     def createGraphicsWindows(self) : 
+
+        if self.enableShow : 
+            self.windowHandler('picture')
+            return
 
         self.intLeftScreen = self.paramMenu.ui.spinBoxScreenLeft.value()
         self.intRightScreen = self.paramMenu.ui.spinBoxScreenRight.value()
@@ -319,15 +373,9 @@ class stereoPhoto(object):
         self.graphWindowLeft.ui.graphicsView.setGeometry(rect)
         self.graphWindowLeft.ui.widget.setGeometry(rect)
         self.graphWindowLeft.move(QPoint(self.screenLeft.x(), self.screenLeft.y()))
-        self.graphWindowLeft.keyPressed.connect(self.keyboardHandler)
-        
+        self.graphWindowLeft.leaveEvent = self.windowHandlerEvent 
+        self.graphWindowLeft.enterEvent = self.windowHandlerEvent
 
-        self.graphWindowLeft.ui.widget.mouseMoveEvent = self.mMoveEvent
-        self.tick=0
-        self.graphWindowLeft.ui.widget.mousePressEvent = self.mPressEvent
-        self.graphWindowLeft.ui.widget.wheelEvent = self.wheelEvent
-
-        
         rect = QRect(0,0,self.screenRight.width(),self.screenRight.height())
         self.graphWindowRight = graphicsWindow("Image Droite")
         self.graphWindowRight.setWindowState(Qt.WindowMaximized)
@@ -336,16 +384,7 @@ class stereoPhoto(object):
         self.graphWindowRight.move(QPoint(self.screenRight.x(), self.screenRight.y()))
         
         self.graphWindowLeft.cursorRectInit(self.screenLeft.width(), self.screenLeft.height())
-        self.graphWindowRight.cursorRectInit(self.screenRight.width(), self.screenRight.height())
-
-        
-        #22 est la taille en pixel de la barre du haute de la fenetre
-        #Il y a toujours un petit pan lorsqu'on active le Pan sinon 
-        self.lastX = self.panCenterLeft[0]
-        self.lastY = self.panCenterLeft[1] - 22
-        win32api.SetCursorPos(self.leftScreenCenter)
-        self.graphWindowLeft.ui.widget.setMouseTracking(True)
-        self.graphWindowLeft.setCursor(self.graphWindowLeft.invisibleCursor)
+        self.graphWindowRight.cursorRectInit(self.screenRight.width(), self.screenRight.height(),self.paramMenu.ui.spinBoxDistanceCurseur.value())
 
         width = self.paramMenu.ui.spinBoxPenWidth.value()
         color = QColor(self.paramMenu.ui.comboBoxColor.currentText())
@@ -354,10 +393,11 @@ class stereoPhoto(object):
         self.my_pen.setCosmetic(True)
 
         self.enableShow = True
+        self.optWindow.ui.pushButtonCloseWindow.setEnabled(True)
         self.loadNewPair()
 
         
-    def loadNewPair(self):
+    def loadNewPair(self,mouseAction=True):
 
         if hasattr(self, "tSeekLeft"): 
             try : self.tSeekLeft.newImage.disconnect(self.addLeftPixmap)
@@ -380,8 +420,8 @@ class stereoPhoto(object):
         self.leftPic.close()
         self.rightPic.close()
 
-        xLeft = (fullLeftPicSize[0])*(self.optWindow.ui.spinBoxRecouvrementH.value()/100)
-        xRight = (fullRightPicSize[0])*(self.optWindow.ui.spinBoxRecouvrementH.value()/100)
+        xLeft = (fullLeftPicSize[0])*(self.paramMenu.ui.spinBoxRecouvrementH.value()/100)
+        xRight = (fullRightPicSize[0])*(self.paramMenu.ui.spinBoxRecouvrementH.value()/100)
         
         yLeft = yRight = 0
         
@@ -410,15 +450,71 @@ class stereoPhoto(object):
         self.graphWindowRight.show()
         self.graphWindowLeft.show()
         
+        if mouseAction : self.windowHandler('picture')
+        
         pixel = self.pointTranslator(onlyPixel=True)
         self.centerPixelLeft = pixel[0]
         self.centerPixelRight = pixel[1]
 
+        if self.buttonPosition : 
+            
+            if self.optWindow.currentMNTPath : 
+                mntDS = gdal.Open(self.optWindow.currentMNTPath)
+                mntBand = mntDS.GetRasterBand(1)
+                mntGeo = mntDS.GetGeoTransform()
+                px = math.floor((self.buttonPosition[0] - mntGeo[0]) / mntGeo[1]) 
+                py = math.floor((self.buttonPosition[1] - mntGeo[3]) / mntGeo[5])
+                Z = mntBand.ReadAsArray(px,py,1,1)[0][0]
+                mntDS = None
+            else : Z = self.dualManager.calculateZ(self.centerPixelLeft, self.centerPixelRight)
+            
+            pxL, pyL = self.leftPictureManager.coordToPixel(self.buttonPosition,Z)
+            pxR, pyR = self.rightPictureManager.coordToPixel(self.buttonPosition,Z)
 
-        self.zoomToScale(2,center=True)
+            if pxL < 0 or pxL > fullLeftPicSize[0] or pyL < 0 or pxL > fullLeftPicSize[1] : self.zoomToScale(2,center=True)
+            elif pxR < 0 or pxR > fullRightPicSize[0] or pyR < 0 or pxR > fullRightPicSize[1] : self.zoomToScale(2,center=True)
+            else : 
+                #pixL = (pxL-self.cropValueLeft[0], pyL)            
+                #if self.rightMiroir == 1 :
+                #    mirrorX = self.rightPicSize[0] - pxR - 2000
+                #    pixR = (mirrorX, pyR)
+                #else : pixR = (pxR-self.cropValueRight[0], pyR) 
+
+                pixL = (pxL-self.cropValueLeft[0]-1000, pyL-1000)            
+                if self.rightMiroir == 1 :
+                    mirrorX = self.rightPicSize[0] - pxR - 1000
+                    pixR = (mirrorX, pyR-1000)
+                else : pixR = (pxR-self.cropValueRight[0]-1000, pyR-1000)  
+                
+                
+                customView = pixL + pixR + (2000,2000)
+                #customView = (pxL,pyL,pxR,pyR) + self.lastCurrentView[-2:]
+                self.zoomToScale(-1, customView=customView)
+        
+
+        elif self.lastCurrentView : 
+            pxL, pyL = self.leftPictureManager.coordToPixel(self.lastCurrentView[:2],self.lastCurrentView[2])
+            pxR, pyR = self.rightPictureManager.coordToPixel(self.lastCurrentView[:2],self.lastCurrentView[2])
+
+            if pxL < 0 or pxL > fullLeftPicSize[0] or pyL < 0 or pxL > fullLeftPicSize[1] : self.zoomToScale(2,center=True)
+            elif pxR < 0 or pxR > fullRightPicSize[0] or pyR < 0 or pxR > fullRightPicSize[1] : self.zoomToScale(2,center=True)
+            else : 
+                pixL = (pxL-self.cropValueLeft[0], pyL)            
+                if self.rightMiroir == 1 :
+                    mirrorX = self.rightPicSize[0] - pxR - self.lastCurrentView[-2]
+                    pixR = (mirrorX, pyR)
+                else : pixR = (pxR-self.cropValueRight[0], pyR)  
+                
+                
+                customView = pixL + pixR + self.lastCurrentView[-2:]
+                #customView = (pxL,pyL,pxR,pyR) + self.lastCurrentView[-2:]
+                self.zoomToScale(-1, customView=customView)
+        
+
+        else : self.zoomToScale(2,center=True)
         Z = self.dualManager.calculateZ(self.centerPixelLeft, self.centerPixelRight)
         self.initAltitude = Z
-        
+        self.buttonPosition = None
 
         self.polygonOnLeftScreen = []
         self.polygonOnRightScreen = []
@@ -457,8 +553,10 @@ class stereoPhoto(object):
         img = Image.open(tifPath)
         #Seek(3) est le facteur le plus petit qui permet un affichage immédiat d'une image
         img.seek(3)
-        divCropValue = map(lambda val : val/8, cropValue)
-
+        #print(cropValue)
+        divCropValue = tuple(map(lambda val : val/8, cropValue))
+        #print(divCropValue)
+        #print(tuple(divCropValue))
         thread = imageEnhancing(img, self.listParam)
         thread.start()
         retVal = thread.join()
@@ -675,7 +773,7 @@ class stereoPhoto(object):
     
     #Ouverture de la fenêtre de rehaussement
     def enhanceClick(self):
-        self.enhanceManager = enhanceManager(self.currentLeftTIF, self.currentRightTIF, self.listParam)
+        self.enhanceManager = enhanceManager(self.currentLeftTIF, self.currentRightTIF, self.listParam, self.leftParID, self.rightParID)
         self.enhanceManager.listParamSignal.connect(self.applyEnhance)
 
     #Permet le lancement du traitement de modification des images
@@ -683,34 +781,71 @@ class stereoPhoto(object):
         self.enhanceManager.listParamSignal.disconnect(self.applyEnhance)
         self.listParam = listParam
 
+    def windowHandlerEvent(self,event) : 
+        if event.type() == QtCore.QEvent.Enter : self.windowHandler('picture')
+        if event.type() == QtCore.QEvent.Leave : self.windowHandler('qgis')
+    
+    def windowHandler(self,window) : 
+        if window == 'qgis' : 
+            self.setLastView()
+            try : self.graphWindowLeft.keyPressed.disconnect(self.keyboardHandler)
+            except : pass
+            self.graphWindowLeft.ui.widget.mouseMoveEvent = None
+            self.graphWindowLeft.ui.widget.mousePressEvent = None
+            self.graphWindowLeft.ui.widget.wheelEvent = None
+            self.graphWindowLeft.ui.widget.setMouseTracking(False)
+            self.graphWindowLeft.setCursor(self.graphWindowLeft.normalCursor)
+            win32api.SetCursorPos((self.iface.mainWindow().pos().x()+int(iface.mainWindow().width()/2), self.iface.mainWindow().pos().y()+int(iface.mainWindow().height()/2)))
+            
+            self.iface.mainWindow().activateWindow()
+            self.iface.mainWindow().raise_()
+            
+            #self.graphWindowLeft.leaveEvent = QMainWindow.leaveEvent
+            #self.graphWindowLeft.enterEvent = self.windowHandlerEvent #lambda : self.windowHandler('picture')
+
+        if window == 'picture' : 
+            self.graphWindowLeft.keyPressed.connect(self.keyboardHandler)
+            self.graphWindowLeft.ui.widget.mouseMoveEvent = self.mMoveEvent
+            self.tick=0
+            self.graphWindowLeft.ui.widget.mousePressEvent = self.mPressEvent
+            self.graphWindowLeft.ui.widget.wheelEvent = self.wheelEvent
+            self.graphWindowLeft.setCursor(self.graphWindowLeft.invisibleCursor)
+
+            #22 est la taille en pixel de la barre du haute de la fenetre
+            #Il y a toujours un petit pan lorsqu'on active le Pan sinon 
+            self.lastX = self.panCenterLeft[0]
+            self.lastY = self.panCenterLeft[1] - 22
+            win32api.SetCursorPos(self.leftScreenCenter)
+            self.graphWindowLeft.ui.widget.setMouseTracking(True)
+
+            self.graphWindowLeft.activateWindow()
+            self.graphWindowLeft.raise_()
+
+            if self.lastEnhanceParam != self.listParam : 
+                self.lastEnhanceParam = self.listParam
+                self.loadNewPair(False)
+            
+            #self.graphWindowLeft.leaveEvent = self.windowHandlerEvent #lambda : self.windowHandler('qgis')
+            #self.graphWindowLeft.enterEvent = QMainWindow.enterEvent
+
+
     #Fonction appelée lorsque les touches respectives du clavier sont appuyées
     #Les touches sont utiles lorsque le mode pan est en cours d'utilisation
     #Possibilité d'ajouter d'autres fonctions plus tard
     def keyboardHandler(self, event):
         if event.type() == QtCore.QEvent.KeyPress :
-            if event.key() == QtCore.Qt.Key_W and self.optWindow.ui.toolButtonNord.isEnabled() :
-                self.toolButtonPressEvent('N')
+            if event.key() == QtCore.Qt.Key_Escape :
 
-            elif event.key() == QtCore.Qt.Key_A  and self.optWindow.ui.toolButtonOuest.isEnabled() :
-                self.toolButtonPressEvent('O')
-            
-            elif event.key() == QtCore.Qt.Key_S  and self.optWindow.ui.toolButtonSud.isEnabled() :
-                self.toolButtonPressEvent('S')
-            
-            elif event.key() == QtCore.Qt.Key_D and self.optWindow.ui.toolButtonEst.isEnabled() :
-                self.toolButtonPressEvent('E')
-
-            elif event.key() == QtCore.Qt.Key_Escape and self.enableShow :
-
-                self.graphWindowLeft.ui.widget.setMouseTracking(False)
-                win32api.SetCursorPos((self.optWindow.pos().x(), self.optWindow.pos().y()))
-                self.graphWindowLeft.setCursor(self.graphWindowLeft.normalCursor)
-                self.closeAllSideWindows()
-                self.enableShow = False
+                self.windowHandler('qgis')
+                #self.graphWindowLeft.ui.widget.setMouseTracking(False)
+                #win32api.SetCursorPos((self.optWindow.pos().x(), self.optWindow.pos().y()))
+                #self.graphWindowLeft.setCursor(self.graphWindowLeft.normalCursor)
+                #self.closeAllSideWindows()
+                #self.iface.mainWindow().activateWindow() #Combiner avec raise() pour mettre la fenetre on top
 
             elif event.key() == int(self.paramMenu.currentDictParam['BindZoom']) : self.zoomClick = True
             elif event.key() == int(self.paramMenu.currentDictParam['BindLong']) : self.longClick = True
-            elif event.key() == int(self.paramMenu.currentDictParam['BindPoly']) : self.polyClick = True
+            elif event.key() == int(self.paramMenu.currentDictParam['BindPoly']) : self.curseurClick = True
             elif event.key() == int(self.paramMenu.currentDictParam['BindDraw']) : 
                 if self.optWindow.ui.radioButtonDraw.isChecked() : self.optWindow.ui.radioButtonCut.setChecked(True)
                 else : self.optWindow.ui.radioButtonDraw.setChecked(True)
@@ -721,7 +856,7 @@ class stereoPhoto(object):
         else : 
             self.zoomClick = False
             self.longClick = False
-            self.polyClick = False
+            self.curseurClick = False
             
     #Fonction qui réalise le pan 
     #Lors du pan la souris est présente sur l'écran qui contient l'image de gauche
@@ -757,18 +892,18 @@ class stereoPhoto(object):
         self.endDrawPointLeft = self.graphWindowLeft.ui.graphicsView.mapToScene(QPoint(self.panCenterLeft[0], self.panCenterLeft[1]))
         self.endDrawPointRight = self.graphWindowRight.ui.graphicsView.mapToScene(QPoint(self.panCenterRight[0], self.panCenterRight[1]))
 
-        coord = self.pointTranslator(ignoreMNT=True)
+        coord = self.pointTranslator(ignoreMNT=True,only2D=True)
 
         if self.firstDrawClick and (int(self.endDrawPointLeft.x()) not in rangeX or int(self.endDrawPointLeft.y()) not in rangeY) :
-
-            if self.endDrawPointLeft.x() < startX and self.optWindow.ui.toolButtonOuest.isEnabled() :
-                self.toolButtonPressEvent('O')
-            elif self.endDrawPointLeft.x() > self.leftPicSize[0]-startX+1 and self.optWindow.ui.toolButtonEst.isEnabled() :
-                self.toolButtonPressEvent('E')
-            elif self.endDrawPointLeft.y() < startY and self.optWindow.ui.toolButtonNord.isEnabled() :
-                self.toolButtonPressEvent('N')
-            elif self.optWindow.ui.toolButtonSud.isEnabled() :
-                self.toolButtonPressEvent('S')
+            
+            if self.endDrawPointLeft.x() < startX and self.currentOuestID :
+                self.findNextPair('O')
+            elif self.endDrawPointLeft.x() > self.leftPicSize[0]-startX+1 and self.currentEstID :
+                self.findNextPair('E')
+            elif self.endDrawPointLeft.y() < startY and self.currentNordID :
+                self.findNextPair('N')
+            elif self.currentSudID:
+                self.findNextPair('S')
 
         else :
             if  not self.firstDrawClick and self.enableDraw and self.optWindow.currentMNTPath :
@@ -792,7 +927,6 @@ class stereoPhoto(object):
                 self.tick=0
 
     def mPressEvent(self, ev):
-
         if self.optWindow.currentMNTPath and self.enableDraw :
 
             #if shape have 2d only2D = True
@@ -912,29 +1046,12 @@ class stereoPhoto(object):
 
             self.centerPixelRight = (self.centerPixelRight[0], self.centerPixelRight[1]-diffY) 
 
-        elif self.polyClick  : 
-            valX = self.paramMenu.ui.spinBoxMoveInX.value()
-            valY = self.paramMenu.ui.spinBoxMoveInY.value()
-            if self.paramMenu.ui.checkBoxMoveLeft.isChecked() :
-                for item in self.polygonOnLeftScreen:
-                    newPoly = QPolygonF()
-                    poly = item.polygon()
-                    for point in poly :
-                        
-                        if factor > 1 : newPoly << QPointF(point.x() - valX, point.y() - valY)
-                        else : newPoly << QPointF(point.x() + valX, point.y() + valY)
-
-                    item.setPolygon(newPoly)
-
-            if self.paramMenu.ui.checkBoxMoveRight.isChecked()  :
-                for item in self.polygonOnRightScreen:
-                    newPoly = QPolygonF()
-                    poly = item.polygon()
-                    for point in poly :
-                        if factor > 1 : newPoly << QPointF(point.x() - valX, point.y() - valY)
-                        else : newPoly << QPointF(point.x() + valX, point.y() + valY)
-
-                    item.setPolygon(newPoly)
+        elif self.curseurClick  : 
+            if factor > 1 : value = self.paramMenu.ui.spinBoxDistanceCurseur.value() + 2
+            else : value = self.paramMenu.ui.spinBoxDistanceCurseur.value() - 2
+            self.graphWindowRight.cursorRectInit(self.screenRight.width(), self.screenRight.height(),value)
+            self.paramMenu.ui.spinBoxDistanceCurseur.setValue(value)
+                
 
         else : 
 
@@ -951,9 +1068,10 @@ class stereoPhoto(object):
 
             self.centerPixelRight = (self.centerPixelRight[0]-diffX, self.centerPixelRight[1])
 
-    def pointTranslator(self, customPoint=(0,0,0,0), onlyPixel=False, only2D=False,ignoreMNT=False) :
+    def pointTranslator(self, customPoint=(-1,-1,-1,-1), onlyPixel=False, only2D=False,ignoreMNT=False) :
         
-        if customPoint != (0,0,0,0) :
+        if customPoint != (-1,-1,-1,-1) :
+            #pointRight doit être l'inverse en X si mirroir puisque le pixel de l'écran est inverse
             pointLeft = QPoint(customPoint[0], customPoint[1])
             pointRight = QPoint(customPoint[2], customPoint[3])
         else : 
@@ -979,7 +1097,9 @@ class stereoPhoto(object):
         X = (XL + XR) / 2
         Y = (YL + YR) / 2
         
-        if not self.optWindow.currentMNTPath or ignoreMNT: return (X, Y)
+        if not self.optWindow.currentMNTPath or ignoreMNT: 
+            if only2D == True : return (X, Y)
+            else : return (X,Y,Z)
 
         mntDS = gdal.Open(self.optWindow.currentMNTPath)
         mntBand = mntDS.GetRasterBand(1)
@@ -989,7 +1109,7 @@ class stereoPhoto(object):
 
         #comparer mnt vs alt via photogram -> intéressant d'avoir la précision
         try : mntAlt = mntBand.ReadAsArray(px,py,1,1)[0][0]
-        except : return None
+        except : return (X, Y)
 
         XL, YL = self.leftPictureManager.pixelToCoord(pixL, mntAlt)
         XR, YR = self.rightPictureManager.pixelToCoord(pixR, mntAlt)
@@ -1000,11 +1120,19 @@ class stereoPhoto(object):
         if addedAlt > 0 :
             mntAlt += addedAlt
 
-        if only2D : (mntLong,mntLat)
+        if only2D : return (mntLong,mntLat)
         else : return (mntLong,mntLat,mntAlt)
 
 
-    def zoomToScale(self,value,center=False) :
+    def zoomToScale(self,value,center=False,customView=None) :
+        ##GraphicsViews sceneRect regarder si ça valeur en fonction du zoom se teste avec F5-12
+        if value == -1 and customView : 
+            rect= QtCore.QRectF(customView[0],customView[1],customView[-2],customView[-1])
+            self.graphWindowLeft.ui.graphicsView.fitInView(rect)
+            rect= QtCore.QRectF(customView[2],customView[3],customView[-2],customView[-1])
+            self.graphWindowRight.ui.graphicsView.fitInView(rect)
+            self.setQGISView()
+            return
 
         sizeRef = [500,1000,2000,3000,4000,5000,7000,9000]
         ratio = sizeRef[value]
@@ -1020,16 +1148,17 @@ class stereoPhoto(object):
             point = self.graphWindowRight.ui.graphicsView.mapToScene(QPoint(self.panCenterRight[0], self.panCenterRight[1]))
             xSizeR = point.x()
             ySizeR = point.y()
-            
+        
         rect= QtCore.QRectF(xSizeL-(ratio/2),ySizeL-(ratio/2),ratio,ratio)
         self.graphWindowLeft.ui.graphicsView.fitInView(rect)
         rect= QtCore.QRectF(xSizeR-(ratio/2),ySizeR-(ratio/2),ratio,ratio)
         self.graphWindowRight.ui.graphicsView.fitInView(rect)
+
         self.setQGISView()
     
     def setQGISView(self): 
 
-        coord = self.pointTranslator(ignoreMNT=True)
+        coord = self.pointTranslator(ignoreMNT=True,only2D=True)
         self.canvas.setCenter(QgsPointXY(coord[0],coord[1]))
         
         gv = self.graphWindowLeft.ui.graphicsView

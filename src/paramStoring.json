@@ -1,1 +1,22 @@
-{"Color": "Cyan", "BindDraw": "49", "BindLong": "16777248", "BindPoly": "90", "BindZoom": "16777249", "AddAltitude": "0", "PenWidth": "4", "ScreenLeft": "0", "ScreenRight": "0", "Flip" : "0"}
+{   
+    "Color": "Cyan", 
+    "BindDraw": "49", 
+    "BindLong": "16777248", 
+    "BindPoly": "90", 
+    "BindZoom": "16777249", 
+    "AddAltitude": "0", 
+    "PenWidth": "4", 
+    "ScreenLeft": "0", 
+    "ScreenRight": "0", 
+    "Flip" : "0",
+    "DistanceCurseur" : "16",
+    "PourcentageRetirer" : "40",
+    "LastPath" : "",
+    "LastName" : "",
+    "LastX" : "0",
+    "LastY" : "0",
+    "LastZ" : "0",
+    "ScaleX" : "0",
+    "ScaleY" : "0",
+    "MNTPath" : ""
+}

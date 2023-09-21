@@ -12,11 +12,11 @@ def getParDict(path) :
         if i.split('.')[-1] == 'par' : 
             fullpath = os.path.join(path,i)
             try :
-                f = open(fullpath)
-                s = f.read()
+                with open(fullpath) as f : 
+                    s = f.read()
             except : 
-                f = open(fullpath, encoding='ANSI')
-                s = f.read() 
+                with open(fullpath, encoding='ANSI') as f :
+                    s = f.read() 
             
             v1 = s.find('XYZ00')
             v2 = s.find("\n", v1)
@@ -29,6 +29,38 @@ def getParDict(path) :
             f.close()
 
     return parDict
+
+
+def findPairWithCoord(parDict,centerCoord) : 
+    distDict = {}
+    minDist = 9999999
+    minID = ''
+    for key, val in parDict.items() :
+        dist = math.sqrt((centerCoord[0]-val[0])**2 + (centerCoord[1]-val[1])**2)
+        distDict[key] = dist
+        if dist < minDist : 
+            minID = key
+            minDist = dist
+
+    buffer = 500
+    nbPic = int(minID.split('_')[1])
+    leftDist = 9999999
+    leftName = ''
+    rightDist = 9999998
+    
+    for key in distDict.keys() : 
+        if key != minID and abs(parDict[minID][1] - parDict[key][1]) < buffer :  
+            idNb = int(key.split('_')[1])
+            if idNb + 1 == nbPic or idNb - 1 == nbPic :  
+                if parDict[key][0] < parDict[minID][0] :
+                    leftDist = distDict[key]
+                    leftName = key
+                elif parDict[key][0] > parDict[minID][0] :    
+                    rightDist = distDict[key]
+
+    if leftDist < rightDist : minID = leftName
+    return (minID,minDist)
+    #if minDist < 3000 : 
 
 #a = getDict()
 #b= iter(a)
