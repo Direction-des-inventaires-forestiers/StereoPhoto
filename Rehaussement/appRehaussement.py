@@ -20,7 +20,8 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 from ui_Rehaussement import colorWindow, tableModel
-import sys, os, time, gdal, qimage2ndarray, threading
+import sys, os, time, threading
+from osgeo import gdal
 from math import ceil
 
 Image.MAX_IMAGE_PIXELS = 1000000000 
@@ -379,9 +380,11 @@ class app(QApplication):
         p = Image.merge("RGB", (r[0],r[1],r[2]))   
         pictureArray = np.array(p)
 
-        a = qimage2ndarray.array2qimage(pictureArray)
+        height, width, channel = pictureArray.shape
+        q_image = QImage(pictureArray.data, width, height, (width*3), QImage.Format_RGB888)
+        #a = qimage2ndarray.array2qimage(pictureArray)
         scene = QGraphicsScene()
-        scene.addPixmap(QPixmap.fromImage(a))
+        scene.addPixmap(QPixmap.fromImage(q_image))
         self.colorWindow.ui.graphicsView.setScene(scene)
 
         if ajustView == "reset":
@@ -736,9 +739,12 @@ class threadShow(QThread):
                     
                     cropPicture = np.array(pictureEnhance.crop((currentTopX,currentTopY,currentLowX,currentLowY)))
 
-                    QtImg = qimage2ndarray.array2qimage(cropPicture)
+                    #cropPicture = np.array(pictureAdjust.crop((currentTopX,currentTopY,currentLowX,currentLowY)))
+                    height, width, channel = cropPicture.shape
+                    q_image = QImage(cropPicture.data, width, height, (width*3), QImage.Format_RGB888)
+                    #QtImg = qimage2ndarray.array2qimage(cropPicture)
                     
-                    QtPixImg = QPixmap.fromImage(QtImg)
+                    QtPixImg = QPixmap.fromImage(q_image)
 
                     self.newImage.emit(QtPixImg, self.scaleFactor, currentTopX, currentTopY)
 

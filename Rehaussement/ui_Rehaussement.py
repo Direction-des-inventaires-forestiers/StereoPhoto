@@ -309,13 +309,13 @@ class colorWindow(QtWidgets.QMainWindow):
 
                 #Augmenter 1er param pour déplacer au centre de la fenetre vers la droite
                 geo = self.ui.label_9.geometry()
-                self.ui.label_9.setGeometry(QtCore.QRect(geo.x()+difX/2, geo.y(), geo.width(), geo.height()))
+                self.ui.label_9.setGeometry(QtCore.QRect(geo.x()+int(difX/2), geo.y(), geo.width(), geo.height()))
                 
                 geo = self.ui.lineEdit.geometry()
-                self.ui.lineEdit.setGeometry(QtCore.QRect(geo.x()+difX/2, geo.y(), geo.width(), geo.height()))
+                self.ui.lineEdit.setGeometry(QtCore.QRect(geo.x()+int(difX/2), geo.y(), geo.width(), geo.height()))
                 
                 geo = self.ui.toolButton.geometry()
-                self.ui.toolButton.setGeometry(QtCore.QRect(geo.x()+difX/2, geo.y(), geo.width(), geo.height()))
+                self.ui.toolButton.setGeometry(QtCore.QRect(geo.x()+int(difX/2), geo.y(), geo.width(), geo.height()))
 
                 #augmenter 3e param pour augmenter la taille vers la droite
                 geo = self.ui.groupBox.geometry()

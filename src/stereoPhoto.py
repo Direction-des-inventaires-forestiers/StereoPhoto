@@ -55,7 +55,7 @@ from .worldManager import pictureManager, dualManager, createWKTString
 from .enhanceManager import enhanceManager, threadShow, imageEnhancing, pictureLayout
 from .drawFunction import *
 from .folderManager import getParDict, findPossiblePair, findNeighbour, findPairWithCoord
-import sys, os, time, math, qimage2ndarray, win32api
+import sys, os, time, math, win32api
 from osgeo import gdal
 
 #Permet l'ouverture avec PIL de fichier énorme!
@@ -156,6 +156,7 @@ class stereoPhoto(object):
             self.paramMenu.ui.spinBoxScreenRight.setMaximum(nbScreen)
 
             self.iface.addDockWidget(Qt.RightDockWidgetArea, self.optWindow)
+            self.optWindow.raise_()
 
             if self.paramMenu.currentDictParam['LastPath'] : self.optWindow.ui.importLineProject.setText(self.paramMenu.currentDictParam['LastPath'])
             
@@ -304,7 +305,8 @@ class stereoPhoto(object):
         rightCV = self.graphWindowRight.ui.graphicsView.mapToScene(rectViewPort).boundingRect() 
         windowSize = (rightCV.width(),rightCV.height()) 
 
-        point = (0,0,rectViewPort.width(),0)
+        if self.rightMiroir == 1 : point = (0,0,rectViewPort.width(),0)
+        else : point = (0,0,0,0)
         coord = self.pointTranslator(point)
         
         self.lastCurrentView = coord + windowSize
@@ -795,8 +797,8 @@ class stereoPhoto(object):
             self.graphWindowLeft.ui.widget.wheelEvent = None
             self.graphWindowLeft.ui.widget.setMouseTracking(False)
             self.graphWindowLeft.setCursor(self.graphWindowLeft.normalCursor)
-            win32api.SetCursorPos((self.iface.mainWindow().pos().x()+int(iface.mainWindow().width()/2), self.iface.mainWindow().pos().y()+int(iface.mainWindow().height()/2)))
-            
+            #win32api.SetCursorPos((self.iface.mainWindow().pos().x()+int(iface.mainWindow().width()/2), self.iface.mainWindow().pos().y()+int(iface.mainWindow().height()/2)))
+            QCursor.setPos(self.iface.mainWindow().mapToGlobal(self.iface.mainWindow().rect().center()))
             self.iface.mainWindow().activateWindow()
             self.iface.mainWindow().raise_()
             
@@ -815,9 +817,10 @@ class stereoPhoto(object):
             #Il y a toujours un petit pan lorsqu'on active le Pan sinon 
             self.lastX = self.panCenterLeft[0]
             self.lastY = self.panCenterLeft[1] - 22
-            win32api.SetCursorPos(self.leftScreenCenter)
+            #win32api.SetCursorPos(self.leftScreenCenter)
+            QCursor.setPos(self.graphWindowLeft.ui.graphicsView.mapToGlobal(self.graphWindowLeft.ui.graphicsView.rect().center()))
             self.graphWindowLeft.ui.widget.setMouseTracking(True)
-
+            self.graphWindowRight.raise_()
             self.graphWindowLeft.activateWindow()
             self.graphWindowLeft.raise_()
 
@@ -863,20 +866,23 @@ class stereoPhoto(object):
     #Cette fonction s'assure que la souris reste sur l'écran conserné pendant le Pan afin de garder le curseur invisible  
     def mMoveEvent(self, ev):
 
-        self.deltaX = int((ev.x()-self.lastX) / 2)
+        self.deltaX = int((ev.x()-self.lastX))
         self.lastX = ev.x()
-        self.deltaY = int((ev.y()-self.lastY) / 2)
+        self.deltaY = int((ev.y()-self.lastY))
         self.lastY = ev.y()
         leftView = self.graphWindowLeft.ui.graphicsView
         rightView = self.graphWindowRight.ui.graphicsView
-        pixRange = 400
-        if ev.x() > (self.screenLeft.width() - pixRange) or ev.x() < pixRange or ev.y() < pixRange or ev.y() > (self.screenLeft.height() - pixRange) :
+        pixRange = 200
+        cursor_pos = leftView.mapFromGlobal(QCursor.pos())
+        if cursor_pos.x() <= pixRange or cursor_pos.x() >= leftView.width()-pixRange or cursor_pos.y() <= pixRange or cursor_pos.y() >= leftView.height()-pixRange:
             self.graphWindowLeft.ui.widget.setMouseTracking(False)
-            win32api.SetCursorPos(self.leftScreenCenter)
-            self.lastX = self.panCenterLeft[0]
-            self.lastY = self.panCenterLeft[1]
+            #win32api.SetCursorPos(self.leftScreenCenter)
+            QCursor.setPos(leftView.mapToGlobal(leftView.rect().center()))
+            last_mouse_pos = leftView.mapToGlobal(leftView.rect().center())
+            self.lastX = last_mouse_pos.x()
+            self.lastY = last_mouse_pos.y()
             self.graphWindowLeft.ui.widget.setMouseTracking(True)
-            
+               
         leftView.horizontalScrollBar().setValue(leftView.horizontalScrollBar().value() + self.deltaX)
         leftView.verticalScrollBar().setValue(leftView.verticalScrollBar().value() + self.deltaY)
         if self.rightMiroir == 0 : rightView.horizontalScrollBar().setValue(rightView.horizontalScrollBar().value() + self.deltaX)
@@ -920,7 +926,7 @@ class stereoPhoto(object):
                     
                 self.currentLeftLineObj = self.graphWindowLeft.ui.graphicsView.scene().addLine(lineL, self.my_pen)
                 self.currentRightLineObj = self.graphWindowRight.ui.graphicsView.scene().addLine(lineR, self.my_pen)
-       
+    
             self.tick += 1 
             if self.tick == 5 : 
                 self.manageQGISCursor(coord)

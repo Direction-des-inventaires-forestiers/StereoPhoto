@@ -137,10 +137,11 @@ class enhanceManager(QObject):
         r = t.join()      
         p = Image.merge("RGB", (r[0],r[1],r[2]))   
         pictureArray = np.array(p)
-
-        a = qimage2ndarray.array2qimage(pictureArray)
+        height, width, channel = pictureArray.shape
+        q_image = QImage(pictureArray.data, width, height, (width*3), QImage.Format_RGB888)
+        #a = qimage2ndarray.array2qimage(pictureArray)
         scene = QGraphicsScene()
-        scene.addPixmap(QPixmap.fromImage(a))
+        scene.addPixmap(QPixmap.fromImage(q_image))
         self.colorWindow.ui.graphicsView.setScene(scene)
 
         if ajustView == "reset":
@@ -508,10 +509,11 @@ class threadShow(QThread):
                     currentLowY = currentTopY + maxY if (currentTopY + maxY) < item[3] else item[3]
                     
                     cropPicture = np.array(pictureAdjust.crop((currentTopX,currentTopY,currentLowX,currentLowY)))
-
-                    QtImg = qimage2ndarray.array2qimage(cropPicture)
+                    height, width, channel = cropPicture.shape
+                    q_image = QImage(cropPicture.data, width, height, (width*3), QImage.Format_RGB888)
+                    #QtImg = qimage2ndarray.array2qimage(cropPicture)
                     
-                    QtPixImg = QPixmap.fromImage(QtImg)
+                    QtPixImg = QPixmap.fromImage(q_image)
 
                     self.newImage.emit(QtPixImg, self.scaleFactor, currentTopX, currentTopY)
 
@@ -731,7 +733,9 @@ def pictureLayout(picture, rotation, miroir, retQImage, cropValue=None):
 
     if retQImage : 
         npPicture = np.array(pic)
-        qtI = qimage2ndarray.array2qimage(npPicture)
-        return qtI
+        height, width, channel = npPicture.shape
+        q_image = QImage(npPicture.data, width, height, (width*3), QImage.Format_RGB888)
+        #qtI = qimage2ndarray.array2qimage(npPicture)
+        return q_image
     else :
         return pic
