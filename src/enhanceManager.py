@@ -41,7 +41,7 @@ from qgis.PyQt.QtGui import *
 #from PyQt5.QtGui import *
 
 from .ui_enhancement import enhanceWindow
-import sys, os, time, qimage2ndarray, threading
+import sys, os, time, threading
 from math import ceil
 
 Image.MAX_IMAGE_PIXELS = 1000000000 
