@@ -1,6 +1,6 @@
 ---
 name: Signalement de problème
-about: Créer un signet pour signaler un problème dans l'application
+about: Créez un signet pour signaler un problème dans l'application
 title: "[BUG]"
 labels: bug
 assignees: frpin33
