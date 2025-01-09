@@ -1,4 +1,4 @@
-# Sterephoto
+# StereoPhoto
 StereoPhoto est une extension expérimentale disponible dans QGIS qui permet la visualisation d'une paire de photographies aériennes en stéréoscopie.
 L'application a été développée par la Direction des Inventaires Forestiers (Ministère des Ressources naturelles et des Forêts).
 

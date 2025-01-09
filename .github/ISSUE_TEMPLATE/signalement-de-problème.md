@@ -1,6 +1,6 @@
 ---
 name: Signalement de problème
-about: Créez un signet pour signaler un problème dans l'application
+about: Créez un billet pour signaler un problème dans l'application
 title: "[BUG]"
 labels: bug
 assignees: frpin33
@@ -23,7 +23,7 @@ Expliquer le résultat souhaité à la suite des étapes réalisées. Qu'est-ce 
 **Capture d'écran**
 Si des images peuvent aider à expliquer la situation, il est préférable de les inclure.
 
-**Description de l'ordinateur **
+**Description de l'ordinateur**
  - OS: Windows, Linux, macOS
  - Version de QGIS : 3.26.2
  - Version de Python : 3.12.8 

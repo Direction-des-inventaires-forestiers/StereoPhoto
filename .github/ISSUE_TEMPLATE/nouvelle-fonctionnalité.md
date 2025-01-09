@@ -1,6 +1,6 @@
 ---
 name: Nouvelle fonctionnalité
-about: Créez un signet pour suggérer une fonctionnalité que vous voulez ajouter dans l'application
+about: Créez un billet pour suggérer une fonctionnalité que vous voulez ajouter dans l'application
 title: "[FONCTION]"
 labels: feature request
 assignees: frpin33
