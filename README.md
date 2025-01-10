@@ -23,31 +23,29 @@ Il est possible de faire l'affichage de vecteurs sur les images. Tout simplement
 ### En effectuant les étapes de la première utilisation, si vous rencontrez un problème lors du déroulement, vous pouvez utiliser le texte de l'étape pour l'ajouter dans votre billet dans la section Issues si vous rapportez le problème.
 
 
-Ouvrir le fichier de photo
-
-    Choisir la paire d'image dans QGIS avec le bouton Trouver la paire, l'utilisateur doit être à une échelle rapprocher de l'image qu'il désire utiliser (SCR du projet doit être le bon pour le fonctionnement du bouton
-    OU
-    Utiliser le bouton Parcourir la liste pour choisir une image spécifique 
+Ajouter un fichier de photo à l'application 
+- Choisir la paire d'image dans QGIS avec le bouton Trouver la paire, l'utilisateur doit être à une échelle rapprocher de l'image qu'il désire utiliser, SCR du projet doit être le bon pour le fonctionnement du bouton
+- Utiliser le bouton Parcourir la liste pour choisir une image spécifique 
 
 Ouvrir le menu des paramètres 
-
-    Choix des écrans
-    Cocher Flip si la carte graphique est stéréoscopique
-    Choisir les touches raccourcis Zoom, Déplacement Y, Dessin 
+- Choix des écrans
+- Cocher Flip si la carte graphique est stéréoscopique
+- Choisir les touches raccourcis Zoom, Déplacement Y, Dessin 
 
 Importer une couche vectorielle de polygone, la couche doit être dans QGIS, le SCR du projet sera modifié pour utiliser celui de la couche 
+
 Si vous voulez utiliser la valeur d'altitude (Z) disponible dans le polygone 3D, cochez la case Afficher Altitude 
 
 Utiliser l'outil de Rehaussement 
-    Utiliser la fonction Min/Max
-    ET/OU
-    Utiliser les options de contraste, luminosité, netteté et saturation
-    ET/OU
-    Ajouter/Retirer du rouge, vert,  bleu 
+- Utiliser la fonction Min/Max
+- Utiliser les options de contraste, luminosité, netteté et saturation
+- Ajouter/Retirer du rouge, vert, bleu 
 
 
 Importer un modèle numérique de terrain format TIF ou VRT
+
 Sélectionner le bouton Découper **Recommander**
+
 Le bouton Dessiner est pour ajouter un nouveau polygone 
 
 Cliquer sur le bouton Naviguer 
@@ -55,36 +53,40 @@ Cliquer sur le bouton Naviguer
 **Début du mode Navigation**
 
 Les images s'affichent sur leur écran respectif
+
 Lorsque je regarde les images avec les écrans et son miroir, je vois dans une perspective 3D
+
 Les images se superpose d'une manière qui est agréable de regarder
+
 La portion des images affichées sur chaque écran est la même 
+
 Un curseur en forme de croix s'affiche au milieu de l'écran
 
+**Déplacement de base**
 
-Déplacement de base
-    La souris permet d'aller dans toutes les directions
-    Il est possible de Zoom In/Out avec la roulette et la touche CTRL 
-    F5-F12 différent niveau de Zoom 
-    Il est possible de déphaser les images pour changer l'altitude avec la roulette de la souris 
+- La souris permet d'aller dans toutes les directions
+- Il est possible de Zoom In/Out avec la roulette et la touche CTRL 
+- F5-F12 différent niveau de Zoom 
+- Il est possible de déphaser les images pour changer l'altitude avec la roulette de la souris 
 
 Pour quitter le mode Navigation, appuyer sur la touche Escape (Échap) 
 
-Navigation entre les paires d'images
-    Lorsque je me déplace sur les images 3D, je vois ma position apparaître dans QGIS 
-    L'échelle de QGIS correspond grossièrement avec celle de l'application 
-    Lorsque ma position dans QGIS atteint les bordures de la vue courant, la fenêtre QGIS change de place avec le positionnement au milieu de la fenêtre 
-    Lorsque que j'atteins les bordures d'une image (Bordure du 2% du périmètre) la paire d'image change
-    La nouvelle paire d'image qui correspond belle et bien à l'image voisine s'affiche
-    La position sur la nouvelle paire d'image est la même que sur l'ancienne
-    
+**Navigation entre les paires d'images**
 
+- Lorsque je me déplace sur les images 3D, je vois ma position apparaître dans QGIS 
+- L'échelle de QGIS correspond grossièrement avec celle de l'application 
+- Lorsque ma position dans QGIS atteint les bordures de la vue courant, la fenêtre QGIS change de place avec le positionnement au milieu de la fenêtre 
+- Lorsque que j'atteins les bordures d'une image (Bordure du 2% du périmètre) la paire d'image change
+- La nouvelle paire d'image qui correspond belle et bien à l'image voisine s'affiche
+- La position sur la nouvelle paire d'image est la même que sur l'ancienne
+    
 Les polygones s'affichent sur les images et leur position est juste 
  
-Outil de dessin Découper 
-    Commencer par placer un premier point avec le clic gauche de la souris
-    Continuer votre trace en ajoutant autant de point que nécessaire
-    Placer le dernier point avec le clic gauche et terminer la dessin de la ligne avec le clic droit
-    Le résultat apparait dans l'application et dans QGIS, le/les polygones sont bien découpé
+**Outil de dessin Découper** 
+- Commencer par placer un premier point avec le clic gauche de la souris
+- Continuer votre trace en ajoutant autant de point que nécessaire
+- Placer le dernier point avec le clic gauche et terminer la dessin de la ligne avec le clic droit
+- Le résultat apparait dans l'application et dans QGIS, le/les polygones sont bien découpé
 
 
 
