@@ -1,6 +1,6 @@
 ---
 name: Nouvelle fonctionnalité
-about: Créez un billet pour suggérer une fonctionnalité que vous voulez ajouter dans l'application
+about: Créez un billet pour suggérer une fonctionnalité que vous souhaitez faire ajouter dans l'application
 title: "[FONCTION]"
 labels: feature request
 assignees: frpin33
@@ -12,6 +12,7 @@ Expliquez comment votre fonctionnalité permettrait d'améliorer l'application.
 
 **Quels seraient les impacts suite à l'implémentation de la fonctionnalité** 
 Quelles nouvelles actions seront désormais possible dans l'application?
+Est-ce que une action présente dans le guide de la première utilisation pourrait bénéficier de cet ajout? Vous pouvez la copier ici.
 
 **Est-il possible de faire le travail à l'extérieur de l'application?**
 Est-ce que la fonctionnalité peut être réalisée dans QGIS ou d'une autre manière? 
@@ -21,8 +22,6 @@ Si des images peuvent aider à expliquer la situation, il est préférable de le
 
 **Description de l'ordinateur**
  - OS: Windows, Linux, macOS
- - Version de QGIS : 3.26.2
- - Version de Python : 3.12.8 
  - Mon poste utilise une carte graphique stéréoscopique : Oui/Non
 
 **Informations supplémentaires**

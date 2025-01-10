@@ -19,6 +19,7 @@ Description des étapes pour reproduire la situation :
 
 **Quel était le résultat souhaité**
 Expliquer le résultat souhaité à la suite des étapes réalisées. Qu'est-ce qu'il aurait dû se produire?
+Est-ce que l'action est présente dans le guide de la première utilisation? Vous pouvez la copier ici.
 
 **Capture d'écran**
 Si des images peuvent aider à expliquer la situation, il est préférable de les inclure.
