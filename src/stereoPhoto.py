@@ -55,7 +55,7 @@ from .worldManager import pictureManager, dualManager, createWKTString
 from .enhanceManager import enhanceManager, threadShow, imageEnhancing, pictureLayout
 from .drawFunction import *
 from .folderManager import getParDict, findPossiblePair, findNeighbour, findPairWithCoord
-import sys, os, time, math, win32api
+import sys, os, time, math
 from osgeo import gdal
 
 #Permet l'ouverture avec PIL de fichier énorme!
@@ -208,6 +208,7 @@ class stereoPhoto(object):
     def optWindowClose(self):
         self.closeAllSideWindows()
         self.optWindow.close()
+        self.action.setChecked(False)
     
     def newPictureFile(self):
         
@@ -305,10 +306,11 @@ class stereoPhoto(object):
         rightCV = self.graphWindowRight.ui.graphicsView.mapToScene(rectViewPort).boundingRect() 
         windowSize = (rightCV.width(),rightCV.height()) 
 
-        if self.rightMiroir == 1 : point = (0,0,rectViewPort.width(),0)
-        else : point = (0,0,0,0)
-        coord = self.pointTranslator(point)
-        
+        #if self.rightMiroir == 1 : point = (0,0,rectViewPort.width(),0)
+        #else : point = (0,0,0,0)
+        #coord = self.pointTranslator(point)
+
+        coord = self.pointTranslator()
         self.lastCurrentView = coord + windowSize
 
         self.paramMenu.currentDictParam['LastX'] = str(self.lastCurrentView[0])
@@ -375,8 +377,8 @@ class stereoPhoto(object):
         self.graphWindowLeft.ui.graphicsView.setGeometry(rect)
         self.graphWindowLeft.ui.widget.setGeometry(rect)
         self.graphWindowLeft.move(QPoint(self.screenLeft.x(), self.screenLeft.y()))
-        self.graphWindowLeft.leaveEvent = self.windowHandlerEvent 
-        self.graphWindowLeft.enterEvent = self.windowHandlerEvent
+        #self.graphWindowLeft.leaveEvent = self.windowHandlerEvent 
+        #self.graphWindowLeft.enterEvent = self.windowHandlerEvent
 
         rect = QRect(0,0,self.screenRight.width(),self.screenRight.height())
         self.graphWindowRight = graphicsWindow("Image Droite")
@@ -439,8 +441,8 @@ class stereoPhoto(object):
         self.graphWindowLeft.currentRect = self.leftRect
         self.graphWindowRight.currentRect = self.rightRect
 
-        self.leftPictureManager = pictureManager(self.leftPicSize, self.currentLeftPAR, "aa")
-        self.rightPictureManager = pictureManager(self.rightPicSize, self.currentRightPAR, "aa")
+        self.leftPictureManager = pictureManager(fullLeftPicSize, self.currentLeftPAR, "aa")
+        self.rightPictureManager = pictureManager(fullRightPicSize, self.currentRightPAR, "aa")
 
         self.dualManager = dualManager(self.leftPictureManager, self.rightPictureManager)
         
@@ -453,6 +455,8 @@ class stereoPhoto(object):
         self.graphWindowLeft.show()
         
         if mouseAction : self.windowHandler('picture')
+
+        
         
         pixel = self.pointTranslator(onlyPixel=True)
         self.centerPixelLeft = pixel[0]
@@ -473,8 +477,8 @@ class stereoPhoto(object):
             pxL, pyL = self.leftPictureManager.coordToPixel(self.buttonPosition,Z)
             pxR, pyR = self.rightPictureManager.coordToPixel(self.buttonPosition,Z)
 
-            if pxL < 0 or pxL > fullLeftPicSize[0] or pyL < 0 or pxL > fullLeftPicSize[1] : self.zoomToScale(2,center=True)
-            elif pxR < 0 or pxR > fullRightPicSize[0] or pyR < 0 or pxR > fullRightPicSize[1] : self.zoomToScale(2,center=True)
+            if pxL < 0 or pxL > fullLeftPicSize[0] or pyL < 0 or pyL > fullLeftPicSize[1] : self.zoomToScale(2,center=True)
+            elif pxR < 0 or pxR > fullRightPicSize[0] or pyR < 0 or pyR > fullRightPicSize[1] : self.zoomToScale(2,center=True)
             else : 
                 #pixL = (pxL-self.cropValueLeft[0], pyL)            
                 #if self.rightMiroir == 1 :
@@ -495,20 +499,25 @@ class stereoPhoto(object):
         
 
         elif self.lastCurrentView : 
+            #print(self.lastCurrentView)
             pxL, pyL = self.leftPictureManager.coordToPixel(self.lastCurrentView[:2],self.lastCurrentView[2])
             pxR, pyR = self.rightPictureManager.coordToPixel(self.lastCurrentView[:2],self.lastCurrentView[2])
 
             if pxL < 0 or pxL > fullLeftPicSize[0] or pyL < 0 or pxL > fullLeftPicSize[1] : self.zoomToScale(2,center=True)
             elif pxR < 0 or pxR > fullRightPicSize[0] or pyR < 0 or pxR > fullRightPicSize[1] : self.zoomToScale(2,center=True)
             else : 
+                corrX = self.lastCurrentView[-2] /2     
+                corrY = self.lastCurrentView[-1] /2     
+
                 pixL = (pxL-self.cropValueLeft[0], pyL)            
                 if self.rightMiroir == 1 :
-                    mirrorX = self.rightPicSize[0] - pxR - self.lastCurrentView[-2]
+                    mirrorX = self.rightPicSize[0] - pxR 
                     pixR = (mirrorX, pyR)
                 else : pixR = (pxR-self.cropValueRight[0], pyR)  
+                pixLCustom = (pixL[0]-corrX,pixL[1]-corrY)
+                pixRCustom = (pixR[0]-corrX,pixR[1]-corrY)
                 
-                
-                customView = pixL + pixR + self.lastCurrentView[-2:]
+                customView = pixLCustom + pixRCustom + self.lastCurrentView[-2:]
                 #customView = (pxL,pyL,pxR,pyR) + self.lastCurrentView[-2:]
                 self.zoomToScale(-1, customView=customView)
         
@@ -878,37 +887,53 @@ class stereoPhoto(object):
             self.graphWindowLeft.ui.widget.setMouseTracking(False)
             #win32api.SetCursorPos(self.leftScreenCenter)
             QCursor.setPos(leftView.mapToGlobal(leftView.rect().center()))
-            last_mouse_pos = leftView.mapToGlobal(leftView.rect().center())
+            #last_mouse_pos = leftView.mapToGlobal(leftView.rect().center())
+            last_mouse_pos = leftView.rect().center()
             self.lastX = last_mouse_pos.x()
             self.lastY = last_mouse_pos.y()
             self.graphWindowLeft.ui.widget.setMouseTracking(True)
-               
-        leftView.horizontalScrollBar().setValue(leftView.horizontalScrollBar().value() + self.deltaX)
-        leftView.verticalScrollBar().setValue(leftView.verticalScrollBar().value() + self.deltaY)
-        if self.rightMiroir == 0 : rightView.horizontalScrollBar().setValue(rightView.horizontalScrollBar().value() + self.deltaX)
-        else : rightView.horizontalScrollBar().setValue(rightView.horizontalScrollBar().value() - self.deltaX)
-        rightView.verticalScrollBar().setValue(rightView.verticalScrollBar().value() + self.deltaY)
+
+        #leftView.horizontalScrollBar().setValue(leftView.horizontalScrollBar().value() + self.deltaX)
+        #leftView.verticalScrollBar().setValue(leftView.verticalScrollBar().value() + self.deltaY)
+        #if self.rightMiroir == 0 : rightView.horizontalScrollBar().setValue(rightView.horizontalScrollBar().value() + self.deltaX)
+        #else : rightView.horizontalScrollBar().setValue(rightView.horizontalScrollBar().value() - self.deltaX)
+        #rightView.verticalScrollBar().setValue(rightView.verticalScrollBar().value() + self.deltaY)
+
+        lhv = leftView.horizontalScrollBar().value() + self.deltaX
+        lvv = leftView.verticalScrollBar().value() + self.deltaY
+
+        rhv = rightView.horizontalScrollBar().value() + self.deltaX if self.rightMiroir == 0 else rightView.horizontalScrollBar().value() - self.deltaX
+        rvv = rightView.verticalScrollBar().value() + self.deltaY
+
+
+        leftView.horizontalScrollBar().setValue(lhv)
+        leftView.verticalScrollBar().setValue(lvv)
+        rightView.horizontalScrollBar().setValue(rhv)
+        rightView.verticalScrollBar().setValue(rvv)
+
+
 
         pourcent = 2/100
         startX = int(self.leftPicSize[0]*pourcent)
         startY = int(self.leftPicSize[1]*pourcent)
         rangeX = range(startX, int(self.leftPicSize[0]-startX+1))
         rangeY = range(startY, int(self.leftPicSize[1]-startY+1))
+        print('rangeX  : '+str(rangeX)+' rangeY : ' + str(rangeY))
 
         self.endDrawPointLeft = self.graphWindowLeft.ui.graphicsView.mapToScene(QPoint(self.panCenterLeft[0], self.panCenterLeft[1]))
         self.endDrawPointRight = self.graphWindowRight.ui.graphicsView.mapToScene(QPoint(self.panCenterRight[0], self.panCenterRight[1]))
-
+        print(self.endDrawPointLeft)
         coord = self.pointTranslator(ignoreMNT=True,only2D=True)
 
         if self.firstDrawClick and (int(self.endDrawPointLeft.x()) not in rangeX or int(self.endDrawPointLeft.y()) not in rangeY) :
-            
+            print('Changement')
             if self.endDrawPointLeft.x() < startX and self.currentOuestID :
                 self.findNextPair('O')
             elif self.endDrawPointLeft.x() > self.leftPicSize[0]-startX+1 and self.currentEstID :
                 self.findNextPair('E')
             elif self.endDrawPointLeft.y() < startY and self.currentNordID :
                 self.findNextPair('N')
-            elif self.currentSudID:
+            elif self.currentSudID and self.endDrawPointLeft.y() > self.leftPicSize[1]-startY+1:
                 self.findNextPair('S')
 
         else :
@@ -958,7 +983,7 @@ class stereoPhoto(object):
                 self.list3DPoint.append(QgsPoint(coordTuple[0],coordTuple[1],coordTuple[2]))
                 self.listCutCoord.append(QgsPointXY(coordTuple[0],coordTuple[1]))
 
-            elif ev.button() == Qt.RightButton:
+            elif ev.button() == Qt.RightButton and len(self.listDrawCoord) > 0:
 
                 self.firstDrawClick = True
                 if self.currentLeftLineObj :
@@ -1065,10 +1090,16 @@ class stereoPhoto(object):
             if factor > 1 : 
                 #leftView.horizontalScrollBar().setValue(leftView.horizontalScrollBar().value() - 1)
                 rightView.horizontalScrollBar().setValue(rightView.horizontalScrollBar().value() - 3)
+                #value = self.paramMenu.ui.spinBoxDistanceCurseur.value()  + 3
+                
             else :
                 #leftView.horizontalScrollBar().setValue(leftView.horizontalScrollBar().value() + 1)
                 rightView.horizontalScrollBar().setValue(rightView.horizontalScrollBar().value() + 3)
+                #value = self.paramMenu.ui.spinBoxDistanceCurseur.value() - 3
 
+            #self.graphWindowRight.cursorRectInit(self.screenRight.width(), self.screenRight.height(),value)
+            #self.paramMenu.ui.spinBoxDistanceCurseur.setValue(value)
+            
             aPoint = self.graphWindowRight.ui.graphicsView.mapToScene(QPoint(self.panCenterRight[0], self.panCenterRight[1]))
             diffX = aPoint.x() - bPoint.x()
 

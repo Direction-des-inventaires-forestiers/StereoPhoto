@@ -9,7 +9,7 @@
     "ScreenLeft": "0", 
     "ScreenRight": "0", 
     "Flip" : "0",
-    "DistanceCurseur" : "16",
+    "DistanceCurseur" : "0",
     "PourcentageRetirer" : "40",
     "LastPath" : "",
     "LastName" : "",

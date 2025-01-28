@@ -138,13 +138,13 @@ def findNeighbour(parID, currentDict):
             if currentValue[0]+buffer < value[0] and dist < rightDiff :    
                 rightDiff = dist
                 right = key
-    
-    return (up,down,left,right)
-    #Retourner une liste avec toutes les paires possibles (donc les chiffres collés seulement)
     #print(up)
     #print(down)
     #print(left)
     #print(right)
+    return (up,down,left,right)
+    #Retourner une liste avec toutes les paires possibles (donc les chiffres collés seulement)
+    
 
 
 #findNeighbour()

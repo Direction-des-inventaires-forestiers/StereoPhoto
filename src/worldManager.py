@@ -26,7 +26,7 @@ class pictureManager():
         self.sizePicture = sizePicture
         self.pathPAR = pathPAR
         self.pathDEM = pathDEM
-        self.paramPAR = ["$PARAFFINE00", "$PARINVAFF00", "$FOC00", "$XYZ00", "$OPK00"]
+        self.paramPAR = ["$PARAFFINE00", "$PARINVAFF00", "$FOC00", "$XYZ00", "$OPK00", "$PIXELSIZE","$FSCALE00"]
         self.initPAR()
         self.initDEM()
         self.angleCalculation()
@@ -71,6 +71,21 @@ class pictureManager():
         self.phi = radians(float(a[4][-2]))
         self.kappa = radians(float(a[4][-1])) 
         
+        self.pixelSize = float(a[5][-1]) * 10**-3
+        self.fscale = float(a[6][-1])
+
+        longSensor = self.sizePicture[0] * self.pixelSize
+        largSensor = self.sizePicture[1] * self.pixelSize
+        #longGroundAltitude = (self.Z0 * 1000) * (longSensor/self.Focal)
+        longGroundFscale = longSensor * self.fscale
+        #print('Longitude : altitude : ' + str(longGroundAltitude/1000) + ' fsacle : ' + str(longGroundFscale/1000))
+
+        #largGroundAltitude = (self.Z0 * 1000) * (largSensor/self.Focal)
+        largGroundFscale = largSensor * self.fscale
+        #print('Latitude : altitude : ' + str(largGroundAltitude/1000) + ' fsacle : ' + str(largGroundFscale/1000))
+
+
+
         #Pixel central de la photo traduit en mm -> Utile pour les calculs 
         self.PPCx = self.AffineA * (self.sizePicture[0]/2) + self.AffineB * (self.sizePicture[1]/2) + self.AffineC 
         self.PPCy = self.AffineD * (self.sizePicture[0]/2) + self.AffineE * (self.sizePicture[1]/2) + self.AffineF 
@@ -78,6 +93,8 @@ class pictureManager():
         #print(self.PPCy)
         self.PPCy = 0
         self.PPCx = 0
+
+
 
 
     def initDEM(self):

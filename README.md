@@ -30,7 +30,7 @@ Ajouter un fichier de photo à l'application
 Ouvrir le menu des paramètres 
 - Choix des écrans
 - Cocher Flip si la carte graphique est stéréoscopique
-- Choisir les touches raccourcis Zoom, Déplacement Y, Dessin 
+- Choisir les touches raccourcis Zoom, Déplacement Y, Changement de type de dessin 
 
 Importer une couche vectorielle de polygone, la couche doit être dans QGIS, le SCR du projet sera modifié pour utiliser celui de la couche 
 
@@ -71,6 +71,12 @@ Un curseur en forme de croix s'affiche au milieu de l'écran
 
 Pour quitter le mode Navigation, appuyer sur la touche Escape (Échap) 
 
+Appuyer sur le bouton Fermer pour que les fenêtres des images se ferme complètement
+
+Lorsque je retourne en Navigation, l'application ouvre les bonnes images avec la même position et la même échelle que la dernière utilisation 
+
+Lorsque je ferme QGIS/Redémarre mon poste, lorsque j'ouvre l'application, il contient mon dernier jeu de données utilisé ainsi que mon dernier positionnement
+
 **Navigation entre les paires d'images**
 
 - Lorsque je me déplace sur les images 3D, je vois ma position apparaître dans QGIS 
@@ -89,6 +95,12 @@ Les polygones s'affichent sur les images et leur position est juste
 - Le résultat apparait dans l'application et dans QGIS, le/les polygones sont bien découpé
 
 
+**Outil de dessin Dessiner**
 
+Cet outil permet d'ajouter un nouveau polygone. Une fois le polygone créer, il faut modifier sa table manuellement
+- Commencer par placer un premier point avec le clic gauche de la souris
+- Continuer votre trace en ajoutant autant de point que nécessaire
+- Placer le dernier point avec le clic gauche et terminer la dessin de la ligne avec le clic droit, le dernier point va se connecter avec le point le plus proche
+- Le résultat apparait dans l'application et dans QGIS, le/les polygones sont bien découpé
 
 
