@@ -875,9 +875,9 @@ class stereoPhoto(object):
     #Cette fonction s'assure que la souris reste sur l'écran conserné pendant le Pan afin de garder le curseur invisible  
     def mMoveEvent(self, ev):
 
-        self.deltaX = int((ev.x()-self.lastX))
+        self.deltaX = int((ev.x()-self.lastX)/2)
         self.lastX = ev.x()
-        self.deltaY = int((ev.y()-self.lastY))
+        self.deltaY = int((ev.y()-self.lastY)/2)
         self.lastY = ev.y()
         leftView = self.graphWindowLeft.ui.graphicsView
         rightView = self.graphWindowRight.ui.graphicsView
