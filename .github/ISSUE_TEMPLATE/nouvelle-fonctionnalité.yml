@@ -1,34 +1,31 @@
----
 name: Nouvelle fonctionnalité
-description: Créez un billet pour suggérer une fonctionnalité que vous souhaitez
-  faire ajouter dans l'application.
-labels:
-  - feature request
-body:
-  - type: markdown
-    attribute:
-      value: >
-        Vous souhaitez suggérer une fonctionnalité à ajouter dans l'application?
+description: Créez un billet pour suggérer une fonctionnalité que vous souhaitez faire ajouter dans l'application.
+labels: 
+  - 'Feature Request'
 
+body : 
+  - type : markdown
+    attributes : 
+      value : |
+        Vous souhaitez suggérer une fonctionnalité à ajouter dans l'application?
         Veuillez remplir ce billet pour que votre suggestion soit considéré par notre équipe.
+
+
   - type: textarea
     id: zone-suggestion
     attributes:
-      label: Expliquez comment votre fonctionnalité permettrait d'améliorer
-        l'application?
-      description: >
-        Quels seraient les impacts suite à l'implémentation de la
-        fonctionnalité?
-
+      label: Expliquez comment votre fonctionnalité permettrait d'améliorer l'application?
+      description: |
+        Quels seraient les impacts suite à l'implémentation de la fonctionnalité?
         Est-ce que la fonctionnalité peut être réalisée dans QGIS ou d'une autre manière? 
-
         Si des images peuvent aider à expliquer la situation, il est préférable de les inclure.
     validations:
       required: true
+
   - type: textarea
     id: info-supplementaire
     attributes:
       label: Informations supplémentaires
-      description: >
-        Ajoutez toute information que vous considérez essentielle pour
-        expliquer votre idée en détail.
+      description: |
+        Ajoutez toute information que vous considérez essentielle pour expliquer votre idée en détail.
+
