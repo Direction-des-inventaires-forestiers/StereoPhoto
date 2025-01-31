@@ -6,5 +6,5 @@ Pour toute question supplémentaire ou si vous désirez participer au développe
 
 # Première utilisation 
 
-Afin de faciliter l'installation ainsi que la première utilisation, il est recommandé d'utiliser [le guide d'utilisation.](guideUtilisationStereoPhoto_v0_1_3.pdf) Le guide peut être utilisé pour envoyer des commentaires à notre adresse courriel. Le texte dans le document peut aussi être ajouté lorsque vous créez un nouveau billet dans la section **Issues** 
+Afin de faciliter l'installation ainsi que la première utilisation, il est recommandé d'utiliser [le guide d'utilisation.](guideUtilisationStereoPhoto_v0_1_3.pdf) Le guide peut être utilisé pour envoyer des commentaires à notre adresse courriel. Le texte dans le document peut aussi être utilisé lorsque vous créez un nouveau billet dans la section **Issues** 
 
