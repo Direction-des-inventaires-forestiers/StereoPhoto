@@ -1,0 +1,6 @@
+blank_issues_enabled: false
+
+contact_links : 
+  -name: Documentation du logiciel QGIS
+  -url : https://qgis.org/resources/hub/
+  -about: Pour toute interrogation en lien avec le logiciel QGIS, la documentation du logiciel est la meilleure ressource.
