@@ -1,0 +1,41 @@
+name: Signalement de problème
+description: Créez un billet pour signaler un problème dans l'application
+labels: 
+  - "bug"
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Créer un signalement d'un problème que vous avez rencontrer en utilisant l'application. 
+
+  - type: textarea
+    id: zone-etape
+    attributes:
+      label: Expliquer le plus clairement possible votre situation et comment répliquer le problème. 
+      description: |
+        Description des étapes pour reproduire la situation :
+        1. Aller vers '...'
+        2. Cliquer sur '....'
+        3. Descendre vers  '....'
+        4. L'erreur se produit
+    validations:
+      required: true
+
+    - type: textarea
+    id: zone-result
+    attributes:
+      label: Expliquer le résultat souhaité à la suite des étapes réalisées. Qu'est-ce qu'il aurait dû se produire?
+    validations:
+      required: true
+
+  - type: textarea
+    id: info-supplementaire
+    attributes:
+      label: Informations supplémentaires
+      description: |
+        Ajoutez toute information que vous considérez essentielle pour expliquer votre idée en détail.
+        La version de QGIS, le système d'opération de votre poste ainsi que l'utilisation d'une carte graphique stéréoscopique sont des informations que vous pouvez ajouter ici 
+
+
+

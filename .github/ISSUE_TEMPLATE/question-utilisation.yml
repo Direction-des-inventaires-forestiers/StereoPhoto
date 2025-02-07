@@ -1,0 +1,18 @@
+name: Question sur l'utilisation et le fonctionnement de l'application
+description: Créez un billet pour toutes questions liées à l'interface utilisateur ainsi que le fonctionnement général de l'application
+labels:
+  - "documentation"
+
+body:
+  - type: textarea
+    id: zone-suggestion
+    attributes:
+      label: Vous avez un questionnement sur une fonctionnalité disponible dans l'application?
+      description: |
+        Est-ce que la fonctionnalité est présente dans le guide d'utilisation? Vous pouvez la copier ici.
+        Est-ce que la fonctionnalité est bien expliquer dans le guide? Qu'est qui pourrait être ajouter au guide pour détailler davantage la fonction? 
+        Ajoutez toute information que vous considérez essentielle pour expliquer le problème en détail
+    validations:
+      required: true
+
+
