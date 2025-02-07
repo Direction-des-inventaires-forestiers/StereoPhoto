@@ -16,13 +16,13 @@ body:
       description: |
         Description des étapes pour reproduire la situation :
         1. Aller vers '...'
-        2. Cliquer sur '....'
-        3. Descendre vers  '....'
+        2. Cliquer sur '...'
+        3. Descendre vers  '...'
         4. L'erreur se produit
     validations:
       required: true
 
-    - type: textarea
+  - type: textarea
     id: zone-result
     attributes:
       label: Expliquer le résultat souhaité à la suite des étapes réalisées. Qu'est-ce qu'il aurait dû se produire?
