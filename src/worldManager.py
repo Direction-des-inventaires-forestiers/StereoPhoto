@@ -91,8 +91,8 @@ class pictureManager():
         self.PPCy = self.AffineD * (self.sizePicture[0]/2) + self.AffineE * (self.sizePicture[1]/2) + self.AffineF 
         #print(self.PPCx)
         #print(self.PPCy)
-        self.PPCy = 0
-        self.PPCx = 0
+        #self.PPCy = 0
+        #self.PPCx = 0
 
 
 

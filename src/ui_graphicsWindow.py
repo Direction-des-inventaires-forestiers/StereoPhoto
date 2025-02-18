@@ -63,10 +63,12 @@ class graphicsWindow(QtWidgets.QMainWindow):
         #self.setWindowFlags(Qt.Window | Qt.WindowTitleHint | Qt.CustomizeWindowHint | Qt.WindowMaximizeButtonHint | Qt.WindowMinimizeButtonHint)
 
     def keyPressEvent(self, event):
-        self.keyPressed.emit(event)
+        if self.isActiveWindow() : self.keyPressed.emit(event)
+        super().keyPressEvent(event)
 
     def keyReleaseEvent(self, event):
-        self.keyPressed.emit(event)
+        if self.isActiveWindow() : self.keyPressed.emit(event)
+        super().keyReleaseEvent(event)
 
     #Détermine la position du curseur 
     def cursorRectInit(self, x, y, extra=0):
@@ -74,8 +76,8 @@ class graphicsWindow(QtWidgets.QMainWindow):
         y = int(y/2)
         r = self.rayon
         self.myRect = QtCore.QRect(x-r, y-r, 2*r, 2*r)
-        self.vLine = QtCore.QLineF(x-r+int(extra), y, x+r+int(extra), y)
-        self.hLine = QtCore.QLineF(x+int(extra), y-r, x+int(extra), y+r)
+        self.vLine = QtCore.QLineF(x-r, y, x+r, y)
+        self.hLine = QtCore.QLineF(x, y-r, x, y+r)
         self.ui.widget.update()
 
     #Fonction qui dessine le curseur au centre de l'image

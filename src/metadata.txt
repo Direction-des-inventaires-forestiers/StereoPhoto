@@ -9,7 +9,7 @@ description= Permet la visualisation d'images avec un système stéréoscopique
 about= FR: En utilisant un dossier d'images TIF, l'application permet de visualiser des images en stéréoscopie. Il est possible d'ajouter une couche vectorielle sur l'image. La couche en question peut être modifier en ajoutant de nouveaux polygones ainsi que par du découpage. L'utilisation d'un modèle numérique de terrain est recommandé. L'application fonctionne sans une carte graphique stéréoscopique. 
 
     EN : With a folder of TIF pictures, this plugins allows the user to view the pictures in stereoscopy. It is also possible to add a vector layer that can be edited. New features can be added to the layer, you can also cut existing features. It is recommanded to use a digital elevation model. The plugin doesn't requier a stereoscopic graphics card.
-version=0.1.3
+version=0.1.4
 homepage=https://github.com/Direction-des-inventaires-forestiers/StereoPhoto
 tracker=https://github.com/Direction-des-inventaires-forestiers/StereoPhoto/issues
 repository=https://github.com/Direction-des-inventaires-forestiers/StereoPhoto

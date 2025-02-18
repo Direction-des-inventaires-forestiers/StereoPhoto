@@ -102,7 +102,6 @@ class stereoPhoto(object):
 
             self.zoomClick = False
             self.longClick = False
-            self.curseurClick = False
 
             self.firstDrawClick = True
             self.listDrawCoord = []
@@ -377,6 +376,7 @@ class stereoPhoto(object):
         self.graphWindowLeft.ui.graphicsView.setGeometry(rect)
         self.graphWindowLeft.ui.widget.setGeometry(rect)
         self.graphWindowLeft.move(QPoint(self.screenLeft.x(), self.screenLeft.y()))
+        self.graphWindowLeft.keyPressed.connect(self.keyboardHandler)
         #self.graphWindowLeft.leaveEvent = self.windowHandlerEvent 
         #self.graphWindowLeft.enterEvent = self.windowHandlerEvent
 
@@ -386,9 +386,10 @@ class stereoPhoto(object):
         self.graphWindowRight.ui.graphicsView.setGeometry(rect)
         self.graphWindowRight.ui.widget.setGeometry(rect)
         self.graphWindowRight.move(QPoint(self.screenRight.x(), self.screenRight.y()))
+        self.graphWindowRight.keyPressed.connect(self.keyboardHandler)
         
         self.graphWindowLeft.cursorRectInit(self.screenLeft.width(), self.screenLeft.height())
-        self.graphWindowRight.cursorRectInit(self.screenRight.width(), self.screenRight.height(),self.paramMenu.ui.spinBoxDistanceCurseur.value())
+        self.graphWindowRight.cursorRectInit(self.screenRight.width(), self.screenRight.height())
 
         width = self.paramMenu.ui.spinBoxPenWidth.value()
         color = QColor(self.paramMenu.ui.comboBoxColor.currentText())
@@ -420,12 +421,14 @@ class stereoPhoto(object):
 
         fullLeftPicSize = self.leftPic.size
         fullRightPicSize = self.rightPic.size
+        self.realLeftPicSize = fullLeftPicSize
+        self.realRightPicSize = fullRightPicSize
 
         self.leftPic.close()
         self.rightPic.close()
 
-        xLeft = (fullLeftPicSize[0])*(self.paramMenu.ui.spinBoxRecouvrementH.value()/100)
-        xRight = (fullRightPicSize[0])*(self.paramMenu.ui.spinBoxRecouvrementH.value()/100)
+        xLeft = (fullLeftPicSize[0])*((100-self.paramMenu.ui.spinBoxRecouvrementH.value())/100)
+        xRight = (fullRightPicSize[0])*((100-self.paramMenu.ui.spinBoxRecouvrementH.value())/100)
         
         yLeft = yRight = 0
         
@@ -525,6 +528,9 @@ class stereoPhoto(object):
         else : self.zoomToScale(2,center=True)
         Z = self.dualManager.calculateZ(self.centerPixelLeft, self.centerPixelRight)
         self.initAltitude = Z
+
+        self.optWindow.ui.labelAltitude.setText(str(round(Z,5)))
+
         self.buttonPosition = None
 
         self.polygonOnLeftScreen = []
@@ -653,8 +659,8 @@ class stereoPhoto(object):
             del self.tPolygon
         rectCoord = self.getShowRect()
         value = [self.cropValueLeft[0],self.rightMiroir,self.rightPicSize[0],self.cropValueRight[0],self.initAltitude]
-        lmanag = [self.leftPicSize, self.currentLeftPAR]
-        rmanag = [self.rightPicSize, self.currentRightPAR]
+        lmanag = [self.realLeftPicSize, self.currentLeftPAR]
+        rmanag = [self.realRightPicSize, self.currentRightPAR]
         mntPath = self.optWindow.currentMNTPath
         useLayerZ = self.optWindow.ui.checkBoxUseLayerZ.isChecked()
         self.tPolygon = calculatePolygon(self.vectorLayerName,rectCoord,lmanag,rmanag,value, mntPath,useLayerZ)
@@ -799,8 +805,8 @@ class stereoPhoto(object):
     def windowHandler(self,window) : 
         if window == 'qgis' : 
             self.setLastView()
-            try : self.graphWindowLeft.keyPressed.disconnect(self.keyboardHandler)
-            except : pass
+            #try : self.graphWindowLeft.keyPressed.disconnect(self.keyboardHandler)
+            #except : pass
             self.graphWindowLeft.ui.widget.mouseMoveEvent = None
             self.graphWindowLeft.ui.widget.mousePressEvent = None
             self.graphWindowLeft.ui.widget.wheelEvent = None
@@ -815,7 +821,7 @@ class stereoPhoto(object):
             #self.graphWindowLeft.enterEvent = self.windowHandlerEvent #lambda : self.windowHandler('picture')
 
         if window == 'picture' : 
-            self.graphWindowLeft.keyPressed.connect(self.keyboardHandler)
+            #self.graphWindowLeft.keyPressed.connect(self.keyboardHandler)
             self.graphWindowLeft.ui.widget.mouseMoveEvent = self.mMoveEvent
             self.tick=0
             self.graphWindowLeft.ui.widget.mousePressEvent = self.mPressEvent
@@ -857,7 +863,6 @@ class stereoPhoto(object):
 
             elif event.key() == int(self.paramMenu.currentDictParam['BindZoom']) : self.zoomClick = True
             elif event.key() == int(self.paramMenu.currentDictParam['BindLong']) : self.longClick = True
-            elif event.key() == int(self.paramMenu.currentDictParam['BindPoly']) : self.curseurClick = True
             elif event.key() == int(self.paramMenu.currentDictParam['BindDraw']) : 
                 if self.optWindow.ui.radioButtonDraw.isChecked() : self.optWindow.ui.radioButtonCut.setChecked(True)
                 else : self.optWindow.ui.radioButtonDraw.setChecked(True)
@@ -868,7 +873,6 @@ class stereoPhoto(object):
         else : 
             self.zoomClick = False
             self.longClick = False
-            self.curseurClick = False
             
     #Fonction qui réalise le pan 
     #Lors du pan la souris est présente sur l'écran qui contient l'image de gauche
@@ -918,12 +922,10 @@ class stereoPhoto(object):
         startY = int(self.leftPicSize[1]*pourcent)
         rangeX = range(startX, int(self.leftPicSize[0]-startX+1))
         rangeY = range(startY, int(self.leftPicSize[1]-startY+1))
-        print('rangeX  : '+str(rangeX)+' rangeY : ' + str(rangeY))
 
         self.endDrawPointLeft = self.graphWindowLeft.ui.graphicsView.mapToScene(QPoint(self.panCenterLeft[0], self.panCenterLeft[1]))
         self.endDrawPointRight = self.graphWindowRight.ui.graphicsView.mapToScene(QPoint(self.panCenterRight[0], self.panCenterRight[1]))
-        print(self.endDrawPointLeft)
-        coord = self.pointTranslator(ignoreMNT=True,only2D=True)
+        coord = self.pointTranslator(ignoreMNT=True) #,only2D=True)
 
         if self.firstDrawClick and (int(self.endDrawPointLeft.x()) not in rangeX or int(self.endDrawPointLeft.y()) not in rangeY) :
             print('Changement')
@@ -954,7 +956,7 @@ class stereoPhoto(object):
     
             self.tick += 1 
             if self.tick == 5 : 
-                self.manageQGISCursor(coord)
+                self.manageQGISCursor(coord[:2])
                 self.tick=0
 
     def mPressEvent(self, ev):
@@ -1077,33 +1079,19 @@ class stereoPhoto(object):
 
             self.centerPixelRight = (self.centerPixelRight[0], self.centerPixelRight[1]-diffY) 
 
-        elif self.curseurClick  : 
-            if factor > 1 : value = self.paramMenu.ui.spinBoxDistanceCurseur.value() + 2
-            else : value = self.paramMenu.ui.spinBoxDistanceCurseur.value() - 2
-            self.graphWindowRight.cursorRectInit(self.screenRight.width(), self.screenRight.height(),value)
-            self.paramMenu.ui.spinBoxDistanceCurseur.setValue(value)
-                
-
         else : 
 
-            bPoint = self.graphWindowRight.ui.graphicsView.mapToScene(QPoint(self.panCenterRight[0], self.panCenterRight[1]))
-            if factor > 1 : 
-                #leftView.horizontalScrollBar().setValue(leftView.horizontalScrollBar().value() - 1)
-                rightView.horizontalScrollBar().setValue(rightView.horizontalScrollBar().value() - 3)
-                #value = self.paramMenu.ui.spinBoxDistanceCurseur.value()  + 3
+            if factor < 1 : 
+                leftView.verticalScrollBar().setValue(leftView.verticalScrollBar().value() - 1)
+                rightView.verticalScrollBar().setValue(rightView.verticalScrollBar().value() - 1)
+                rightView.horizontalScrollBar().setValue(rightView.horizontalScrollBar().value() - 1)
                 
             else :
-                #leftView.horizontalScrollBar().setValue(leftView.horizontalScrollBar().value() + 1)
-                rightView.horizontalScrollBar().setValue(rightView.horizontalScrollBar().value() + 3)
-                #value = self.paramMenu.ui.spinBoxDistanceCurseur.value() - 3
+                leftView.verticalScrollBar().setValue(leftView.verticalScrollBar().value() + 1)
+                rightView.verticalScrollBar().setValue(rightView.verticalScrollBar().value() + 1)
+                rightView.horizontalScrollBar().setValue(rightView.horizontalScrollBar().value() + 1)
 
-            #self.graphWindowRight.cursorRectInit(self.screenRight.width(), self.screenRight.height(),value)
-            #self.paramMenu.ui.spinBoxDistanceCurseur.setValue(value)
-            
-            aPoint = self.graphWindowRight.ui.graphicsView.mapToScene(QPoint(self.panCenterRight[0], self.panCenterRight[1]))
-            diffX = aPoint.x() - bPoint.x()
-
-            self.centerPixelRight = (self.centerPixelRight[0]-diffX, self.centerPixelRight[1])
+            self.pointTranslator(ignoreMNT=True)
 
     def pointTranslator(self, customPoint=(-1,-1,-1,-1), onlyPixel=False, only2D=False,ignoreMNT=False) :
         
@@ -1128,6 +1116,7 @@ class stereoPhoto(object):
         if onlyPixel : return (pixL,pixR)
 
         Z = self.dualManager.calculateZ(pixL, pixR)
+        self.optWindow.ui.labelAltitude.setText(str(round(Z,5)))
         XL, YL = self.leftPictureManager.pixelToCoord(pixL, Z)
         XR, YR = self.rightPictureManager.pixelToCoord(pixR, Z)
 
@@ -1140,13 +1129,21 @@ class stereoPhoto(object):
 
         mntDS = gdal.Open(self.optWindow.currentMNTPath)
         mntBand = mntDS.GetRasterBand(1)
+        mntNoData = mntBand.GetNoDataValue()
         mntGeo = mntDS.GetGeoTransform()
         px = math.floor((X - mntGeo[0]) / mntGeo[1]) 
         py = math.floor((Y - mntGeo[3]) / mntGeo[5])
 
         #comparer mnt vs alt via photogram -> intéressant d'avoir la précision
         try : mntAlt = mntBand.ReadAsArray(px,py,1,1)[0][0]
-        except : return (X, Y)
+        except : 
+            if only2D : return (X, Y)
+            else : return (X, Y, Z)
+        
+        if mntAlt == mntNoData : 
+            if only2D : return (X, Y)
+            else : return (X, Y, Z)
+            
 
         XL, YL = self.leftPictureManager.pixelToCoord(pixL, mntAlt)
         XR, YR = self.rightPictureManager.pixelToCoord(pixR, mntAlt)

@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>428</width>
-    <height>433</height>
+    <height>402</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -30,7 +30,7 @@
      </font>
     </property>
     <property name="title">
-     <string>Paramètre du dessin</string>
+     <string>Paramètres du dessin</string>
     </property>
     <widget class="QComboBox" name="comboBoxColor">
      <property name="geometry">
@@ -248,7 +248,7 @@
       </rect>
      </property>
      <property name="text">
-      <string>Gauche :</string>
+      <string>Bas : </string>
      </property>
     </widget>
     <widget class="QLabel" name="label_9">
@@ -261,7 +261,7 @@
       </rect>
      </property>
      <property name="text">
-      <string>Droite :</string>
+      <string>Haut : </string>
      </property>
     </widget>
     <widget class="QSpinBox" name="spinBoxScreenLeft">
@@ -343,7 +343,7 @@
       <string>Flip</string>
      </property>
      <property name="text">
-      <string>Carte graphique Flip</string>
+      <string>Retirer l'effet miroir</string>
      </property>
     </widget>
    </widget>
@@ -351,9 +351,9 @@
     <property name="geometry">
      <rect>
       <x>30</x>
-      <y>205</y>
+      <y>190</y>
       <width>341</width>
-      <height>151</height>
+      <height>121</height>
      </rect>
     </property>
     <property name="font">
@@ -363,7 +363,7 @@
      </font>
     </property>
     <property name="title">
-     <string>Raccourci clavier</string>
+     <string>Raccourcis clavier</string>
     </property>
     <widget class="QLineEdit" name="lineEditZoom">
      <property name="geometry">
@@ -415,36 +415,11 @@
       <bool>true</bool>
      </property>
     </widget>
-    <widget class="QLineEdit" name="lineEditMovePoly">
-     <property name="geometry">
-      <rect>
-       <x>180</x>
-       <y>90</y>
-       <width>61</width>
-       <height>20</height>
-      </rect>
-     </property>
-     <property name="font">
-      <font>
-       <weight>50</weight>
-       <bold>false</bold>
-      </font>
-     </property>
-     <property name="accessibleName">
-      <string>BindPoly</string>
-     </property>
-     <property name="text">
-      <string>Z</string>
-     </property>
-     <property name="readOnly">
-      <bool>true</bool>
-     </property>
-    </widget>
     <widget class="QLineEdit" name="lineEditDrawCut">
      <property name="geometry">
       <rect>
        <x>180</x>
-       <y>120</y>
+       <y>90</y>
        <width>61</width>
        <height>20</height>
       </rect>
@@ -491,24 +466,11 @@
       <string>Déplacement Longitude :</string>
      </property>
     </widget>
-    <widget class="QLabel" name="label_10">
-     <property name="geometry">
-      <rect>
-       <x>10</x>
-       <y>90</y>
-       <width>151</width>
-       <height>16</height>
-      </rect>
-     </property>
-     <property name="text">
-      <string>Déplacement Curseur :</string>
-     </property>
-    </widget>
     <widget class="QLabel" name="label_11">
      <property name="geometry">
       <rect>
        <x>10</x>
-       <y>120</y>
+       <y>90</y>
        <width>171</width>
        <height>16</height>
       </rect>
@@ -561,33 +523,11 @@
       <bool>true</bool>
      </property>
     </widget>
-    <widget class="QToolButton" name="toolButtonEditPoly">
-     <property name="geometry">
-      <rect>
-       <x>260</x>
-       <y>90</y>
-       <width>51</width>
-       <height>19</height>
-      </rect>
-     </property>
-     <property name="font">
-      <font>
-       <weight>50</weight>
-       <bold>false</bold>
-      </font>
-     </property>
-     <property name="text">
-      <string>Modifier</string>
-     </property>
-     <property name="checkable">
-      <bool>true</bool>
-     </property>
-    </widget>
     <widget class="QToolButton" name="toolButtonDrawCut">
      <property name="geometry">
       <rect>
        <x>260</x>
-       <y>120</y>
+       <y>90</y>
        <width>51</width>
        <height>19</height>
       </rect>
@@ -610,7 +550,7 @@
     <property name="geometry">
      <rect>
       <x>320</x>
-      <y>360</y>
+      <y>320</y>
       <width>75</width>
       <height>23</height>
      </rect>
@@ -623,7 +563,7 @@
     <property name="geometry">
      <rect>
       <x>240</x>
-      <y>360</y>
+      <y>320</y>
       <width>75</width>
       <height>23</height>
      </rect>
@@ -632,52 +572,11 @@
      <string>OK</string>
     </property>
    </widget>
-   <widget class="QSpinBox" name="spinBoxDistanceCurseur">
-    <property name="geometry">
-     <rect>
-      <x>160</x>
-      <y>150</y>
-      <width>42</width>
-      <height>22</height>
-     </rect>
-    </property>
-    <property name="accessibleName">
-     <string>DistanceCurseur</string>
-    </property>
-    <property name="minimum">
-     <number>-50</number>
-    </property>
-    <property name="maximum">
-     <number>50</number>
-    </property>
-    <property name="value">
-     <number>16</number>
-    </property>
-   </widget>
-   <widget class="QLabel" name="label_6">
-    <property name="geometry">
-     <rect>
-      <x>30</x>
-      <y>150</y>
-      <width>131</width>
-      <height>16</height>
-     </rect>
-    </property>
-    <property name="font">
-     <font>
-      <weight>75</weight>
-      <bold>true</bold>
-     </font>
-    </property>
-    <property name="text">
-     <string>Distance du curseur :</string>
-    </property>
-   </widget>
    <widget class="QSpinBox" name="spinBoxRecouvrementH">
     <property name="geometry">
      <rect>
-      <x>160</x>
-      <y>180</y>
+      <x>80</x>
+      <y>160</y>
       <width>42</width>
       <height>22</height>
      </rect>
@@ -692,16 +591,16 @@
      <number>100</number>
     </property>
     <property name="value">
-     <number>40</number>
+     <number>60</number>
     </property>
    </widget>
    <widget class="QLabel" name="label_7">
     <property name="geometry">
      <rect>
-      <x>30</x>
-      <y>180</y>
-      <width>131</width>
-      <height>16</height>
+      <x>20</x>
+      <y>140</y>
+      <width>181</width>
+      <height>20</height>
      </rect>
     </property>
     <property name="font">
@@ -711,7 +610,7 @@
      </font>
     </property>
     <property name="text">
-     <string>Pourcentage à retirer :</string>
+     <string>Recouvrement des images (%)  </string>
     </property>
    </widget>
   </widget>

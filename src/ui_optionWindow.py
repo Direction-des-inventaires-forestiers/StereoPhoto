@@ -190,6 +190,17 @@ class Ui_StereoDockWidget(object):
         self.pushButtonFindBestPair.setEnabled(False)
         self.pushButtonFindBestPair.setGeometry(QtCore.QRect(290, 65, 101, 23))
         self.pushButtonFindBestPair.setObjectName("pushButtonFindBestPair")
+        self.label_5 = QtWidgets.QLabel(self.dockWidgetContents)
+        self.label_5.setGeometry(QtCore.QRect(40, 190, 141, 16))
+        font = QtGui.QFont()
+        font.setPointSize(10)
+        font.setBold(True)
+        font.setWeight(75)
+        self.label_5.setFont(font)
+        self.label_5.setObjectName("label_5")
+        self.labelAltitude = QtWidgets.QLabel(self.dockWidgetContents)
+        self.labelAltitude.setGeometry(QtCore.QRect(60, 210, 81, 16))
+        self.labelAltitude.setObjectName("labelAltitude")
         StereoDockWidget.setWidget(self.dockWidgetContents)
 
         self.retranslateUi(StereoDockWidget)
@@ -217,6 +228,9 @@ class Ui_StereoDockWidget(object):
         self.checkBoxUseLayerZ.setText(_translate("StereoDockWidget", "Afficher avec l\'altitude"))
         self.pushButtonCloseWindow.setText(_translate("StereoDockWidget", "Fermer"))
         self.pushButtonFindBestPair.setText(_translate("StereoDockWidget", "Trouver la paire"))
+        self.label_5.setText(_translate("StereoDockWidget", "Altitude du curseur"))
+        self.labelAltitude.setText(_translate("StereoDockWidget", "100.000000000"))
+        
 
 class dropEventMNT(QtWidgets.QGroupBox): 
     validMNT = pyqtSignal()
