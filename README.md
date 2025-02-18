@@ -10,4 +10,4 @@ Afin de faciliter l'installation ainsi que la première utilisation, il est reco
 
 # Fichier de test
 
-Un fichier contenant une paire d'image ainsi que les fichiers «.par» associé est disponible sur ce dépôt. Ce fichier démontre comment le dossier d'image devrait être assemblé pour être compatible avec l'application. 
+Un fichier contenant une paire d'image ainsi que les fichiers «.par» associé est disponible sur [ce dépôt.](fichierTest/) Ce fichier démontre comment le dossier d'image devrait être assemblé pour être compatible avec l'application. 
