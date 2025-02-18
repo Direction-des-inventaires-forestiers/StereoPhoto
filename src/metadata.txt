@@ -17,5 +17,5 @@ LICENSE=GPL-2.0 license
 # end of mandatory metadata
 
 tags = stereoscopy, 3D, photo-interpretation, aerial photography, stereoimaging
-experimental=True
+experimental=False
 deprecated=False

@@ -8,3 +8,6 @@ Pour toute question supplémentaire ou si vous désirez participer au développe
 
 Afin de faciliter l'installation ainsi que la première utilisation, il est recommandé d'utiliser [le guide d'utilisation.](guideUtilisationStereoPhoto_v0_1_3.pdf) Le guide peut être utilisé pour envoyer des commentaires à notre adresse courriel. Le texte dans le document peut aussi être utilisé lorsque vous créez un nouveau billet dans la section **Issues** 
 
+# Fichier de test
+
+Un fichier contenant une paire d'image ainsi que les fichiers «.par» associé est disponible sur ce dépôt. Ce fichier démontre comment le dossier d'image devrait être assemblé pour être compatible avec l'application. 
