@@ -822,14 +822,7 @@ class stereoPhoto(object):
 
         if window == 'picture' : 
             #self.graphWindowLeft.keyPressed.connect(self.keyboardHandler)
-            self.graphWindowLeft.ui.widget.mouseMoveEvent = self.mMoveEvent
-            self.tick=0
-            self.graphWindowLeft.ui.widget.mousePressEvent = self.mPressEvent
-            self.graphWindowLeft.ui.widget.wheelEvent = self.wheelEvent
-            self.graphWindowLeft.setCursor(self.graphWindowLeft.invisibleCursor)
-
-            #22 est la taille en pixel de la barre du haute de la fenetre
-            #Il y a toujours un petit pan lorsqu'on active le Pan sinon 
+            
             self.lastX = self.panCenterLeft[0]
             self.lastY = self.panCenterLeft[1] - 22
             #win32api.SetCursorPos(self.leftScreenCenter)
@@ -838,6 +831,15 @@ class stereoPhoto(object):
             self.graphWindowRight.raise_()
             self.graphWindowLeft.activateWindow()
             self.graphWindowLeft.raise_()
+            self.graphWindowLeft.ui.widget.mouseMoveEvent = self.mMoveEvent
+            self.tick=0
+            self.graphWindowLeft.ui.widget.mousePressEvent = self.mPressEvent
+            self.graphWindowLeft.ui.widget.wheelEvent = self.wheelEvent
+            self.graphWindowLeft.setCursor(self.graphWindowLeft.invisibleCursor)
+
+            #22 est la taille en pixel de la barre du haute de la fenetre
+            #Il y a toujours un petit pan lorsqu'on active le Pan sinon 
+            
 
             if self.lastEnhanceParam != self.listParam : 
                 self.lastEnhanceParam = self.listParam
@@ -928,7 +930,6 @@ class stereoPhoto(object):
         coord = self.pointTranslator(ignoreMNT=True) #,only2D=True)
 
         if self.firstDrawClick and (int(self.endDrawPointLeft.x()) not in rangeX or int(self.endDrawPointLeft.y()) not in rangeY) :
-            print('Changement')
             if self.endDrawPointLeft.x() < startX and self.currentOuestID :
                 self.findNextPair('O')
             elif self.endDrawPointLeft.x() > self.leftPicSize[0]-startX+1 and self.currentEstID :

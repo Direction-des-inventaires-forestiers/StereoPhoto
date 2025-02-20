@@ -28,6 +28,7 @@ class pictureManager():
         self.pathDEM = pathDEM
         self.paramPAR = ["$PARAFFINE00", "$PARINVAFF00", "$FOC00", "$XYZ00", "$OPK00", "$PIXELSIZE","$FSCALE00"]
         self.initPAR()
+        #Try + Message QGIS si les point par marche pas
         self.initDEM()
         self.angleCalculation()
         
@@ -71,7 +72,9 @@ class pictureManager():
         self.phi = radians(float(a[4][-2]))
         self.kappa = radians(float(a[4][-1])) 
         
-        self.pixelSize = float(a[5][-1]) * 10**-3
+        try : 
+            self.pixelSize = float(a[5][-1])* 10**-3
+        except : self.pixelSize = self.AffineA
         self.fscale = float(a[6][-1])
 
         longSensor = self.sizePicture[0] * self.pixelSize
