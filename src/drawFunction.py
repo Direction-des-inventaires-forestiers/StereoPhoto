@@ -29,7 +29,7 @@ from qgis.PyQt.QtGui import *
 #from PyQt5.QtCore import *
 #from PyQt5.QtGui import *
 
-import math, threading
+import math, threading, traceback
 from osgeo import gdal
 from .worldManager import pictureManager, dualManager
 
@@ -121,95 +121,174 @@ def automaticPolygon(oldGeo, currentIndex, newGeo, vectorLayer):
     vectorLayer.commitChanges()
 
 
+def addPoint(vectorLayer,geometry) :
+    vectorLayer.startEditing()
+    
+    #feature = QgsFeature(vectorLayer.fields())  
+    #feature.setGeometry(geometry)
+    feature = QgsFeature()
+    #geom = QgsGeometry()
+    feature.setGeometry(geometry)
+    feature.setFields(vectorLayer.fields())
+
+    
+    
+    vectorLayer.dataProvider().addFeature(feature)
+    vectorLayer.commitChanges()
+    vectorLayer.triggerRepaint()
+    
+    return feature
+    
+
+
 class calculatePolygon(QThread):
-    def __init__(self, featList, rectCoord, leftPicMan, rightPicMan, value, mntPath, useLayerZ=False):
+    def __init__(self, vectorToShow, rectCoord, leftPicMan, rightPicMan, value, mntPath, useLayerZ=False):
         QThread.__init__(self)
         #self.features = featList
-        self.featName = featList
+        self.vectorToShow = vectorToShow
         self.rectCoord = rectCoord
         self.leftManager = pictureManager(leftPicMan[0], leftPicMan[1], 'aa')
         self.rightManager = pictureManager(rightPicMan[0], rightPicMan[1], 'aa')
         self.dualManag = dualManager(self.leftManager,self.rightManager)
         self.keyVal = value #cropValueLeft[0],rightMiroir,rightPicSize[0],cropValueRight[0],initAltitude
         self.mntPath = mntPath 
-        self.mntPath = ''
         self.useLayerZ = useLayerZ
         self.oldMNTPath = ''
-        self.listPolyL = []
-        self.listPolyR = []
+        self.dictPolyL = {}
+        self.dictPolyR = {}
+        self.running = True
+        self.count = 0
 
     def run(self):
-        
-        for layer in iface.mapCanvas().layers():
-            if layer.type() == QgsMapLayerType.VectorLayer and layer.name() == self.featName: 
-                #print(self.rectCoord)
-                features = layer.getFeatures(self.rectCoord)
-                break
-    
-        for item in features : 
-            try : 
-                featureGeo = item.geometry() 
+        while self.running : 
+            if self.mntPath != '' :
+                self.mntDS = gdal.Open(self.mntPath)
+                self.mntBand = self.mntDS.GetRasterBand(1)
+                self.mntGeo = self.mntDS.GetGeoTransform()
+                self.mntSize = (self.mntDS.RasterXSize, self.mntDS.RasterYSize)
+                self.mntNodata = self.mntBand.GetNoDataValue()
+                self.pxStart = math.floor((self.rectCoord.xMinimum() - self.mntGeo[0]) / self.mntGeo[1]) 
+                self.pyStart = math.floor((self.rectCoord.yMaximum() - self.mntGeo[3]) / self.mntGeo[5])
+                #print('range mnt start : ' + str(self.pxStart)+ ' , ' +str(self.pyStart))
+                #try : 
+                pxEnd = math.floor((self.rectCoord.xMaximum() - self.mntGeo[0]) / self.mntGeo[1]) 
+                pyEnd = math.floor((self.rectCoord.yMinimum() - self.mntGeo[3]) / self.mntGeo[5])
+                #print('range mnt end : ' + str(pxEnd)+ ' , ' +str(pyEnd))
+                sizeX = int(pxEnd-self.pxStart) if pxEnd < self.mntSize[0] else int(self.mntSize[0]-self.pxStart)
+                sizeY = int(pyEnd-self.pyStart) if pyEnd < self.mntSize[1] else int(self.mntSize[1]-self.pyStart)
+                try : self.mntArr = self.mntBand.ReadAsArray(self.pxStart,self.pyStart,sizeX,sizeY)
+                except : self.mntArr = self.mntNodata
+                #print(self.mntArr.shape)
                 
-                if featureGeo.isNull() == False :
+            for layer in iface.mapCanvas().layers():
+                try :
+                    name = layer.name()
+                    #print(name)
+                    if layer.type() == QgsMapLayerType.VectorLayer and name in self.vectorToShow.keys() : 
+                        
+                        self.dictPolyL[name] = [[],self.vectorToShow[name],layer.geometryType()]
+                        self.dictPolyR[name] = [[]]
+                        #print(self.rectCoord)
+                        features = layer.getFeatures(self.rectCoord)
+            
+                        for item in features : 
+                            #try : 
+                            featureGeo = item.geometry() 
+                            self.count += 1
+                            
+                            if featureGeo.isNull() == False and featureGeo.type() == QgsWkbTypes.PolygonGeometry :
 
-                    polygonL = QPolygonF()
-                    polygonR = QPolygonF()
-                    listPoint = []
-                    for vertex in featureGeo.vertices():
-                        data = vertex
-        
-                        if data.is3D() : z = self.getAltitude(data.x(), data.y(),z=data.z()) 
-                        elif data.is3D() and self.useLayerZ : z = data.z()
-                        else :  z = self.getAltitude(data.x(), data.y())
+                                polygonL = QPolygonF()
+                                polygonR = QPolygonF()
+                                listPoint = []
+                                for vertex in featureGeo.vertices():
+                                    data = vertex
+                                    if data.is3D() and self.useLayerZ : z = data.z()
+                                    elif data.is3D() : z = self.getAltitude(data.x(), data.y(),z=data.z()) 
+                                    else :  z = self.getAltitude(data.x(), data.y())
+                                            
+                                    xPixel, yPixel = self.leftManager.coordToPixel((data.x() , data.y()), z)
+                                    
+                                    pixL = (xPixel-self.keyVal[0], yPixel)            
+
+                                    xPixel, yPixel = self.rightManager.coordToPixel((data.x() , data.y()), z)          
+                                    if self.keyVal[1] == 1 :
+                                        mirrorX = self.keyVal[2] - xPixel
+                                        pixR = (mirrorX, yPixel)
+                                    else : pixR = (xPixel-self.keyVal[3], yPixel)  
+                                    
+                                    polygonL.append(QPointF(pixL[0], pixL[1]))
+                                    polygonR.append(QPointF(pixR[0], pixR[1]))
+
+                                    if (data.x(),data.y()) in listPoint :
+                                        self.dictPolyL[name][0].append(polygonL)
+                                        self.dictPolyR[name][0].append(polygonR)
+                                        polygonL = QPolygonF()
+                                        polygonR = QPolygonF()
+                                        listPoint = []
+
+                                    else : listPoint.append((data.x(),data.y()))
+
+                                self.dictPolyL[name][0].append(polygonL)
+                                self.dictPolyR[name][0].append(polygonR)
+                            elif featureGeo.isNull() == False and featureGeo.type() == QgsWkbTypes.PointGeometry :
+                                data = featureGeo.constGet()
                                 
-                        xPixel, yPixel = self.leftManager.coordToPixel((data.x() , data.y()), z)
+                                if QgsWkbTypes.hasZ(featureGeo.wkbType()) and self.useLayerZ : z = data.z()
+                                elif QgsWkbTypes.hasZ(featureGeo.wkbType()) : z = self.getAltitude(data.x(), data.y(),z=data.z()) 
+                                else : z = self.getAltitude(data.x(), data.y())
+                                #print(z)
+                                        
+                                xPixel, yPixel = self.leftManager.coordToPixel((data.x() , data.y()), z)
+                                
+                                pixL = (xPixel-self.keyVal[0], yPixel)            
+
+                                xPixel, yPixel = self.rightManager.coordToPixel((data.x() , data.y()), z)          
+                                if self.keyVal[1] == 1 :
+                                    mirrorX = self.keyVal[2] - xPixel
+                                    pixR = (mirrorX, yPixel)
+                                else : pixR = (xPixel-self.keyVal[3], yPixel)  
+                                
+                                #polygonL.append(QPointF(pixL[0], pixL[1]))
+                                #polygonR.append(QPointF(pixR[0], pixR[1]))
+
+                                self.dictPolyL[name][0].append((pixL[0], pixL[1]))
+                                self.dictPolyR[name][0].append((pixR[0], pixR[1]))
                         
-                        pixL = (xPixel-self.keyVal[0], yPixel)            
-
-                        xPixel, yPixel = self.rightManager.coordToPixel((data.x() , data.y()), z)          
-                        if self.keyVal[1] == 1 :
-                            mirrorX = self.keyVal[2] - xPixel
-                            pixR = (mirrorX, yPixel)
-                        else : pixR = (xPixel-self.keyVal[3], yPixel)  
-                        
-                        polygonL.append(QPointF(pixL[0], pixL[1]))
-                        polygonR.append(QPointF(pixR[0], pixR[1]))
-
-                        if (data.x(),data.y()) in listPoint :
-                            self.listPolyL.append(polygonL)
-                            self.listPolyR.append(polygonR)
-                            polygonL = QPolygonF()
-                            polygonR = QPolygonF()
-                            listPoint = []
-
-                        else : listPoint.append((data.x(),data.y()))
-
-                    self.listPolyL.append(polygonL)
-                    self.listPolyR.append(polygonR)
-            except : pass
-        #self.completed() #calculationDone.emit(self.listPolyL,self.listPolyR)
-           
+                        #except : pass
+                        #self.completed() #calculationDone.emit(self.dictPolyL,self.dictPolyR)
+                    #self.running = False
+                except Exception as e:
+                    print(f"Error in thread: {e}")
+                    traceback.print_exc()
+            self.running = False
+                
     #def join(self) : 
         #threading.Thread.join(self)
-        #return (self.listPolyL, self.listPolyR)
+        #return (self.dictPolyL, self.dictPolyR)
 
     def getAltitude(self,x,y,z=None) : 
         mntAlt = None
+    
+        if self.mntPath != '' and  self.mntArr is not self.mntNodata:
+            #if self.oldMNTPath != self.mntPath :
+            #        self.mntDS = gdal.Open(self.mntPath)
+            #        self.mntBand = self.mntDS.GetRasterBand(1)
+            #        self.mntGeo = self.mntDS.GetGeoTransform()
+            #        self.mntSize = (self.mntDS.RasterXSize, self.mntDS.RasterYSize)
+            #        self.oldMNTPath = self.mntPath
+            #else: pass
 
-        if self.mntPath != '' :
-            if self.oldMNTPath != self.mntPath :
-                    self.mntDS = gdal.Open(self.mntPath)
-                    self.mntBand = self.mntDS.GetRasterBand(1)
-                    self.mntGeo = self.mntDS.GetGeoTransform()
-                    self.mntSize = (self.mntDS.RasterXSize, self.mntDS.RasterYSize)
-                    self.oldMNTPath = self.mntPath
-            else: pass
-
-            px = math.floor((x - self.mntGeo[0]) / self.mntGeo[1]) 
-            py = math.floor((y - self.mntGeo[3]) / self.mntGeo[5])
+            pxPoint = math.floor((x - self.mntGeo[0]) / self.mntGeo[1]) 
+            pyPoint = math.floor((y - self.mntGeo[3]) / self.mntGeo[5])
+            #print('Point X : ' + str(pxPoint) + ', Point Y : ' + str(pyPoint))
             try : 
-                mntAlt = self.mntBand.ReadAsArray(px,py,1,1)[0][0]
-                if mntAlt >= 1 : 
+                #mntAlt = self.mntBand.ReadAsArray(pxPoint-self.pxStart,pyPoint-self.pyStart ,1,1)[0][0]
+                
+                #Array numpy l'axe Y en premier
+                mntAlt = self.mntArr[pyPoint-self.pyStart,pxPoint-self.pxStart]
+                #print(mntAlt)
+                if mntAlt != self.mntNodata : 
                     return mntAlt
 
             except : pass
@@ -222,4 +301,5 @@ class calculatePolygon(QThread):
         
         return mntAlt
 
-
+    def stop(self) : 
+        self.running = False

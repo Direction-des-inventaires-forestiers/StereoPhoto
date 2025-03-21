@@ -120,8 +120,8 @@ class stereoPhoto(object):
 
             self.polygonOnLeftScreen = []
             self.polygonOnRightScreen = []
-            self.polygonL2Draw = []
-            self.polygonR2Draw = []
+            self.polygonL2Draw = {}
+            self.polygonR2Draw = {}
             
             self.greyRectOnLeftScreen = []
             self.greyRectOnRightScreen = []
@@ -535,8 +535,8 @@ class stereoPhoto(object):
 
         self.polygonOnLeftScreen = []
         self.polygonOnRightScreen = []
-        self.polygonL2Draw = []
-        self.polygonR2Draw = []
+        self.polygonL2Draw = {}
+        self.polygonR2Draw = {}
         self.greyRectOnLeftScreen = []
         self.greyRectOnRightScreen = []
 
@@ -597,11 +597,15 @@ class stereoPhoto(object):
         self.enableDraw = True
         self.vectorLayer = self.optWindow.vLayer
         self.vectorLayerName = self.optWindow.vLayerName
+        #self.vectorLayer.geometryType() # QgsWkbTypes.PolygonGeometry  QgsWkbTypes.PointGeometry
         QgsProject.instance().setCrs(self.vectorLayer.crs())
-        self.optWindow.ui.pushButtonRemoveShape.setEnabled(True)
-        if self.vectorLayer.getFeature(0).geometry().vertexAt(0).is3D() : 
-            self.optWindow.ui.checkBoxUseLayerZ.setEnabled(True)
-        else : self.optWindow.ui.checkBoxUseLayerZ.setEnabled(False)
+        self.optWindow.ui.pushButtonRemoveShape.setEnabled(True) #and self.vectorLayer.geometryType() == QgsWkbTypes.PolygonGeometry : 
+        if QgsWkbTypes.hasZ(self.vectorLayer.wkbType()) : self.optWindow.ui.checkBoxUseLayerZ.setEnabled(True)
+        else : 
+            #self.optWindow.ui.checkBoxUseLayerZ.setChecked(False)
+            self.optWindow.ui.checkBoxUseLayerZ.setEnabled(False)
+        #Calculer les polygones quand une paire est choisi?
+        #self.startPolygonThread()
 
     #Fonction qui détermine la région approximative des photos
     #Retourne le rectangle de coordonnée
@@ -637,8 +641,8 @@ class stereoPhoto(object):
                 self.graphWindowRight.ui.graphicsView.scene().removeItem(item)
         self.polygonOnRightScreen = []
 
-        self.polygonL2Draw = []
-        self.polygonR2Draw = []
+        self.polygonL2Draw = {}
+        self.polygonR2Draw = {}
         
 
         self.vectorLayer = None 
@@ -650,26 +654,32 @@ class stereoPhoto(object):
         self.optWindow.ui.importLineVectorLayer.textChanged.connect(self.mNewVectorLayer)
 
         self.optWindow.ui.pushButtonRemoveShape.setEnabled(False)
+        #self.optWindow.ui.checkBoxUseLayerZ.setChecked(False)
         self.optWindow.ui.checkBoxUseLayerZ.setEnabled(False)
 
 
     #Ralentie l'app et fait des crash très fréquent, peut être pas donner l'object au complet...
     def startPolygonThread(self) : 
         if hasattr(self,'tPolygon'): 
-            del self.tPolygon
+            if self.tPolygon.isRunning():
+                self.tPolygon.stop()
+                self.tPolygon.wait()
         rectCoord = self.getShowRect()
         value = [self.cropValueLeft[0],self.rightMiroir,self.rightPicSize[0],self.cropValueRight[0],self.initAltitude]
         lmanag = [self.realLeftPicSize, self.currentLeftPAR]
         rmanag = [self.realRightPicSize, self.currentRightPAR]
         mntPath = self.optWindow.currentMNTPath
+        #self.vectorToShow[widget.label.text()] = widget.color
+        vectorToShow = self.optWindow.vectorToShow
         useLayerZ = self.optWindow.ui.checkBoxUseLayerZ.isChecked()
-        self.tPolygon = calculatePolygon(self.vectorLayerName,rectCoord,lmanag,rmanag,value, mntPath,useLayerZ)
+        self.tPolygon = calculatePolygon(vectorToShow,rectCoord,lmanag,rmanag,value, mntPath,useLayerZ)
         self.tPolygon.finished.connect(self.storePolygon)
         self.tPolygon.start(QThread.LowestPriority)
         
     def storePolygon(self):
-        self.polygonL2Draw = self.tPolygon.listPolyL
-        self.polygonR2Draw = self.tPolygon.listPolyR
+        print(self.tPolygon.count)
+        self.polygonL2Draw = self.tPolygon.dictPolyL
+        self.polygonR2Draw = self.tPolygon.dictPolyR
         self.drawPolygon()
         
         
@@ -688,11 +698,36 @@ class stereoPhoto(object):
         self.polygonOnRightScreen = []
 
         if self.polygonL2Draw : 
-            for i in range(len(self.polygonL2Draw)) : 
-                leftObj = self.graphWindowLeft.ui.graphicsView.scene().addPolygon(self.polygonL2Draw[i], self.my_pen)
-                rightObj = self.graphWindowRight.ui.graphicsView.scene().addPolygon(self.polygonR2Draw[i], self.my_pen)
-                self.polygonOnLeftScreen.append(leftObj)
-                self.polygonOnRightScreen.append(rightObj)
+            for name, arr in self.polygonL2Draw.items() : 
+                geoType = arr[2]
+                color = arr[1]
+                polyLeft = arr[0]
+                polyRight = self.polygonR2Draw[name][0]
+                width = self.paramMenu.ui.spinBoxPenWidth.value()
+                #color = QColor(self.paramMenu.ui.comboBoxColor.currentText())
+
+                layerPen = QPen(color, width, Qt.SolidLine, Qt.SquareCap, Qt.RoundJoin)
+                layerPen.setCosmetic(True)
+
+                for i in range(len(polyLeft)) : 
+
+                    if geoType == QgsWkbTypes.PolygonGeometry : 
+                        leftObj = self.graphWindowLeft.ui.graphicsView.scene().addPolygon(polyLeft[i], layerPen)
+                        rightObj = self.graphWindowRight.ui.graphicsView.scene().addPolygon(polyRight[i], layerPen)
+                    elif geoType == QgsWkbTypes.PointGeometry : 
+                        radius = 9  # Radius of the ellipse to represent the point
+                        pointLeft = QGraphicsEllipseItem(polyLeft[i][0] - radius, polyLeft[i][1] - radius, 2*radius, 2*radius)
+                        pointLeft.setPen(layerPen)
+                        pointLeft.setBrush(color)
+                        pointRigth = QGraphicsEllipseItem(polyRight[i][0] - radius, polyRight[i][1] - radius, 2*radius, 2*radius)
+                        pointRigth.setPen(layerPen)
+                        pointRigth.setBrush(color)
+                        leftObj = self.graphWindowLeft.ui.graphicsView.scene().addItem(pointLeft)
+                        rightObj = self.graphWindowRight.ui.graphicsView.scene().addItem(pointRigth)
+
+                    
+                    self.polygonOnLeftScreen.append(leftObj)
+                    self.polygonOnRightScreen.append(rightObj)
 
         if self.greyRectOnLeftScreen : 
             for item in self.greyRectOnLeftScreen :
@@ -961,7 +996,7 @@ class stereoPhoto(object):
                 self.tick=0
 
     def mPressEvent(self, ev):
-        if self.optWindow.currentMNTPath and self.enableDraw :
+        if self.optWindow.currentMNTPath and self.enableDraw and self.vectorLayer.geometryType() == QgsWkbTypes.PolygonGeometry :
 
             #if shape have 2d only2D = True
             coordTuple = self.pointTranslator()
@@ -1045,10 +1080,34 @@ class stereoPhoto(object):
                 self.list2DPoint = []
                 self.list3DPoint = []
                 self.bbox = QgsRectangle()
+                self.startPolygonThread()    
                 
-                self.startPolygonThread()
+                
                     
+        elif self.enableDraw and self.vectorLayer.geometryType() == QgsWkbTypes.PointGeometry :
+            coordTuple = self.pointTranslator() #QgsPointXY(coordTuple[0],coordTuple[1])    
+            if QgsWkbTypes.hasZ(self.vectorLayer.wkbType()) : geo = QgsGeometry(QgsPoint(coordTuple[0],coordTuple[1],coordTuple[2]))
+            else : geo = QgsGeometry.fromPointXY(QgsPointXY(coordTuple[0],coordTuple[1]))
+            
+            
+            self.windowHandler('qgis')
+            feature = addPoint(self.vectorLayer, geo)
+            
+            
+            #self.vectorLayer.select(feature.id())
+            self.vectorLayer.startEditing()
+            resultForm = self.iface.openFeatureForm(self.vectorLayer, feature)
+            if resultForm == False : 
+                provider =  self.vectorLayer.dataProvider()
+                provider.deleteFeatures([feature.id()]) 
+            self.vectorLayer.commitChanges()
+            self.vectorLayer.triggerRepaint()
+            self.windowHandler('picture')
+            
+            
+            self.startPolygonThread()    
 
+    
     #Fonction activer par la roulette de la souris
     #Avec la touche CTRL, il est possible de zoom In/Out sur les photos 
     #Sinon il est possible de déplacer l'image de droite et d'actualiser la valeur Z du centre 
@@ -1118,12 +1177,14 @@ class stereoPhoto(object):
 
         Z = self.dualManager.calculateZ(pixL, pixR)
         self.optWindow.ui.labelAltitude.setText(str(round(Z,5)))
+        '''
         XL, YL = self.leftPictureManager.pixelToCoord(pixL, Z)
         XR, YR = self.rightPictureManager.pixelToCoord(pixR, Z)
 
         X = (XL + XR) / 2
         Y = (YL + YR) / 2
-        
+        '''
+        X, Y = self.leftPictureManager.pixelToCoord(pixL, Z)
         if not self.optWindow.currentMNTPath or ignoreMNT: 
             if only2D == True : return (X, Y)
             else : return (X,Y,Z)
@@ -1146,11 +1207,14 @@ class stereoPhoto(object):
             else : return (X, Y, Z)
             
 
-        XL, YL = self.leftPictureManager.pixelToCoord(pixL, mntAlt)
+        '''XL, YL = self.leftPictureManager.pixelToCoord(pixL, mntAlt)
         XR, YR = self.rightPictureManager.pixelToCoord(pixR, mntAlt)
 
         mntLong = (XL + XR) / 2
-        mntLat = (YL + YR) / 2
+        mntLat = (YL + YR) / 2'''
+
+        mntLong, mntLat = self.leftPictureManager.pixelToCoord(pixL, mntAlt)
+        
         addedAlt = self.paramMenu.ui.spinBoxAltitude.value()
         if addedAlt > 0 :
             mntAlt += addedAlt

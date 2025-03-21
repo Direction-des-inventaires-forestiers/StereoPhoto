@@ -9,6 +9,34 @@
 
 from qgis.PyQt import QtCore, QtGui, QtWidgets
 
+class CustomListItem(QtWidgets.QWidget):
+    def __init__(self, text, parent=None):
+        super().__init__(parent)
+        layout = QtWidgets.QHBoxLayout(self)
+
+        # Checkbox
+        self.checkbox = QtWidgets.QCheckBox()
+        layout.addWidget(self.checkbox)
+
+        # Text label
+        self.label = QtWidgets.QLabel(text)
+        layout.addWidget(self.label)
+
+        # Color button
+        self.color_button = QtWidgets.QPushButton("Choose Color")
+        self.color_button.clicked.connect(self.choose_color)
+        layout.addWidget(self.color_button)
+
+        # Store the selected color
+        self.color = QtGui.QColor(0,0,0)
+        self.color_button.setStyleSheet(f"background-color: {self.color.name()};")
+
+    def choose_color(self):
+        color = QtWidgets.QColorDialog.getColor()
+        if color.isValid():
+            self.color = color
+            self.color_button.setStyleSheet(f"background-color: {color.name()};")
+
 
 class Ui_getVectorLayer(object):
     def setupUi(self, getVectorLayer):
@@ -47,7 +75,26 @@ class Ui_getVectorLayer(object):
         self.listWidget.setSortingEnabled(__sortingEnabled)
         self.label.setText(_translate("getVectorLayer", "Couche vectorielle"))
 
+class getVectorLayerCustomList(QtWidgets.QDialog): 
+    def __init__(self):
+        super(getVectorLayerCustomList, self).__init__()
+        self.ui = Ui_getVectorLayer()
+        self.ui.setupUi(self)
+        self.currentItemNames = []
+    
+    def setItem(self,dictName) : 
+        # Adding custom items to the list widget
+        for cle in dictName:
+            if cle not in self.currentItemNames : 
+                item = QtWidgets.QListWidgetItem()
+                custom_widget = CustomListItem(cle)
+                item.setSizeHint(custom_widget.sizeHint())
+                self.ui.listWidget.addItem(item)
+                self.ui.listWidget.setItemWidget(item, custom_widget)
+                self.currentItemNames.append(cle)
 
+        if self.ui.listWidget.count() > 0 and self.ui.listWidget.currentRow() == -1:
+            self.ui.listWidget.setCurrentRow(0)
 
 class getVectorLayer(QtWidgets.QDialog): 
     def __init__(self, dictName):
@@ -62,4 +109,7 @@ class getVectorLayer(QtWidgets.QDialog):
             item.setFlags(QtCore.Qt.ItemIsSelectable|QtCore.Qt.ItemIsDragEnabled|QtCore.Qt.ItemIsEnabled)
             item.setText(cle)
             self.ui.listWidget.addItem(item)
-        self.ui.listWidget.item(0).setSelected(True)    
+        
+        if self.ui.listWidget.count() > 0:
+            self.ui.listWidget.setCurrentRow(0)
+       

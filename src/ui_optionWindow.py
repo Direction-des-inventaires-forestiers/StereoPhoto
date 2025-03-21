@@ -13,7 +13,7 @@ import os
 from qgis.utils import iface
 from qgis.core import QgsMapLayerType, QgsWkbTypes
 from . import resources
-from .ui_getVectorLayer import getVectorLayer
+from .ui_getVectorLayer import getVectorLayerCustomList
 
 class Ui_StereoDockWidget(object):
     def setupUi(self, StereoDockWidget):
@@ -290,6 +290,7 @@ class optionWindow(QtWidgets.QDockWidget):
         self.ui.groupBoxMNT.validMNT.connect(self.dropImportMNT)
         self.ui.pushButtonRemoveMNT.clicked.connect(self.removeImportMNT)
         self.vLayer = None
+        self.vectorWindow = getVectorLayerCustomList()
         #self.currentMNTPath = ''
 
     def showImportDirectory(self) :
@@ -302,11 +303,11 @@ class optionWindow(QtWidgets.QDockWidget):
     def showImportVector(self):
         self.dictLayerName = {}
         for item in iface.mapCanvas().layers():
-            if item.type() == QgsMapLayerType.VectorLayer and item.geometryType() == QgsWkbTypes.PolygonGeometry: 
+            if item.type() == QgsMapLayerType.VectorLayer and (item.geometryType() == QgsWkbTypes.PolygonGeometry or item.geometryType() == QgsWkbTypes.PointGeometry): 
                 self.dictLayerName[item.name()] = item
         
         if self.dictLayerName : 
-            self.vectorWindow = getVectorLayer(self.dictLayerName)
+            self.vectorWindow.setItem(self.dictLayerName)
             self.vectorWindow.show()
             self.vectorWindow.ui.buttonBox.accepted.connect(self.importVectorAccept)
             self.vectorWindow.ui.buttonBox.rejected.connect(self.importVectorCancel)
@@ -317,7 +318,13 @@ class optionWindow(QtWidgets.QDockWidget):
 
     #Création de l'objet qui réprésente la couche vectorielle
     def importVectorAccept(self):
-        self.vLayerName = self.vectorWindow.ui.listWidget.selectedItems()[0].text()
+        self.vectorToShow = {}
+        for i in range(self.vectorWindow.ui.listWidget.count()) : 
+            item = self.vectorWindow.ui.listWidget.item(i)
+            widget = self.vectorWindow.ui.listWidget.itemWidget(item)
+            if widget.checkbox.isChecked() : self.vectorToShow[widget.label.text()] = widget.color
+
+        self.vLayerName = self.vectorWindow.ui.listWidget.itemWidget(self.vectorWindow.ui.listWidget.selectedItems()[0]).label.text()
         self.vLayer = self.dictLayerName[self.vLayerName]
         self.ui.importLineVectorLayer.setText(self.vLayerName)
         self.vectorWindow.close()
