@@ -291,19 +291,20 @@ class optionWindow(QtWidgets.QDockWidget):
         self.ui.pushButtonRemoveMNT.clicked.connect(self.removeImportMNT)
         self.vLayer = None
         self.vectorWindow = getVectorLayerCustomList()
+        self.projectPath = os.environ["USERPROFILE"]
+        self.mntLocation = os.environ["USERPROFILE"]
         #self.currentMNTPath = ''
 
     def showImportDirectory(self) :
-        fname = QtWidgets.QFileDialog.getExistingDirectory(self, 'Importer un dossier de photos aériennes', os.path.dirname(os.path.abspath(__file__)))
-        if fname:
-            self.ui.importLineProject.setText(fname)
+        fname = QtWidgets.QFileDialog.getExistingDirectory(self, 'Importer un dossier de photos aériennes',self.projectPath)
+        if fname: self.ui.importLineProject.setText(fname)
 
             
     #Ouvre une fenêtre de Qt pour choisir la couche de polygones
     def showImportVector(self):
         self.dictLayerName = {}
         for item in iface.mapCanvas().layers():
-            if item.type() == QgsMapLayerType.VectorLayer and (item.geometryType() == QgsWkbTypes.PolygonGeometry or item.geometryType() == QgsWkbTypes.PointGeometry): 
+            if item.type() == QgsMapLayerType.VectorLayer and item.geometryType() in [QgsWkbTypes.PolygonGeometry, QgsWkbTypes.PointGeometry,QgsWkbTypes.LineGeometry]: 
                 self.dictLayerName[item.name()] = item
         
         if self.dictLayerName : 
@@ -333,14 +334,15 @@ class optionWindow(QtWidgets.QDockWidget):
         self.vectorWindow.close()
 
     def showImportMNT(self):
-        fname = QtWidgets.QFileDialog.getOpenFileName(self, 'Importer un modèle numérique de terrain', os.path.dirname(os.path.abspath(__file__)), 'MNT (*.tif *.vrt)')[0]
+        fname = QtWidgets.QFileDialog.getOpenFileName(self, 'Importer un modèle numérique de terrain', self.mntLocation, 'MNT (*.tif *.vrt)')[0]
         if fname:
             self.currentMNTPath = fname
             nameMNT = os.path.basename(fname)
-            self.ui.importLineMNT.setText(nameMNT)
+            self.mntLocation = os.path.dirname(fname)
             self.ui.radioButtonCut.setEnabled(True)
             self.ui.radioButtonDraw.setEnabled(True)
             self.ui.pushButtonRemoveMNT.setEnabled(True)
+            self.ui.importLineMNT.setText(nameMNT)
         else : 
             self.currentMNTPath = ''
             self.ui.radioButtonCut.setEnabled(False)
@@ -349,6 +351,7 @@ class optionWindow(QtWidgets.QDockWidget):
     
     def dropImportMNT(self):
         self.currentMNTPath = self.ui.groupBoxMNT.MNTPath
+        self.mntLocation = os.path.dirname(self.currentMNTPath)
         self.ui.importLineMNT.setText(self.ui.groupBoxMNT.MNTName)
         self.ui.radioButtonCut.setEnabled(True)
         self.ui.radioButtonDraw.setEnabled(True)

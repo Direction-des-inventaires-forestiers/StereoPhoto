@@ -212,6 +212,7 @@ class stereoPhoto(object):
     def newPictureFile(self):
         
         self.currentMainPath = self.optWindow.ui.importLineProject.text()
+        self.optWindow.projectPath = os.path.dirname(self.currentMainPath)
         self.currentParDict = getParDict(self.currentMainPath)
 
         if self.paramMenu.currentDictParam['LastName'] in self.currentParDict.keys() : 
@@ -227,7 +228,7 @@ class stereoPhoto(object):
         
         else : 
             self.lastCurrentView = ()
-            self.optWindow.removeImportMNT()
+            #self.optWindow.removeImportMNT()
             self.removePolygonOnScreen()
             for key in self.currentParDict :
                 if self.setPairID(key) : break
@@ -597,15 +598,12 @@ class stereoPhoto(object):
         self.enableDraw = True
         self.vectorLayer = self.optWindow.vLayer
         self.vectorLayerName = self.optWindow.vLayerName
-        #self.vectorLayer.geometryType() # QgsWkbTypes.PolygonGeometry  QgsWkbTypes.PointGeometry
         QgsProject.instance().setCrs(self.vectorLayer.crs())
         self.optWindow.ui.pushButtonRemoveShape.setEnabled(True) #and self.vectorLayer.geometryType() == QgsWkbTypes.PolygonGeometry : 
         if QgsWkbTypes.hasZ(self.vectorLayer.wkbType()) : self.optWindow.ui.checkBoxUseLayerZ.setEnabled(True)
         else : 
             #self.optWindow.ui.checkBoxUseLayerZ.setChecked(False)
             self.optWindow.ui.checkBoxUseLayerZ.setEnabled(False)
-        #Calculer les polygones quand une paire est choisi?
-        #self.startPolygonThread()
 
     #Fonction qui détermine la région approximative des photos
     #Retourne le rectangle de coordonnée
@@ -704,7 +702,6 @@ class stereoPhoto(object):
                 polyLeft = arr[0]
                 polyRight = self.polygonR2Draw[name][0]
                 width = self.paramMenu.ui.spinBoxPenWidth.value()
-                #color = QColor(self.paramMenu.ui.comboBoxColor.currentText())
 
                 layerPen = QPen(color, width, Qt.SolidLine, Qt.SquareCap, Qt.RoundJoin)
                 layerPen.setCosmetic(True)
@@ -714,8 +711,11 @@ class stereoPhoto(object):
                     if geoType == QgsWkbTypes.PolygonGeometry : 
                         leftObj = self.graphWindowLeft.ui.graphicsView.scene().addPolygon(polyLeft[i], layerPen)
                         rightObj = self.graphWindowRight.ui.graphicsView.scene().addPolygon(polyRight[i], layerPen)
+                    elif geoType == QgsWkbTypes.LineGeometry : 
+                        leftObj = self.graphWindowLeft.ui.graphicsView.scene().addPath(polyLeft[i], layerPen)
+                        rightObj = self.graphWindowRight.ui.graphicsView.scene().addPath(polyRight[i], layerPen)
                     elif geoType == QgsWkbTypes.PointGeometry : 
-                        radius = 9  # Radius of the ellipse to represent the point
+                        radius = 9  #rayon pour la taille des points 
                         pointLeft = QGraphicsEllipseItem(polyLeft[i][0] - radius, polyLeft[i][1] - radius, 2*radius, 2*radius)
                         pointLeft.setPen(layerPen)
                         pointLeft.setBrush(color)
