@@ -26,82 +26,78 @@ class pictureManager():
         self.sizePicture = sizePicture
         self.pathPAR = pathPAR
         self.pathDEM = pathDEM
-        self.paramPAR = ["$PARAFFINE00", "$PARINVAFF00", "$FOC00", "$XYZ00", "$OPK00", "$PIXELSIZE","$FSCALE00"]
         self.initPAR()
         #Try + Message QGIS si les point par marche pas
-        self.initDEM()
-        self.angleCalculation()
+        
         
     def initPAR(self):
 
-        try :
-            with open(self.pathPAR) as f :
-                s = f.read()
-        except : 
-            with open(self.pathPAR, encoding='ANSI') as f :
-                s = f.read() 
-        a = []
-        for i in range(len(self.paramPAR)) : 
-            v1 = s.find(self.paramPAR[i])
-            v2 = s.find("\n", v1)
-            w = s[v1:v2]
-            a.append(w.split(" ")) 
+        keywords = {
+            "$PARAFFINE00": "affine",
+            "$PARINVAFF00": "inverse_affine",
+            "$FOC00": "focal",
+            "$XYZ00": "camera position",
+            "$OPK00": "orientation",
+            "$PIXELSIZE": "pixel_size",
+            "$FSCALE00": "fscale",
+            "$PPA": "principal point of autocollimation"
+        }
 
-        f.close()
-        self.AffineA = float(a[0][-6])
-        self.AffineB = float(a[0][-5])
-        self.AffineC = float(a[0][-4])
-        self.AffineD = float(a[0][-3])
-        self.AffineE = float(a[0][-2]) 
-        self.AffineF = float(a[0][-1])
-        
-        self.InvA = float(a[1][-6])
-        self.InvB = float(a[1][-5])
-        self.InvC = float(a[1][-4])
-        self.InvD = float(a[1][-3])
-        self.InvE = float(a[1][-2])
-        self.InvF = float(a[1][-1])
-        
-        self.Focal = float(a[2][-1])
-        
-        self.X0 = float(a[3][-3])
-        self.Y0 = float(a[3][-2])
-        self.Z0 = float(a[3][-1])
+        try:
+            with open(self.pathPAR, encoding='utf-8') as f:
+                lines = f.read().splitlines()
+        except:
+            with open(self.pathPAR, encoding='ansi') as f:
+                lines = f.read().splitlines()
 
-        self.omega = radians(float(a[4][-3])) 
-        self.phi = radians(float(a[4][-2]))
-        self.kappa = radians(float(a[4][-1])) 
-        
-        try : 
-            self.pixelSize = float(a[5][-1])* 10**-3
-        except : self.pixelSize = self.AffineA
-        self.fscale = float(a[6][-1])
+        values = {}
+        for line in lines:
+            for key in keywords:
+                if line.startswith(key):
+                    values[key] = line.split()
+                    break
 
-        longSensor = self.sizePicture[0] * self.pixelSize
-        largSensor = self.sizePicture[1] * self.pixelSize
+        affine = [float(val) for val in values["$PARAFFINE00"][-6:]]
+        self.AffineA, self.AffineB, self.AffineC, self.AffineD, self.AffineE, self.AffineF = affine
+
+        inverse_affine = [float(val) for val in values["$PARINVAFF00"][-6:]]
+        self.InvA, self.InvB, self.InvC, self.InvD, self.InvE, self.InvF = inverse_affine
+
+        self.Focal = float(values["$FOC00"][-1])
+
+        self.X0, self.Y0, self.Z0 = [float(val) for val in values["$XYZ00"][-3:]]
+
+        omega, phi, kappa = [float(val) for val in values["$OPK00"][-3:]]
+        self.omega, self.phi, self.kappa = radians(omega), radians(phi), radians(kappa)
+
+        if "$PIXELSIZE" in values:
+            self.pixelSize = float(values["$PIXELSIZE"][-1]) * 1e-3
+        else :
+            self.pixelSize = self.AffineA 
+
+        self.fscale = float(values["$FSCALE00"][-1])
+
+        if "$PPA" in values:
+            ppa_x = float(values["$PPA"][-2])
+            ppa_y = float(values["$PPA"][-1])
+            self.PPCx = self.AffineA * ppa_x + self.AffineB * ppa_y + self.AffineC 
+            self.PPCy = self.AffineD * ppa_x + self.AffineE * ppa_y + self.AffineF 
+        else:
+            self.PPCx = 0
+            self.PPCy = 0
+
+        longSensor = abs(self.sizePicture[0] * self.pixelSize)
+        largSensor = abs(self.sizePicture[1] * self.pixelSize)
+        self.longGroundFscale = longSensor * self.fscale
+        self.largGroundFscale = largSensor * self.fscale
+
         #longGroundAltitude = (self.Z0 * 1000) * (longSensor/self.Focal)
-        longGroundFscale = longSensor * self.fscale
         #print('Longitude : altitude : ' + str(longGroundAltitude/1000) + ' fsacle : ' + str(longGroundFscale/1000))
-
         #largGroundAltitude = (self.Z0 * 1000) * (largSensor/self.Focal)
-        largGroundFscale = largSensor * self.fscale
         #print('Latitude : altitude : ' + str(largGroundAltitude/1000) + ' fsacle : ' + str(largGroundFscale/1000))
+        
+        self.angleCalculation()
 
-
-
-        #Pixel central de la photo traduit en mm -> Utile pour les calculs 
-        self.PPCx = self.AffineA * (self.sizePicture[0]/2) + self.AffineB * (self.sizePicture[1]/2) + self.AffineC 
-        self.PPCy = self.AffineD * (self.sizePicture[0]/2) + self.AffineE * (self.sizePicture[1]/2) + self.AffineF 
-        #print(self.PPCx)
-        #print(self.PPCy)
-        #self.PPCy = 0
-        #self.PPCx = 0
-
-
-
-
-    def initDEM(self):
-        altitudeTerrain = 298
 
     def affineEquation(self, pixel) :
         xMM = self.AffineA * pixel[0] + self.AffineB * pixel[1] + self.AffineC 
@@ -129,8 +125,6 @@ class pictureManager():
         xPixel, yPixel = self.invAffineEquation([xMM,yMM])
         return xPixel, yPixel
 
-    def getZ(self, coord):
-        pass
 
     def angleCalculation(self):
         self.r11 = cos(self.phi)*cos(self.kappa)
@@ -146,13 +140,10 @@ class pictureManager():
     def getKX(self, valueMM):
         return (self.r11*(valueMM[0]-self.PPCx) + self.r12*(valueMM[1]-self.PPCy) - self.r13*self.Focal) / (self.r31*(valueMM[0]-self.PPCx) + self.r32*(valueMM[1]-self.PPCy) - self.r33*self.Focal)
 
-
     def getKY(self, valueMM):
         return (self.r21*(valueMM[0]-self.PPCx) + self.r22*(valueMM[1]-self.PPCy) - self.r23*self.Focal) / (self.r31*(valueMM[0]-self.PPCx) + self.r32*(valueMM[1]-self.PPCy) - self.r33*self.Focal)
 
     
-# get Initial Z 
-
 class dualManager() :
 
     def __init__(self, leftManager, rightManager, Z=0):
@@ -200,19 +191,3 @@ def createWKTString(coordList,strName) :
         retSTR += '))'
 
         return retSTR
-
-
-'''
-class demManager() :
-    b.identify(QgsPointXY(-70.00001,48),QgsRaster.IdentifyFormatValue).results()'''
-
-    #Coord 1 = centre et son Z
-    #Coord 2 = Coord calculer + Z 
-
-"""
-path = "U:\\Photos\\q18067_171_rgb.par"
-size = [11310,17310]
-a = pictureManager(size,path,'a')
-pix = [11310/2,17310/2]
-print(a.pixelToCoord(size,300))
-"""

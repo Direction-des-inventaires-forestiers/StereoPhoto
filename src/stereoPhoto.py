@@ -962,7 +962,7 @@ class stereoPhoto(object):
 
         self.endDrawPointLeft = self.graphWindowLeft.ui.graphicsView.mapToScene(QPoint(self.panCenterLeft[0], self.panCenterLeft[1]))
         self.endDrawPointRight = self.graphWindowRight.ui.graphicsView.mapToScene(QPoint(self.panCenterRight[0], self.panCenterRight[1]))
-        coord = self.pointTranslator(ignoreMNT=True) #,only2D=True)
+        coord = self.pointTranslator()#ignoreMNT=True) #,only2D=True)
 
         if self.firstDrawClick and (int(self.endDrawPointLeft.x()) not in rangeX or int(self.endDrawPointLeft.y()) not in rangeY) :
             if self.endDrawPointLeft.x() < startX and self.currentOuestID :
@@ -1174,15 +1174,17 @@ class stereoPhoto(object):
         else : pixR = (centerPointRight.x()+self.cropValueRight[0], centerPointRight.y())  
 
         if onlyPixel : return (pixL,pixR)
-
+        print((pixL,pixR))
         Z = self.dualManager.calculateZ(pixL, pixR)
         self.optWindow.ui.labelAltitude.setText(str(round(Z,5)))
         '''
         XL, YL = self.leftPictureManager.pixelToCoord(pixL, Z)
+        print(XL, YL)
         XR, YR = self.rightPictureManager.pixelToCoord(pixR, Z)
-
+        print(XR, YR)
         X = (XL + XR) / 2
         Y = (YL + YR) / 2
+        print(X, Y)
         '''
         X, Y = self.leftPictureManager.pixelToCoord(pixL, Z)
         if not self.optWindow.currentMNTPath or ignoreMNT: 

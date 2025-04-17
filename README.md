@@ -17,12 +17,16 @@ Le texte dans le document peut aussi être utilisé lorsque vous créez un nouve
 
 Un fichier contenant une paire d'image ainsi que les fichiers «.par» associé est disponible sur [ce dépôt.](fichierTest/) Ce fichier démontre comment le dossier d'image devrait être assemblé pour être compatible avec l'application. 
 
-Les valeurs du fichier «.par» qui sont obligatoire pour le fonctionnement de l'application sont les suivantes : 
+Les valeurs du fichier «.par» qui sont obligatoires pour le fonctionnement de l'application sont les suivantes : 
 
 - $PARAFFINE00
 - $PARINVAFF00 
 - $FOC00 
 - $XYZ00
 - $OPK00
-- $PIXELSIZE
 - $FSCALE00
+
+Les valeurs du fichier «.par» qui sont facultatives : 
+
+- $PPA
+- $PIXELSIZE

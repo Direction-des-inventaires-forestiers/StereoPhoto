@@ -723,9 +723,9 @@ def pictureLayout(picture, rotation, miroir, retQImage, cropValue=None):
             pic = pic.rotate(270, expand=1)
         
         if miroir == 1 :
-            pic = pic.transpose(Image.FLIP_LEFT_RIGHT)
+            pic = pic.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
         elif miroir == 2 :
-            pic = pic.transpose(Image.FLIP_TOP_BOTTOM)
+            pic = pic.transpose(Image.Transpose.FLIP_TOP_BOTTOM)
 
     if cropValue:
         pic = pic.crop(cropValue)
