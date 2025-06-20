@@ -17,15 +17,14 @@ Il est aussi possible de calculer le Z pour un point donné en utilisant l'infor
 from math import cos, sin, radians
 #from qgis.PyQt.QtCore import QRectF
 from PyQt5.QtCore import QRectF
-
+import numpy as np
 
 class pictureManager(): 
 
-    def __init__(self, sizePicture, pathPAR, pathDEM):
+    def __init__(self, sizePicture, pathPAR):
 
         self.sizePicture = sizePicture
         self.pathPAR = pathPAR
-        self.pathDEM = pathDEM
         self.initPAR()
         #Try + Message QGIS si les point par marche pas
         
@@ -75,7 +74,10 @@ class pictureManager():
         else :
             self.pixelSize = self.AffineA 
 
-        self.fscale = float(values["$FSCALE00"][-1])
+        if "$FSCALE00" in values:   
+            self.fscale = float(values["$FSCALE00"][-1]) * 1e-3
+        else : 
+            self.fscale = self.Z0/self.Focal
 
         if "$PPA" in values:
             ppa_x = float(values["$PPA"][-2])
@@ -86,15 +88,7 @@ class pictureManager():
             self.PPCx = 0
             self.PPCy = 0
 
-        longSensor = abs(self.sizePicture[0] * self.pixelSize)
-        largSensor = abs(self.sizePicture[1] * self.pixelSize)
-        self.longGroundFscale = longSensor * self.fscale
-        self.largGroundFscale = largSensor * self.fscale
-
-        #longGroundAltitude = (self.Z0 * 1000) * (longSensor/self.Focal)
-        #print('Longitude : altitude : ' + str(longGroundAltitude/1000) + ' fsacle : ' + str(longGroundFscale/1000))
-        #largGroundAltitude = (self.Z0 * 1000) * (largSensor/self.Focal)
-        #print('Latitude : altitude : ' + str(largGroundAltitude/1000) + ' fsacle : ' + str(largGroundFscale/1000))
+        self.groundPixelSize = self.fscale * self.pixelSize
         
         self.angleCalculation()
 

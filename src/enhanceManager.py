@@ -41,7 +41,7 @@ from qgis.PyQt.QtGui import *
 #from PyQt5.QtGui import *
 
 from .ui_enhancement import enhanceWindow
-import sys, os, time, threading
+import sys, os, time, threading, traceback
 from math import ceil
 
 Image.MAX_IMAGE_PIXELS = 1000000000 
@@ -455,75 +455,81 @@ class threadShow(QThread):
     
     #Optimisation possible : Offrir le placement selon la proximité 
     def run(self):
+        try : 
 
-        self.picture.seek(self.seekFactor)
-        #Cause un bug dans le GUI, les spinboxs ne sont plus instantanées
-        #Constraste netteté et saturation cause les plus gros ralentissements
-        t = imageEnhancing(self.picture, self.listParam)
-        t.start()
-        r = t.join() 
+            self.picture.seek(self.seekFactor)
+            #Cause un bug dans le GUI, les spinboxs ne sont plus instantanées
+            #Constraste netteté et saturation cause les plus gros ralentissements
+            t = imageEnhancing(self.picture, self.listParam)
+            t.start()
+            r = t.join() 
 
-        pictureEnhance = Image.merge("RGB",(r[0],r[1],r[2]))
+            pictureEnhance = Image.merge("RGB",(r[0],r[1],r[2]))
 
-        pictureAdjust = pictureLayout(pictureEnhance, self.rotation, self.miroir, False) 
-        
-        if self.cropValue:
-            pictureAdjust = pictureAdjust.crop(self.cropValue)
-
-        topX = round(self.pointZero.x()*self.multiFactor) if round(self.pointZero.x()*self.multiFactor) >= 0 else 0
-        topY = round(self.pointZero.y()*self.multiFactor) if round(self.pointZero.y()*self.multiFactor) >= 0 else 0
-        lowX = round(self.pointMax.x()*self.multiFactor)  if round(self.pointMax.x()*self.multiFactor) <= pictureAdjust.size[0] else pictureAdjust.size[0]
-        lowY = round(self.pointMax.y()*self.multiFactor)  if round(self.pointMax.y()*self.multiFactor) <= pictureAdjust.size[1] else pictureAdjust.size[1]
-        
-        sizePixelX = abs(lowX - topX)
-        sizePixelY = abs(lowY - topY)
-     
-        maxX = 750 
-        maxY = 750
-
-        middleRect = [topX, topY, lowX, lowY]
-        firstRect = [0,0,topX, pictureAdjust.size[1]]
-        secondRect = [lowX, 0, pictureAdjust.size[0], pictureAdjust.size[1]]
-        thridRect = [topX, 0, topX+sizePixelX , topY]
-        fourthRect = [topX, topY+sizePixelY, lowX, pictureAdjust.size[1]]
-
-        rect = [middleRect, firstRect, secondRect, thridRect, fourthRect]
-        for item in rect :
-
-            nbDivX = ceil(abs(item[2] - item[0])/maxX)
-            nbDivY = ceil(abs(item[3] - item[1])/maxY)
-
-            currentTopX = item[0]
-            currentTopY = item[1]
+            pictureAdjust = pictureLayout(pictureEnhance, self.rotation, self.miroir, False) 
             
-            for x in range(nbDivX) :
-                
-                currentLowX = currentTopX + maxX if (currentTopX + maxX) < item[2] else item[2]
-                
-                for y in range(nbDivY) : 
+            if self.cropValue:
+                pictureAdjust = pictureAdjust.crop(self.cropValue)
 
-                    if self.keepRunning == False : 
-                        self.picture.close()
-                        return
-                    
-                    currentLowY = currentTopY + maxY if (currentTopY + maxY) < item[3] else item[3]
-                    
-                    cropPicture = np.array(pictureAdjust.crop((currentTopX,currentTopY,currentLowX,currentLowY)))
-                    height, width, channel = cropPicture.shape
-                    q_image = QImage(cropPicture.data, width, height, (width*3), QImage.Format_RGB888)
-                    #QtImg = qimage2ndarray.array2qimage(cropPicture)
-                    
-                    QtPixImg = QPixmap.fromImage(q_image)
-
-                    self.newImage.emit(QtPixImg, self.scaleFactor, currentTopX, currentTopY)
-
-                    currentTopY += maxY
-                
-                currentTopX += maxX
-                currentTopY = item[1]
+            topX = round(self.pointZero.x()*self.multiFactor) if round(self.pointZero.x()*self.multiFactor) >= 0 else 0
+            topY = round(self.pointZero.y()*self.multiFactor) if round(self.pointZero.y()*self.multiFactor) >= 0 else 0
+            lowX = round(self.pointMax.x()*self.multiFactor)  if round(self.pointMax.x()*self.multiFactor) <= pictureAdjust.size[0] else pictureAdjust.size[0]
+            lowY = round(self.pointMax.y()*self.multiFactor)  if round(self.pointMax.y()*self.multiFactor) <= pictureAdjust.size[1] else pictureAdjust.size[1]
+            
+            sizePixelX = abs(lowX - topX)
+            sizePixelY = abs(lowY - topY)
         
-        self.picture.close()
+            maxX = 750 
+            maxY = 750
 
+            middleRect = [topX, topY, lowX, lowY]
+            firstRect = [0,0,topX, pictureAdjust.size[1]]
+            secondRect = [lowX, 0, pictureAdjust.size[0], pictureAdjust.size[1]]
+            thridRect = [topX, 0, topX+sizePixelX , topY]
+            fourthRect = [topX, topY+sizePixelY, lowX, pictureAdjust.size[1]]
+
+            rect = [middleRect, firstRect, secondRect, thridRect, fourthRect]
+            #print(rect)
+            for item in rect :
+
+                nbDivX = ceil(abs(item[2] - item[0])/maxX)
+                nbDivY = ceil(abs(item[3] - item[1])/maxY)
+
+                currentTopX = item[0]
+                currentTopY = item[1]
+                
+                for x in range(nbDivX) :
+                    
+                    currentLowX = currentTopX + maxX if (currentTopX + maxX) < item[2] else item[2]
+                    
+                    for y in range(nbDivY) : 
+
+                        if self.keepRunning == False : 
+                            self.picture.close()
+                            return
+                        
+                        currentLowY = currentTopY + maxY if (currentTopY + maxY) < item[3] else item[3]
+                        #print(f"Trying to crop: ({currentTopX},{currentTopY}) -> ({currentLowX},{currentLowY})")
+                        
+                        cropPicture = np.array(pictureAdjust.crop((currentTopX,currentTopY,currentLowX,currentLowY)))
+                        height, width, channel = cropPicture.shape
+                        q_image = QImage(cropPicture.data, width, height, (width*3), QImage.Format_RGB888)
+                        #QtImg = qimage2ndarray.array2qimage(cropPicture)
+                        
+                        QtPixImg = QPixmap.fromImage(q_image)
+
+                        self.newImage.emit(QtPixImg, self.scaleFactor, currentTopX, currentTopY)
+
+                        currentTopY += maxY
+                    
+                    currentTopX += maxX
+                    currentTopY = item[1]
+            
+            self.picture.close()
+
+        except Exception as e:
+            print("Error in QThread:", e)
+            traceback.print_exc()
 
 #Thread qui reçoit une image PIL ainsi que la liste des paramètres de rehaussement
 #Le thread permet de réaliser le rehaussement

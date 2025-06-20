@@ -54,7 +54,8 @@ from .ui_paramWindow import paramWindow
 from .worldManager import pictureManager, dualManager, createWKTString
 from .enhanceManager import enhanceManager, threadShow, imageEnhancing, pictureLayout
 from .drawFunction import *
-from .folderManager import getParDict, findPossiblePair, findNeighbour, findPairWithCoord
+#from .folderManager import getParDict, findPossiblePair, findNeighbour, findPairWithCoord
+from .gestionDossier import getParDict, get_neighbors_and_pairs, findPairWithCoord, compute_overlap
 import sys, os, time, math
 from osgeo import gdal
 
@@ -99,6 +100,7 @@ class stereoPhoto(object):
             self.newRightRequest = False
             self.enableDraw = False
             self.enableShow = False
+            self.ignoreMouseAction = False
 
             self.zoomClick = False
             self.longClick = False
@@ -109,14 +111,11 @@ class stereoPhoto(object):
 
             self.list2DPoint = []
             self.list3DPoint = []
-            self.bbox = QgsRectangle()
 
             self.listLeftLineObj = []
             self.listRightLineObj = []
             self.currentLeftLineObj = None
             self.currentRightLineObj = None
-
-            self.isEstPicture = False
 
             self.polygonOnLeftScreen = []
             self.polygonOnRightScreen = []
@@ -131,9 +130,9 @@ class stereoPhoto(object):
 
             self.buttonPosition = None
 
-            #Je garde ces variables par simplicité et compréhension 
-            self.leftOrientation = self.rightOrientation = self.leftMiroir = 0
-            self.rightMiroir = 1
+            #À retirer, mais je dois tester avant
+            self.leftOrientation = self.rightOrientation = self.leftMiroir = self.rightMiroir = 0
+            
 
             self.optWindow = optionWindow(self.iface)
             
@@ -214,9 +213,23 @@ class stereoPhoto(object):
         self.currentMainPath = self.optWindow.ui.importLineProject.text()
         self.optWindow.projectPath = os.path.dirname(self.currentMainPath)
         self.currentParDict = getParDict(self.currentMainPath)
+        
+        
+        if len(self.currentParDict) < 2 :
+            self.optWindow.ui.pushButtonShowIDList.setEnabled(False)
+            self.optWindow.ui.enhanceButton.setEnabled(False)
+            self.optWindow.ui.pushButtonShowPicture.setEnabled(False)
+            self.optWindow.ui.pushButtonFindBestPair.setEnabled(False)
+            return
+
+        else : 
+            self.optWindow.ui.pushButtonShowIDList.setEnabled(True)
+            self.optWindow.ui.enhanceButton.setEnabled(True)
+            self.optWindow.ui.pushButtonShowPicture.setEnabled(True)
+            self.optWindow.ui.pushButtonFindBestPair.setEnabled(True)
 
         if self.paramMenu.currentDictParam['LastName'] in self.currentParDict.keys() : 
-            self.setPairID(self.paramMenu.currentDictParam['LastName'])
+            parToUse = self.paramMenu.currentDictParam['LastName']
             if float(self.paramMenu.currentDictParam['LastX']) != 0.0 :
                 x = float(self.paramMenu.currentDictParam['LastX'])
                 y = float(self.paramMenu.currentDictParam['LastY'])
@@ -230,19 +243,14 @@ class stereoPhoto(object):
             self.lastCurrentView = ()
             #self.optWindow.removeImportMNT()
             self.removePolygonOnScreen()
-            for key in self.currentParDict :
-                if self.setPairID(key) : break
-            else : return 
-
-        self.optWindow.ui.pushButtonShowIDList.setEnabled(True)
-        self.optWindow.ui.enhanceButton.setEnabled(True)
-        self.optWindow.ui.pushButtonShowPicture.setEnabled(True)
-        self.optWindow.ui.pushButtonFindBestPair.setEnabled(True)
-        
+            parToUse = next(iter(self.currentParDict))
+            #for key in self.currentParDict :
+            #    if self.setPairID(key) : break
+            
         self.paramMenu.currentDictParam['LastPath'] = self.currentMainPath
 
         if self.enableShow : self.closeAllSideWindows()
-        self.addNewPair()
+        self.setPairWithPARId(parToUse)
 
     def showIDList(self) : 
         self.pictureSelectWindow = getVectorLayer(sorted(self.currentParDict))
@@ -255,27 +263,35 @@ class stereoPhoto(object):
     
     def pictureSelectionAccept(self):
         pictureID = self.pictureSelectWindow.ui.listWidget.selectedItems()[0].text()
-        if self.setPairID(pictureID) :  self.addNewPair()
-        if self.enableShow : self.loadNewPair()
+        #if self.setPairID(pictureID) :  self.addNewPair()
+        self.setPairWithPARId(pictureID)
+        
+        if self.enableShow and self.leftParID != '': self.loadNewPair()
         self.lastCurrentView = ()
         self.pictureSelectWindow.close()
 
-    def setPairID(self, pictureID) :
-        pair = findPossiblePair(pictureID, self.currentParDict)
-        if pair != ('', '') :
-            if pair[1] :
-                self.leftParID = pictureID
-                self.rightParID = pair[1]
-                self.isEstPicture = True if findPossiblePair(pair[1], self.currentParDict)[1] else False
-                        
-            else : 
-                self.leftParID = pair[0] 
-                self.rightParID = pictureID
-                self.isEstPicture = False
-            return True
-        else : return False
+    def setPairWithPARId(self, parID, secondID=None) : 
 
-    def addNewPair(self) :
+        #Retourne les paires left et right ainsi que les 4 voisins NOSE
+        #Voisin Est/Ouest peut être une image qui n'est pas une paire
+        #Voisin Nord/Sud peut être une paire pour assurer la continuitée de la vue courante
+        self.infoNeighbors = get_neighbors_and_pairs(parID, self.currentParDict)
+
+        if secondID : 
+            self.leftParID = parID
+            self.rightParID = secondID
+        
+        elif self.infoNeighbors['leftPic'][0] is None and self.infoNeighbors['rightPic'][0] is None : 
+            self.leftParID == ''
+            return
+        
+        elif self.infoNeighbors['rightPic'][0] is None : 
+            self.leftParID = self.infoNeighbors['leftPic'][0]
+            self.rightParID = parID
+                        
+        else : 
+            self.leftParID = parID
+            self.rightParID = self.infoNeighbors['rightPic'][0]
 
         self.optWindow.ui.labelLeftName.setText(self.leftParID)
         self.optWindow.ui.labelRightName.setText(self.rightParID)
@@ -286,29 +302,33 @@ class stereoPhoto(object):
         self.currentRightTIF = self.currentMainPath  + '/' + self.rightParID + '.tif'
         self.currentRightPAR = self.currentMainPath  + '/' + self.rightParID + '.par'
 
-        neighbour = findNeighbour(self.leftParID, self.currentParDict)
+        infoNeighborR = get_neighbors_and_pairs(self.rightParID, self.currentParDict)
+        self.infoNeighbors = get_neighbors_and_pairs(self.leftParID, self.currentParDict)
 
-        if neighbour[0] : self.currentNordID = neighbour[0]
-        else : self.currentNordID = ''
-
-        if neighbour[1] : self.currentSudID = neighbour[1]
-        else : self.currentSudID = ''
-  
-        if neighbour[2] : self.currentOuestID = neighbour[2]
-        else : self.currentOuestID = ''
-
-        if neighbour[3] and self.isEstPicture : self.currentEstID = neighbour[3]
-        else : self.currentEstID = ''
+        self.currentLeftID = True if self.infoNeighbors['left'][0] else False
         
+        if infoNeighborR['rightPic'][0] is None and infoNeighborR['right'][0] : 
+            self.currentRightID = True
+            self.infoNeighbors['right'] = infoNeighborR['right']
 
+        elif infoNeighborR['rightPic'][0] : self.currentRightID = True
+        else : self.currentRightID = False
+
+        #on doit regarder si suite à l'image de droite est-ce qu'une paire existe
+        #rightNeighbor = self.infoNeighbors['right']
+        #self.infoNeighbors = get_neighbors_and_pairs(self.leftParID, self.currentParDict)
+        #self.infoNeighbors = rightNeighbor 
+        #self.currentRightID = True if infoNeighborR['rightPic'][0] is None else False
+        
+        self.currentUpID = True if len(self.infoNeighbors['up']) != 0 else False
+        self.currentDownID = True if len(self.infoNeighbors['down']) != 0 else False
+        print(self.infoNeighbors)
+
+        
     def setLastView(self) :
-        rectViewPort = self.graphWindowRight.ui.graphicsView.viewport().rect()
-        rightCV = self.graphWindowRight.ui.graphicsView.mapToScene(rectViewPort).boundingRect() 
-        windowSize = (rightCV.width(),rightCV.height()) 
-
-        #if self.rightMiroir == 1 : point = (0,0,rectViewPort.width(),0)
-        #else : point = (0,0,0,0)
-        #coord = self.pointTranslator(point)
+        rectViewPort = self.graphWindowLeft.ui.graphicsView.viewport().rect()
+        leftCV = self.graphWindowLeft.ui.graphicsView.mapToScene(rectViewPort).boundingRect() 
+        windowSize = (leftCV.width(),leftCV.height()) 
 
         coord = self.pointTranslator()
         self.lastCurrentView = coord + windowSize
@@ -322,14 +342,42 @@ class stereoPhoto(object):
     
     def findNextPair(self, ori):
         self.setLastView()
+        secondID = None
+        if ori == 'L': newID = self.infoNeighbors['left'][0]
+        elif ori == 'R': newID = self.infoNeighbors['right'][0]
+        
+        elif ori == 'D': #down/Bas
+            if len(self.infoNeighbors['down']) == 2 :
+                name_1 = self.infoNeighbors['down'][0][0]
+                name_2 = self.infoNeighbors['down'][1][0]
+                x0_1 = self.currentParDict[name_1][0]
+                x0_2 = self.currentParDict[name_2][0]
+                if x0_1 < x0_2 : 
+                    newID = name_1
+                    secondID = name_2
+                else : 
+                    newID = name_2
+                    secondID = name_1
 
-        if ori == 'N': newID = self.currentNordID
-        elif ori == 'O': newID = self.currentOuestID
-        elif ori == 'S': newID = self.currentSudID
-        elif ori == 'E':  newID = self.currentEstID
-        else : return
+            else : newID = self.infoNeighbors['down'][0][0]
+        
+        elif ori == 'U': #up/Haut
+            if len(self.infoNeighbors['up']) == 2 :
+                name_1 = self.infoNeighbors['up'][0][0]
+                name_2 = self.infoNeighbors['up'][1][0]
+                x0_1 = self.currentParDict[name_1][0]
+                x0_2 = self.currentParDict[name_2][0]
+                if x0_1 < x0_2 : 
+                    newID = name_1
+                    secondID = name_2
+                else : 
+                    newID = name_2
+                    secondID = name_1
 
-        if self.setPairID(newID) :  self.addNewPair()
+            else : newID = self.infoNeighbors['up'][0][0]
+        
+        #if self.setPairID(newID) :  self.addNewPair()
+        self.setPairWithPARId(newID,secondID)
 
         self.loadNewPair()
 
@@ -347,8 +395,9 @@ class stereoPhoto(object):
         #Zone de 3 km pour être proche de la photo le plus possible
         if max(width,height,distance) < 3000 : 
             self.buttonPosition = centerCoord
-            if self.setPairID(imageID) :  self.addNewPair()
-            if self.enableShow : self.loadNewPair()
+            #if self.setPairID(imageID) :  self.addNewPair()
+            self.setPairWithPARId(imageID)
+            if self.enableShow and self.leftParID != '' : self.loadNewPair()
         else : self.buttonPosition = None
 
     
@@ -360,7 +409,7 @@ class stereoPhoto(object):
 
         self.intLeftScreen = self.paramMenu.ui.spinBoxScreenLeft.value()
         self.intRightScreen = self.paramMenu.ui.spinBoxScreenRight.value()
-        self.rightMiroir = 0 if self.paramMenu.ui.checkBoxFlip.isChecked() else 1
+        self.rightMiroir = 0 if self.paramMenu.ui.checkBoxFlip.isChecked() else 3
 
 
         self.screenLeft = QApplication.desktop().screenGeometry(self.intLeftScreen)
@@ -416,43 +465,89 @@ class stereoPhoto(object):
             except: pass
             self.tSeekRight.keepRunning = False
             
-
-        self.leftPic = Image.open(self.currentLeftTIF)
-        self.rightPic = Image.open(self.currentRightTIF)  
-
-        fullLeftPicSize = self.leftPic.size
-        fullRightPicSize = self.rightPic.size
-        self.realLeftPicSize = fullLeftPicSize
-        self.realRightPicSize = fullRightPicSize
-
-        self.leftPic.close()
-        self.rightPic.close()
-
-        xLeft = (fullLeftPicSize[0])*((100-self.paramMenu.ui.spinBoxRecouvrementH.value())/100)
-        xRight = (fullRightPicSize[0])*((100-self.paramMenu.ui.spinBoxRecouvrementH.value())/100)
+        self.graphWindowLeft.ui.graphicsView.setTransform(QTransform())
+        self.graphWindowRight.ui.graphicsView.setTransform(QTransform())  
         
-        yLeft = yRight = 0
+        #Récupération de la taille complète des images
+        leftPic = gdal.Open(self.currentLeftTIF)
+        rightPic = gdal.Open(self.currentRightTIF)  
+        self.fullLeftPicSize = (leftPic.RasterXSize, leftPic.RasterYSize)
+        self.fullRightPicSize = (rightPic.RasterXSize, rightPic.RasterYSize)
+        leftPic = None
+        rightPic = None
         
-        self.cropValueLeft = (xLeft, yLeft, int(fullLeftPicSize[0]), int(fullLeftPicSize[1]))
-        if self.rightMiroir == 1 : self.cropValueRight = (xRight, yRight, int(fullRightPicSize[0]), int(fullRightPicSize[1]))
-        else : self.cropValueRight = (0, yRight, int(fullRightPicSize[0])-xRight, int(fullRightPicSize[1]))
+        self.leftPictureManager = pictureManager(self.fullLeftPicSize, self.currentLeftPAR)
+        self.rightPictureManager = pictureManager(self.fullRightPicSize, self.currentRightPAR)
 
-        self.leftPicSize = (fullLeftPicSize[0]-xLeft, fullLeftPicSize[1]-yLeft)
-        self.rightPicSize = (fullRightPicSize[0]-xRight, fullRightPicSize[1]-yRight)
 
+        #xLStart = int((bboxOverlap[0] - leftBbox[2])/gpzL)
+        #yLStart = int((bboxOverlap[1] - leftBbox[3])/gpzL)
+        
+        #xLEnd = int((bboxOverlap[2] - leftBbox[4])/gpzL) + self.fullLeftPicSize[0]
+        #yLEnd = int((bboxOverlap[3] - leftBbox[5])/gpzL) + self.fullLeftPicSize[1]
+        
+        #Éventuellement sera géré par le QTransform 
+        #if self.rightMiroir == 1 :
+        #    xRStart = int(abs((bboxOverlap[2] - rightBbox[4])/gpzR))
+        #    xREnd = self.fullRightPicSize[0] - int((bboxOverlap[0] - rightBbox[2])/gpzR)
+        #else :
+        #    xRStart = int((bboxOverlap[0] - rightBbox[2])/gpzR)
+        #    xREnd = int((bboxOverlap[2] - rightBbox[4])/gpzR) + self.fullRightPicSize[0]
+            
+        #yRStart = int((bboxOverlap[1] - rightBbox[3])/gpzR)
+        #yREnd = int((bboxOverlap[3] - rightBbox[5])/gpzR) + self.fullRightPicSize[1]
+
+        #Il faut déterminer la taille avec les coordonnées 
+        #Distance Début vs overlap + transfert coord vers pixel avec un calcul grossier peut etre faire une fonction dans pictureManager
+        
+        #xLeft = (self.fullLeftPicSize[0])*((100-self.paramMenu.ui.spinBoxRecouvrementH.value())/100)
+        #xRight = (self.fullRightPicSize[0])*((100-self.paramMenu.ui.spinBoxRecouvrementH.value())/100)
+        
+        #yLeft = yRight = 0
+        
+        #self.cropValueLeft = (xLeft, yLeft, int(self.fullLeftPicSize[0]), int(self.fullLeftPicSize[1]))
+        #if self.rightMiroir == 1 : self.cropValueRight = (xRight, yRight, int(self.fullRightPicSize[0]), int(self.fullRightPicSize[1]))
+        #else : self.cropValueRight = (0, yRight, int(self.fullRightPicSize[0])-xRight, int(self.fullRightPicSize[1]))
+        #self.leftPicSize = (self.fullLeftPicSize[0]-xLeft, self.fullLeftPicSize[1]-yLeft)
+        #self.rightPicSize = (self.fullRightPicSize[0]-xRight, self.fullRightPicSize[1]-yRight)
+        
+        #self.cropValueLeft = (xLStart, yLStart, xLEnd, yLEnd)
+        #self.cropValueRight = (xRStart, yRStart, xREnd, yREnd)
+
+        leftBbox = self.currentParDict[self.leftParID]
+        rightBbox = self.currentParDict[self.rightParID]
+
+        _, bboxOverlap = compute_overlap(leftBbox, rightBbox)
+
+        gpzL = self.leftPictureManager.groundPixelSize
+        gpzR = self.rightPictureManager.groundPixelSize
+
+        r11L = self.leftPictureManager.r11
+        r12L = self.leftPictureManager.r12
+
+        r11R = self.rightPictureManager.r11
+        r12R = self.rightPictureManager.r12
+        #print('Left')
+        #print(bboxOverlap,leftBbox,gpzL,r11L,r12L)
+        self.cropValueLeft = self.calculDecoupageAvecRotation(self.fullLeftPicSize,bboxOverlap,leftBbox,gpzL,r11L,r12L)
+        #print(self.cropValueLeft)
+        #print('Right')
+        #print(bboxOverlap,rightBbox,gpzR,r11R,r12R)
+        self.cropValueRight = self.calculDecoupageAvecRotation(self.fullRightPicSize,bboxOverlap,rightBbox,gpzR,r11R,r12R)
+        #print(self.cropValueRight)
+        self.leftPicSize = (self.cropValueLeft[2]-self.cropValueLeft[0],self.cropValueLeft[3]-self.cropValueLeft[1])
+        self.rightPicSize = (self.cropValueRight[2]-self.cropValueRight[0],self.cropValueRight[3]-self.cropValueRight[1])
+        
         self.leftRect = QRectF(0, 0, self.leftPicSize[0], self.leftPicSize[1])
         self.rightRect = QRectF(0, 0, self.rightPicSize[0], self.rightPicSize[1]) 
         self.graphWindowLeft.currentRect = self.leftRect
         self.graphWindowRight.currentRect = self.rightRect
 
-        self.leftPictureManager = pictureManager(fullLeftPicSize, self.currentLeftPAR, "aa")
-        self.rightPictureManager = pictureManager(fullRightPicSize, self.currentRightPAR, "aa")
-
         self.dualManager = dualManager(self.leftPictureManager, self.rightPictureManager)
         
         self.getSceneFromPath(self.currentLeftTIF, self.leftMiroir, self.graphWindowLeft, self.cropValueLeft)
         self.getSceneFromPath(self.currentRightTIF, self.rightMiroir, self.graphWindowRight, self.cropValueRight)
-
+        
         self.graphWindowLeft.ui.graphicsView.show()
         self.graphWindowRight.ui.graphicsView.show()
         self.graphWindowRight.show()
@@ -461,78 +556,18 @@ class stereoPhoto(object):
         if mouseAction : self.windowHandler('picture')
 
         
-        
+
         pixel = self.pointTranslator(onlyPixel=True)
-        self.centerPixelLeft = pixel[0]
-        self.centerPixelRight = pixel[1]
-
-        if self.buttonPosition : 
-            
-            if self.optWindow.currentMNTPath : 
-                mntDS = gdal.Open(self.optWindow.currentMNTPath)
-                mntBand = mntDS.GetRasterBand(1)
-                mntGeo = mntDS.GetGeoTransform()
-                px = math.floor((self.buttonPosition[0] - mntGeo[0]) / mntGeo[1]) 
-                py = math.floor((self.buttonPosition[1] - mntGeo[3]) / mntGeo[5])
-                Z = mntBand.ReadAsArray(px,py,1,1)[0][0]
-                mntDS = None
-            else : Z = self.dualManager.calculateZ(self.centerPixelLeft, self.centerPixelRight)
-            
-            pxL, pyL = self.leftPictureManager.coordToPixel(self.buttonPosition,Z)
-            pxR, pyR = self.rightPictureManager.coordToPixel(self.buttonPosition,Z)
-
-            if pxL < 0 or pxL > fullLeftPicSize[0] or pyL < 0 or pyL > fullLeftPicSize[1] : self.zoomToScale(2,center=True)
-            elif pxR < 0 or pxR > fullRightPicSize[0] or pyR < 0 or pyR > fullRightPicSize[1] : self.zoomToScale(2,center=True)
-            else : 
-                #pixL = (pxL-self.cropValueLeft[0], pyL)            
-                #if self.rightMiroir == 1 :
-                #    mirrorX = self.rightPicSize[0] - pxR - 2000
-                #    pixR = (mirrorX, pyR)
-                #else : pixR = (pxR-self.cropValueRight[0], pyR) 
-
-                pixL = (pxL-self.cropValueLeft[0]-1000, pyL-1000)            
-                if self.rightMiroir == 1 :
-                    mirrorX = self.rightPicSize[0] - pxR - 1000
-                    pixR = (mirrorX, pyR-1000)
-                else : pixR = (pxR-self.cropValueRight[0]-1000, pyR-1000)  
-                
-                
-                customView = pixL + pixR + (2000,2000)
-                #customView = (pxL,pyL,pxR,pyR) + self.lastCurrentView[-2:]
-                self.zoomToScale(-1, customView=customView)
+        #self.centerPixelLeft = pixel[0]
+        #self.centerPixelRight = pixel[1]
         
-
-        elif self.lastCurrentView : 
-            #print(self.lastCurrentView)
-            pxL, pyL = self.leftPictureManager.coordToPixel(self.lastCurrentView[:2],self.lastCurrentView[2])
-            pxR, pyR = self.rightPictureManager.coordToPixel(self.lastCurrentView[:2],self.lastCurrentView[2])
-
-            if pxL < 0 or pxL > fullLeftPicSize[0] or pyL < 0 or pxL > fullLeftPicSize[1] : self.zoomToScale(2,center=True)
-            elif pxR < 0 or pxR > fullRightPicSize[0] or pyR < 0 or pxR > fullRightPicSize[1] : self.zoomToScale(2,center=True)
-            else : 
-                corrX = self.lastCurrentView[-2] /2     
-                corrY = self.lastCurrentView[-1] /2     
-
-                pixL = (pxL-self.cropValueLeft[0], pyL)            
-                if self.rightMiroir == 1 :
-                    mirrorX = self.rightPicSize[0] - pxR 
-                    pixR = (mirrorX, pyR)
-                else : pixR = (pxR-self.cropValueRight[0], pyR)  
-                pixLCustom = (pixL[0]-corrX,pixL[1]-corrY)
-                pixRCustom = (pixR[0]-corrX,pixR[1]-corrY)
-                
-                customView = pixLCustom + pixRCustom + self.lastCurrentView[-2:]
-                #customView = (pxL,pyL,pxR,pyR) + self.lastCurrentView[-2:]
-                self.zoomToScale(-1, customView=customView)
-        
-
-        else : self.zoomToScale(2,center=True)
-        Z = self.dualManager.calculateZ(self.centerPixelLeft, self.centerPixelRight)
+        Z = self.dualManager.calculateZ(pixel[0], pixel[1])
         self.initAltitude = Z
+        self.afficherPositionDepart()
 
         self.optWindow.ui.labelAltitude.setText(str(round(Z,5)))
 
-        self.buttonPosition = None
+        
 
         self.polygonOnLeftScreen = []
         self.polygonOnRightScreen = []
@@ -541,19 +576,27 @@ class stereoPhoto(object):
         self.greyRectOnLeftScreen = []
         self.greyRectOnRightScreen = []
 
-        leftTop = self.graphWindowLeft.ui.graphicsView.mapToScene(QPoint(0,0))
         LGV = self.graphWindowLeft.ui.graphicsView
-        leftButtom = self.graphWindowLeft.ui.graphicsView.mapToScene(QPoint(LGV.width(),LGV.height()))
+        leftTop = LGV.mapToScene(QPoint(0,0))
+        leftButtom = LGV.mapToScene(QPoint(LGV.width(),LGV.height()))
 
         if self.showThreadLeftInProcess == False :
             self.threadSeekLeft(leftTop, leftButtom, 1, 0, 1)
             self.showThreadLeftInProcess = True
         else :
             self.newLeftRequest = True
+        
 
-        rightTop = self.graphWindowRight.ui.graphicsView.mapToScene(QPoint(0,0))
         RGV = self.graphWindowRight.ui.graphicsView
-        rightButtom = self.graphWindowRight.ui.graphicsView.mapToScene(QPoint(RGV.width(),RGV.height()))
+        rightTop = RGV.mapToScene(QPoint(0,0))
+        rightButtom = RGV.mapToScene(QPoint(RGV.width(),RGV.height()))
+
+        #if self.paramMenu.ui.checkBoxFlip.isChecked() :  
+        #    rightTop = RGV.mapToScene(QPoint(0,0))
+        #    rightButtom = RGV.mapToScene(QPoint(RGV.width(),RGV.height()))
+        #else : 
+        #    rightTop = RGV.mapToScene(QPoint(RGV.width(),0))
+        #    rightButtom = RGV.mapToScene(QPoint(0,RGV.height()))
 
         if self.showThreadRightInProcess == False :
             self.threadSeekRight(rightTop, rightButtom, 1, 0, 1)
@@ -561,20 +604,102 @@ class stereoPhoto(object):
         else :
             self.newRightRequest = True
 
+        leftTransform = QTransform(self.leftPictureManager.r11, self.leftPictureManager.r12, -self.leftPictureManager.r12, self.leftPictureManager.r11,0,0)                    
+        rightTransform = QTransform(self.rightPictureManager.r11, self.rightPictureManager.r12, -self.rightPictureManager.r12, self.rightPictureManager.r11,0,0)                    
+        if not self.paramMenu.ui.checkBoxFlip.isChecked() : 
+
+            mirror_transform = QTransform()
+            mirror_transform.scale(-1, 1)
+            mirror_transform.translate(-self.fullRightPicSize[0], 0)
+            rightTransform =  rightTransform * mirror_transform
+
+        self.graphWindowLeft.ui.graphicsView.setTransform(leftTransform)
+        self.graphWindowRight.ui.graphicsView.setTransform(rightTransform)    
+    
+        
+        self.afficherPositionDepart()
+        self.buttonPosition = None
         
         if self.enableDraw : 
             self.startPolygonThread()
 
+    def afficherPositionDepart(self) : 
         
+        if self.buttonPosition : 
+            if self.optWindow.currentMNTPath : 
+                mntDS = gdal.Open(self.optWindow.currentMNTPath)
+                mntBand = mntDS.GetRasterBand(1)
+                mntGeo = mntDS.GetGeoTransform()
+                px = math.floor((self.buttonPosition[0] - mntGeo[0]) / mntGeo[1]) 
+                py = math.floor((self.buttonPosition[1] - mntGeo[3]) / mntGeo[5])
+                Z = mntBand.ReadAsArray(px,py,1,1)[0][0]
+                mntDS = None
+            else : Z = self.initAltitude
+            
+            pxL, pyL = self.leftPictureManager.coordToPixel(self.buttonPosition,Z)
+            pxR, pyR = self.rightPictureManager.coordToPixel(self.buttonPosition,Z)
+
+            if pxL < 0 or pxL > self.fullLeftPicSize[0] or pyL < 0 or pyL > self.fullLeftPicSize[1] : self.zoomToScale(2,center=True)
+            elif pxR < 0 or pxR > self.fullRightPicSize[0] or pyR < 0 or pyR > self.fullRightPicSize[1] : self.zoomToScale(2,center=True)
+            else : 
+                #pixL = (pxL-self.cropValueLeft[0], pyL)            
+                #if self.rightMiroir == 1 :
+                #    mirrorX = self.rightPicSize[0] - pxR - 2000
+                #    pixR = (mirrorX, pyR)
+                #else : pixR = (pxR-self.cropValueRight[0], pyR) 
+                zoomX = self.leftPicSize[0] / 8
+                zoomY = self.leftPicSize[1] / 8 
+                 
+                #pixL = (pxL-self.cropValueLeft[0]-1000, pyL-self.cropValueLeft[1]-1000)            
+                #if self.rightMiroir == 1 :
+                #    mirrorX = self.rightPicSize[0] - pxR - 1000
+                #    pixR = (mirrorX, pyR-1000)
+                #else : pixR = (pxR-self.cropValueRight[0]-1000, pyR-self.cropValueRight[1]-1000)  
+                
+                pixL = (pxL-self.cropValueLeft[0]-(zoomX/2), pyL-self.cropValueLeft[1]-(zoomY/2))            
+                pixR = (pxR-self.cropValueRight[0]-(zoomX/2), pyR-self.cropValueRight[1]-(zoomY/2))  
+
+                customView = pixL + pixR + (zoomX,zoomY)
+                #customView = (pxL,pyL,pxR,pyR) + self.lastCurrentView[-2:]
+                self.zoomToScale(-1, customView=customView)
+
+        
+
+        elif self.lastCurrentView : 
+            pxL, pyL = self.leftPictureManager.coordToPixel(self.lastCurrentView[:2],self.lastCurrentView[2])
+            pxR, pyR = self.rightPictureManager.coordToPixel(self.lastCurrentView[:2],self.lastCurrentView[2])
+
+            if pxL < 0 or pxL > self.fullLeftPicSize[0] or pyL < 0 or pxL > self.fullLeftPicSize[1] : self.zoomToScale(2,center=True)
+            elif pxR < 0 or pxR > self.fullRightPicSize[0] or pyR < 0 or pxR > self.fullRightPicSize[1] : self.zoomToScale(2,center=True)
+            else : 
+                corrX = self.lastCurrentView[-2] /2     
+                corrY = self.lastCurrentView[-1] /2     
+
+                pixL = (pxL-self.cropValueLeft[0], pyL-self.cropValueLeft[1])            
+                if self.rightMiroir == 1 :
+                    mirrorX = self.rightPicSize[0] - pxR 
+                    pixR = (mirrorX, pyR)
+                else : pixR = (pxR-self.cropValueRight[0], pyR-self.cropValueRight[1])  
+                pixLCustom = (pixL[0]-corrX,pixL[1]-corrY)
+                pixRCustom = (pixR[0]-corrX,pixR[1]-corrY)
+                
+                customView = pixLCustom + pixRCustom + self.lastCurrentView[-2:]
+                #print(customView)
+                #customView = (pxL,pyL,pxR,pyR) + self.lastCurrentView[-2:]
+                self.zoomToScale(-1, customView=customView)
+        
+
+        else : 
+            self.zoomToScale(2,center=True)
+
+
     def getSceneFromPath(self, tifPath, miroir, graphWindow, cropValue):
 
         img = Image.open(tifPath)
         #Seek(3) est le facteur le plus petit qui permet un affichage immédiat d'une image
         img.seek(3)
-        #print(cropValue)
         divCropValue = tuple(map(lambda val : val/8, cropValue))
-        #print(divCropValue)
-        #print(tuple(divCropValue))
+
         thread = imageEnhancing(img, self.listParam)
         thread.start()
         retVal = thread.join()
@@ -591,6 +716,50 @@ class stereoPhoto(object):
         img.close()
         return scene
 
+    def calculDecoupageAvecRotation(self, sizeImg, bboxOverlap, bbox, gpz, R11, R12) :
+        threshold = 0.5  
+        width, height = sizeImg
+
+        if R11 < -threshold:
+            # +180° Rotation : World X → Pixel X (flip), World Y → Pixel Y 
+            xStart = int((bbox[4] - bboxOverlap[2]) / gpz)
+            yStart = int((bboxOverlap[1] - bbox[3]) / gpz)
+
+            xEnd   = int((bbox[4] - bboxOverlap[0]) / gpz)
+            yEnd   = int((bboxOverlap[3] - bbox[3]) / gpz)
+
+        elif abs(R11) < threshold and R12 > threshold:
+            # +90° Rotation : World X → Pixel Y,  World Y → Pixel X  (flip)           
+            xStart = int((bboxOverlap[1] - bbox[3]) / gpz)
+            yStart = int((bbox[4] - bboxOverlap[2]) / gpz)
+
+            xEnd   = int((bboxOverlap[3] - bbox[3]) / gpz)
+            yEnd   = int((bbox[4] - bboxOverlap[0]) / gpz)
+
+        elif abs(R11) < threshold and R12 < -threshold:
+            # -90° Rotation : World X → Pixel Y (flip), World Y → Pixel X (flip)
+           
+            xStart = int((bbox[5] - bboxOverlap[3]) / gpz)
+            yStart = int((bboxOverlap[0] - bbox[2]) / gpz)
+
+            xEnd   = int((bbox[5] - bboxOverlap[1]) / gpz)
+            yEnd   = int((bboxOverlap[2] - bbox[2]) / gpz)
+
+        else : 
+            # 0° Rotation : World X → Pixel X,  World Y → Pixel Y (flip)
+            xStart = int((bboxOverlap[0] - bbox[2]) / gpz)  
+            yStart = int((bbox[5] - bboxOverlap[3]) / gpz)  
+
+            xEnd = int((bboxOverlap[2] - bbox[2]) / gpz) 
+            yEnd = int((bbox[5] - bboxOverlap[1]) / gpz) 
+        
+        xStart = max(0, min(xStart, width))
+        xEnd   = max(0, min(xEnd, width))
+        yStart = max(0, min(yStart, height))
+        yEnd   = max(0, min(yEnd, height))
+        
+        return (xStart, yStart, xEnd, yEnd)
+                
     #Fonction qui récupère la couche vectorielle et change le SIG de QGIS 
     #Si possible appel la fonction pour afficher la couche vectorielle sur les images
     def mNewVectorLayer(self):
@@ -609,7 +778,7 @@ class stereoPhoto(object):
     #Retourne le rectangle de coordonnée
     def getShowRect(self) :
         
-        if hasattr(self, "leftRect"): 
+        #if hasattr(self, "leftRect"): 
 
             #endLeft = [self.leftRect.x() + self.leftRect.width(), self.leftRect.y() + self.leftRect.height()]
             #topXL, topYL = self.leftPictureManager.pixelToCoord([self.leftRect.x(),self.leftRect.y()],self.initAltitude)
@@ -618,14 +787,21 @@ class stereoPhoto(object):
 
             #Il a été montré que self.initAltitude peut avoir un trop grand écart avec des portions de l'image
             #Ainsi il est possible de manquer des polygones dans la zone
-            topXL, topYL = self.leftPictureManager.pixelToCoord([self.cropValueLeft[0],self.cropValueLeft[1]],self.initAltitude)
-            botXL, botYL = self.leftPictureManager.pixelToCoord([self.cropValueLeft[2], self.cropValueLeft[3]],self.initAltitude)
+            #topXL, topYL = self.leftPictureManager.pixelToCoord([self.cropValueLeft[0],self.cropValueLeft[1]],self.initAltitude)
+            #botXL, botYL = self.leftPictureManager.pixelToCoord([self.cropValueLeft[2], self.cropValueLeft[3]],self.initAltitude)
+        try :
+            leftBbox = self.currentParDict[self.leftParID]
+            rightBbox = self.currentParDict[self.rightParID]
+
+            _, bboxOverlap = compute_overlap(leftBbox, rightBbox) #(overlap_xmin, overlap_ymin, overlap_xmax, overlap_ymax)
+
+            rectL = QgsRectangle(QgsPointXY(bboxOverlap[0]-700, bboxOverlap[1]+700), QgsPointXY(bboxOverlap[2]+700, bboxOverlap[3]-700))
             
             #tester avec crop value 0,1 remplacer par 0
-            rectL = QgsRectangle(QgsPointXY(topXL-700, topYL+700), QgsPointXY(botXL+700, botYL-700))
+            #rectL = QgsRectangle(QgsPointXY(topXL-700, topYL+700), QgsPointXY(botXL+700, botYL-700))
             return rectL
         
-        else :
+        except :
             return QgsRectangle(QgsPointXY(0, 0), QgsPointXY(0, 0))
         
     def removePolygonOnScreen(self) :
@@ -663,9 +839,9 @@ class stereoPhoto(object):
                 self.tPolygon.stop()
                 self.tPolygon.wait()
         rectCoord = self.getShowRect()
-        value = [self.cropValueLeft[0],self.rightMiroir,self.rightPicSize[0],self.cropValueRight[0],self.initAltitude]
-        lmanag = [self.realLeftPicSize, self.currentLeftPAR]
-        rmanag = [self.realRightPicSize, self.currentRightPAR]
+        value = [self.cropValueLeft,self.rightMiroir,self.rightPicSize[0],self.cropValueRight,self.initAltitude]
+        lmanag = [self.fullLeftPicSize, self.currentLeftPAR]
+        rmanag = [self.fullRightPicSize, self.currentRightPAR]
         mntPath = self.optWindow.currentMNTPath
         #self.vectorToShow[widget.label.text()] = widget.color
         vectorToShow = self.optWindow.vectorToShow
@@ -675,7 +851,6 @@ class stereoPhoto(object):
         self.tPolygon.start(QThread.LowestPriority)
         
     def storePolygon(self):
-        print(self.tPolygon.count)
         self.polygonL2Draw = self.tPolygon.dictPolyL
         self.polygonR2Draw = self.tPolygon.dictPolyR
         self.drawPolygon()
@@ -719,11 +894,11 @@ class stereoPhoto(object):
                         pointLeft = QGraphicsEllipseItem(polyLeft[i][0] - radius, polyLeft[i][1] - radius, 2*radius, 2*radius)
                         pointLeft.setPen(layerPen)
                         pointLeft.setBrush(color)
-                        pointRigth = QGraphicsEllipseItem(polyRight[i][0] - radius, polyRight[i][1] - radius, 2*radius, 2*radius)
-                        pointRigth.setPen(layerPen)
-                        pointRigth.setBrush(color)
+                        pointRight = QGraphicsEllipseItem(polyRight[i][0] - radius, polyRight[i][1] - radius, 2*radius, 2*radius)
+                        pointRight.setPen(layerPen)
+                        pointRight.setBrush(color)
                         leftObj = self.graphWindowLeft.ui.graphicsView.scene().addItem(pointLeft)
-                        rightObj = self.graphWindowRight.ui.graphicsView.scene().addItem(pointRigth)
+                        rightObj = self.graphWindowRight.ui.graphicsView.scene().addItem(pointRight)
 
                     
                     self.polygonOnLeftScreen.append(leftObj)
@@ -833,6 +1008,7 @@ class stereoPhoto(object):
         self.enhanceManager.listParamSignal.disconnect(self.applyEnhance)
         self.listParam = listParam
 
+    #Fonction non utilisée à reprendre pour la souris qui sort  
     def windowHandlerEvent(self,event) : 
         if event.type() == QtCore.QEvent.Enter : self.windowHandler('picture')
         if event.type() == QtCore.QEvent.Leave : self.windowHandler('qgis')
@@ -916,29 +1092,16 @@ class stereoPhoto(object):
     #Cette fonction s'assure que la souris reste sur l'écran conserné pendant le Pan afin de garder le curseur invisible  
     def mMoveEvent(self, ev):
 
+        if self.ignoreMouseAction : 
+            self.ignoreMouseAction = False
+            return
+
         self.deltaX = int((ev.x()-self.lastX)/2)
         self.lastX = ev.x()
         self.deltaY = int((ev.y()-self.lastY)/2)
         self.lastY = ev.y()
         leftView = self.graphWindowLeft.ui.graphicsView
         rightView = self.graphWindowRight.ui.graphicsView
-        pixRange = 200
-        cursor_pos = leftView.mapFromGlobal(QCursor.pos())
-        if cursor_pos.x() <= pixRange or cursor_pos.x() >= leftView.width()-pixRange or cursor_pos.y() <= pixRange or cursor_pos.y() >= leftView.height()-pixRange:
-            self.graphWindowLeft.ui.widget.setMouseTracking(False)
-            #win32api.SetCursorPos(self.leftScreenCenter)
-            QCursor.setPos(leftView.mapToGlobal(leftView.rect().center()))
-            #last_mouse_pos = leftView.mapToGlobal(leftView.rect().center())
-            last_mouse_pos = leftView.rect().center()
-            self.lastX = last_mouse_pos.x()
-            self.lastY = last_mouse_pos.y()
-            self.graphWindowLeft.ui.widget.setMouseTracking(True)
-
-        #leftView.horizontalScrollBar().setValue(leftView.horizontalScrollBar().value() + self.deltaX)
-        #leftView.verticalScrollBar().setValue(leftView.verticalScrollBar().value() + self.deltaY)
-        #if self.rightMiroir == 0 : rightView.horizontalScrollBar().setValue(rightView.horizontalScrollBar().value() + self.deltaX)
-        #else : rightView.horizontalScrollBar().setValue(rightView.horizontalScrollBar().value() - self.deltaX)
-        #rightView.verticalScrollBar().setValue(rightView.verticalScrollBar().value() + self.deltaY)
 
         lhv = leftView.horizontalScrollBar().value() + self.deltaX
         lvv = leftView.verticalScrollBar().value() + self.deltaY
@@ -953,6 +1116,24 @@ class stereoPhoto(object):
         rightView.verticalScrollBar().setValue(rvv)
 
 
+        pixRange = 200
+        cursor_pos = leftView.mapFromGlobal(QCursor.pos())
+        centerView = leftView.rect().center()
+        if cursor_pos.x() <= pixRange or cursor_pos.x() >= leftView.width()-pixRange or cursor_pos.y() <= pixRange or cursor_pos.y() >= leftView.height()-pixRange:
+            #self.graphWindowLeft.ui.widget.setMouseTracking(False)
+            self.ignoreMouseAction = True
+            #win32api.SetCursorPos(self.leftScreenCenter)
+            QCursor.setPos(leftView.mapToGlobal(centerView))
+            #last_mouse_pos = leftView.mapToGlobal(leftView.rect().center())
+            self.lastX = centerView.x()
+            self.lastY = centerView.y()
+            #self.graphWindowLeft.ui.widget.setMouseTracking(True)
+
+        #leftView.horizontalScrollBar().setValue(leftView.horizontalScrollBar().value() + self.deltaX)
+        #leftView.verticalScrollBar().setValue(leftView.verticalScrollBar().value() + self.deltaY)
+        #if self.rightMiroir == 0 : rightView.horizontalScrollBar().setValue(rightView.horizontalScrollBar().value() + self.deltaX)
+        #else : rightView.horizontalScrollBar().setValue(rightView.horizontalScrollBar().value() - self.deltaX)
+        #rightView.verticalScrollBar().setValue(rightView.verticalScrollBar().value() + self.deltaY)
 
         pourcent = 2/100
         startX = int(self.leftPicSize[0]*pourcent)
@@ -962,17 +1143,59 @@ class stereoPhoto(object):
 
         self.endDrawPointLeft = self.graphWindowLeft.ui.graphicsView.mapToScene(QPoint(self.panCenterLeft[0], self.panCenterLeft[1]))
         self.endDrawPointRight = self.graphWindowRight.ui.graphicsView.mapToScene(QPoint(self.panCenterRight[0], self.panCenterRight[1]))
+        #viewPtLeft = QPoint(self.panCenterLeft[0], self.panCenterLeft[1])
+        # Find which item is under that point in the view
+        #itemLeft = self.graphWindowLeft.ui.graphicsView.itemAt(viewPtLeft)
+        #scenePtLeft = self.graphWindowLeft.ui.graphicsView.mapToScene(viewPtLeft)
+        #imgPtLeft = itemLeft.mapFromScene(scenePtLeft)
+        print(self.endDrawPointLeft, self.endDrawPointRight)
+        #print(scenePtLeft,imgPtLeft)
+        print(rangeX,rangeY)
         coord = self.pointTranslator()#ignoreMNT=True) #,only2D=True)
 
         if self.firstDrawClick and (int(self.endDrawPointLeft.x()) not in rangeX or int(self.endDrawPointLeft.y()) not in rangeY) :
-            if self.endDrawPointLeft.x() < startX and self.currentOuestID :
-                self.findNextPair('O')
-            elif self.endDrawPointLeft.x() > self.leftPicSize[0]-startX+1 and self.currentEstID :
-                self.findNextPair('E')
-            elif self.endDrawPointLeft.y() < startY and self.currentNordID :
-                self.findNextPair('N')
-            elif self.currentSudID and self.endDrawPointLeft.y() > self.leftPicSize[1]-startY+1:
-                self.findNextPair('S')
+            threshold_deg=10
+            kappa = math.degrees(self.leftPictureManager.kappa)
+            #Nord à gauche (-90 + 90)
+            if (abs(kappa + 90) < threshold_deg):
+                if self.endDrawPointLeft.x() < startX and self.currentUpID :
+                    self.findNextPair('U')
+                elif self.endDrawPointLeft.x() > self.leftPicSize[0]-startX+1 and self.currentDownID :
+                    self.findNextPair('D')
+                elif self.endDrawPointLeft.y() < startY and self.currentRightID :
+                    self.findNextPair('R')
+                elif self.endDrawPointLeft.y() > self.leftPicSize[1]-startY+1 and self.currentLeftID :
+                    self.findNextPair('L')
+            #Nord à droite (90 - 90)
+            elif (abs(kappa - 90) < threshold_deg) :
+                if self.endDrawPointLeft.x() < startX and self.currentDownID :
+                    self.findNextPair('D')
+                elif self.endDrawPointLeft.x() > self.leftPicSize[0]-startX+1 and self.currentUpID :
+                    self.findNextPair('U')
+                elif self.endDrawPointLeft.y() < startY and self.currentLeftID :
+                    self.findNextPair('L')
+                elif self.endDrawPointLeft.y() > self.leftPicSize[1]-startY+1 and self.currentRightID :
+                    self.findNextPair('R')
+            #Nord en bas (+/- 180 +/- 180)
+            elif abs(kappa - 180) < threshold_deg or abs(kappa + 180) < threshold_deg: 
+                if self.endDrawPointLeft.x() < startX and self.currentRightID :
+                    self.findNextPair('R')
+                elif self.endDrawPointLeft.x() > self.leftPicSize[0]-startX+1 and self.currentLeftID :
+                    self.findNextPair('L')
+                elif self.endDrawPointLeft.y() < startY and self.currentDownID :
+                    self.findNextPair('D')
+                elif self.endDrawPointLeft.y() > self.leftPicSize[1]-startY+1 and self.currentUpID :
+                    self.findNextPair('U')
+            #Nord en haut
+            else : 
+                if self.endDrawPointLeft.x() < startX and self.currentLeftID :
+                    self.findNextPair('L')
+                elif self.endDrawPointLeft.x() > self.leftPicSize[0]-startX+1 and self.currentRightID :
+                    self.findNextPair('R')
+                elif self.endDrawPointLeft.y() < startY and self.currentUpID :
+                    self.findNextPair('U')
+                elif self.endDrawPointLeft.y() > self.leftPicSize[1]-startY+1 and self.currentDownID :
+                    self.findNextPair('D')
 
         else :
             if  not self.firstDrawClick and self.enableDraw and self.optWindow.currentMNTPath :
@@ -1005,14 +1228,12 @@ class stereoPhoto(object):
                 if self.firstDrawClick :
                     self.startDrawPointLeft = self.graphWindowLeft.ui.graphicsView.mapToScene(QPoint(self.panCenterLeft[0], self.panCenterLeft[1]))
                     self.startDrawPointRight = self.graphWindowRight.ui.graphicsView.mapToScene(QPoint(self.panCenterRight[0], self.panCenterRight[1]))
-                    self.bbox = QgsRectangle(coordTuple[0],coordTuple[1],coordTuple[0],coordTuple[1])
                     self.firstDrawClick = False
                 else : 
                     self.startDrawPointLeft = self.endDrawPointLeft
                     self.startDrawPointRight = self.endDrawPointRight
                     self.listLeftLineObj.append(self.currentLeftLineObj)
                     self.listRightLineObj.append(self.currentRightLineObj)
-                    self.bbox.combineExtentWith(coordTuple[0],coordTuple[1])
                     self.currentLeftLineObj = None
                     self.currentRightLineObj = None
                 
@@ -1053,7 +1274,6 @@ class stereoPhoto(object):
                     
                     rectCoord = self.getShowRect()
                     listGeo = list(currentVectorLayer.getFeatures(rectCoord))
-                    #listGeo = currentVectorLayer.getFeatures(self.bbox)
                     #reshapeLayer(lineString2D,listGeo,currentVectorLayer)
                     
                     #Détection du feature selon le 
@@ -1079,7 +1299,6 @@ class stereoPhoto(object):
                 
                 self.list2DPoint = []
                 self.list3DPoint = []
-                self.bbox = QgsRectangle()
                 self.startPolygonThread()    
                 
                 
@@ -1126,18 +1345,12 @@ class stereoPhoto(object):
             self.setQGISView()
 
         elif self.longClick :
-            bPoint = self.graphWindowRight.ui.graphicsView.mapToScene(QPoint(self.panCenterRight[0], self.panCenterRight[1]))
             if factor > 1 : 
-                #leftView.verticalScrollBar().setValue(leftView.verticalScrollBar().value() - 1)
                 rightView.verticalScrollBar().setValue(rightView.verticalScrollBar().value() - 3)
             else :
-                #leftView.verticalScrollBar().setValue(leftView.verticalScrollBar().value() + 1)
                 rightView.verticalScrollBar().setValue(rightView.verticalScrollBar().value() + 3)
 
-            aPoint = self.graphWindowRight.ui.graphicsView.mapToScene(QPoint(self.panCenterRight[0], self.panCenterRight[1]))
-            diffY = aPoint.y() - bPoint.y()
-
-            self.centerPixelRight = (self.centerPixelRight[0], self.centerPixelRight[1]-diffY) 
+        
 
         else : 
 
@@ -1166,26 +1379,17 @@ class stereoPhoto(object):
         centerPointLeft = self.graphWindowLeft.ui.graphicsView.mapToScene(pointLeft)
         centerPointRight = self.graphWindowRight.ui.graphicsView.mapToScene(pointRight)
 
-        pixL = (centerPointLeft.x()+self.cropValueLeft[0], centerPointLeft.y())            
+        pixL = (centerPointLeft.x()+self.cropValueLeft[0], centerPointLeft.y()+self.cropValueLeft[1])            
         
         if self.rightMiroir == 1 :
             mirrorX = self.rightPicSize[0] - centerPointRight.x()
             pixR = (mirrorX, centerPointRight.y())
-        else : pixR = (centerPointRight.x()+self.cropValueRight[0], centerPointRight.y())  
+        else : pixR = (centerPointRight.x()+self.cropValueRight[0], centerPointRight.y()+self.cropValueRight[1])  
 
         if onlyPixel : return (pixL,pixR)
-        print((pixL,pixR))
         Z = self.dualManager.calculateZ(pixL, pixR)
         self.optWindow.ui.labelAltitude.setText(str(round(Z,5)))
-        '''
-        XL, YL = self.leftPictureManager.pixelToCoord(pixL, Z)
-        print(XL, YL)
-        XR, YR = self.rightPictureManager.pixelToCoord(pixR, Z)
-        print(XR, YR)
-        X = (XL + XR) / 2
-        Y = (YL + YR) / 2
-        print(X, Y)
-        '''
+
         X, Y = self.leftPictureManager.pixelToCoord(pixL, Z)
         if not self.optWindow.currentMNTPath or ignoreMNT: 
             if only2D == True : return (X, Y)
@@ -1226,34 +1430,77 @@ class stereoPhoto(object):
 
 
     def zoomToScale(self,value,center=False,customView=None) :
-        ##GraphicsViews sceneRect regarder si ça valeur en fonction du zoom se teste avec F5-12
+        
         if value == -1 and customView : 
             rect= QtCore.QRectF(customView[0],customView[1],customView[-2],customView[-1])
-            self.graphWindowLeft.ui.graphicsView.fitInView(rect)
+            self.graphWindowLeft.ui.graphicsView.fitInView(rect, QtCore.Qt.KeepAspectRatio)
             rect= QtCore.QRectF(customView[2],customView[3],customView[-2],customView[-1])
-            self.graphWindowRight.ui.graphicsView.fitInView(rect)
-            self.setQGISView()
-            return
+            self.graphWindowRight.ui.graphicsView.fitInView(rect, QtCore.Qt.KeepAspectRatio)
+            #self.setQGISView()
+            #return
 
-        sizeRef = [500,1000,2000,3000,4000,5000,7000,9000]
-        ratio = sizeRef[value]
-        if center : 
-            xSizeL = self.leftPicSize[0]/2
-            ySizeL = self.leftPicSize[1]/2
-            xSizeR = self.rightPicSize[0]/2
-            ySizeR = self.rightPicSize[1]/2
+            #sizeRef = [500,1000,2000,3000,4000,5000,7000,9000]
+            #ratio = sizeRef[value]
+        
+        elif center : 
+            midX = (self.leftPictureManager.X0 + self.rightPictureManager.X0) / 2
+            midY = (self.leftPictureManager.Y0 + self.rightPictureManager.Y0) / 2
+            if self.optWindow.currentMNTPath : 
+                mntDS = gdal.Open(self.optWindow.currentMNTPath)
+                mntBand = mntDS.GetRasterBand(1)
+                mntGeo = mntDS.GetGeoTransform()
+                px = math.floor((midX - mntGeo[0]) / mntGeo[1]) 
+                py = math.floor((midY - mntGeo[3]) / mntGeo[5])
+                Z = mntBand.ReadAsArray(px,py,1,1)[0][0]
+                mntDS = None
+            else : 
+                #Autre méthode pour estimer l'altitude? Avec le dual manager? 
+                #Rajouter une option dans le menu des paramètres? -> Altitude moyenne du vol 
+                Z = 300
+            
+            pxL, pyL = self.leftPictureManager.coordToPixel((midX,midY),Z)
+            pxR, pyR = self.rightPictureManager.coordToPixel((midX,midY),Z)
+
+            zoomX = self.leftPicSize[0] / 8
+            zoomY = self.leftPicSize[1] / 8 
+                 
+    
+            pixL = (pxL-self.cropValueLeft[0]-(zoomX/2), pyL-self.cropValueLeft[1]-(zoomY/2))            
+            pixR = (pxR-self.cropValueRight[0]-(zoomX/2), pyR-self.cropValueRight[1]-(zoomY/2))  
+
+            #customView = pixL + pixR + (zoomX,zoomY)
+            rect= QtCore.QRectF(pixL[0],pixL[1],zoomX,zoomY)
+            self.graphWindowLeft.ui.graphicsView.fitInView(rect, QtCore.Qt.KeepAspectRatio)
+            rect= QtCore.QRectF(pixR[0],pixR[1],zoomX,zoomY)
+            self.graphWindowRight.ui.graphicsView.fitInView(rect, QtCore.Qt.KeepAspectRatio)
+
+
+            #xSizeL = self.leftPicSize[0]/2
+            #ySizeL = self.leftPicSize[1]/2 
+            #xSizeR = self.rightPicSize[0]/2
+            #ySizeR = self.rightPicSize[1]/2
+        
         else : 
+            zoomLevels = [128, 64, 32, 16, 8, 4, 2, 1]  # 8 zoom levels
+            scaleFactor = zoomLevels[value]
+
             point = self.graphWindowLeft.ui.graphicsView.mapToScene(QPoint(self.panCenterLeft[0], self.panCenterLeft[1]))
             xSizeL = point.x()
             ySizeL = point.y()
             point = self.graphWindowRight.ui.graphicsView.mapToScene(QPoint(self.panCenterRight[0], self.panCenterRight[1]))
             xSizeR = point.x()
             ySizeR = point.y()
-        
-        rect= QtCore.QRectF(xSizeL-(ratio/2),ySizeL-(ratio/2),ratio,ratio)
-        self.graphWindowLeft.ui.graphicsView.fitInView(rect)
-        rect= QtCore.QRectF(xSizeR-(ratio/2),ySizeR-(ratio/2),ratio,ratio)
-        self.graphWindowRight.ui.graphicsView.fitInView(rect)
+
+            rectWidthL  = self.leftPicSize[0] / scaleFactor
+            rectHeightL = self.leftPicSize[1] / scaleFactor
+
+            rectWidthR  = self.rightPicSize[0] / scaleFactor
+            rectHeightR = self.rightPicSize[1] / scaleFactor
+            
+            rect= QtCore.QRectF(xSizeL-(rectWidthL/2),ySizeL-(rectHeightL/2),rectWidthL,rectHeightL)
+            self.graphWindowLeft.ui.graphicsView.fitInView(rect, QtCore.Qt.KeepAspectRatio)
+            rect= QtCore.QRectF(xSizeR-(rectWidthR/2),ySizeR-(rectHeightR/2),rectWidthR,rectHeightR)
+            self.graphWindowRight.ui.graphicsView.fitInView(rect, QtCore.Qt.KeepAspectRatio)
 
         self.setQGISView()
     

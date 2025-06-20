@@ -147,10 +147,10 @@ class calculatePolygon(QThread):
         #self.features = featList
         self.vectorToShow = vectorToShow
         self.rectCoord = rectCoord
-        self.leftManager = pictureManager(leftPicMan[0], leftPicMan[1], 'aa')
-        self.rightManager = pictureManager(rightPicMan[0], rightPicMan[1], 'aa')
+        self.leftManager = pictureManager(leftPicMan[0], leftPicMan[1])
+        self.rightManager = pictureManager(rightPicMan[0], rightPicMan[1])
         self.dualManag = dualManager(self.leftManager,self.rightManager)
-        self.keyVal = value #cropValueLeft[0],rightMiroir,rightPicSize[0],cropValueRight[0],initAltitude
+        self.keyVal = value #cropValueLeft,rightMiroir,rightPicSize[0],cropValueRight,initAltitude
         self.mntPath = mntPath 
         self.useLayerZ = useLayerZ
         self.oldMNTPath = ''
@@ -264,14 +264,14 @@ class calculatePolygon(QThread):
         else : z = self.getAltitude(point.x(), point.y())
                 
         xPixel, yPixel = self.leftManager.coordToPixel((point.x() , point.y()), z)
-        
-        pixL = (xPixel-self.keyVal[0], yPixel)            
+        #keyVal  = cropValueLeft,rightMiroir,rightPicSize[0],cropValueRight,initAltitude
+        pixL = (xPixel-self.keyVal[0][0], yPixel-self.keyVal[0][1])            
 
         xPixel, yPixel = self.rightManager.coordToPixel((point.x() , point.y()), z)          
         if self.keyVal[1] == 1 :
             mirrorX = self.keyVal[2] - xPixel
             pixR = (mirrorX, yPixel)
-        else : pixR = (xPixel-self.keyVal[3], yPixel)  
+        else : pixR = (xPixel-self.keyVal[3][0], yPixel-self.keyVal[3][1])  
         
         return pixL, pixR
 

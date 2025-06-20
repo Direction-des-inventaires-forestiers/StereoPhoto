@@ -82,16 +82,16 @@ from qgis.PyQt.QtCore import *
 from qgis.PyQt.QtGui import *
 import math
 
-def createShapePoint(shapeName, epsg, photoPath):
+def createShapePoint(shapeName, epsg):
     #
     fields = QgsFields()
     fields.append(QgsField("id", QVariant.Int))
     fields.append(QgsField("name", QVariant.String))
-    shapeName = 'C:\\Users\\pinfr1\\Downloads\\Photos/pointFromPicture.shp'
-    epsg = 'EPSG:32187'
+    shapeName = 'E:\\point/pointFromPicture.shp'
+    epsg = 'EPSG:2950'
     
     vectorWriter = QgsVectorFileWriter(shapeName, "System", fields, QgsWkbTypes.MultiPoint, QgsCoordinateReferenceSystem(epsg), "ESRI Shapefile")
-    points = getParDict('C:\\Users\\pinfr1\\Downloads\\Photos')
+    points = getParDict('E:\\mtm8')
     for key, value in points.items() :
         
         feature = QgsFeature(fields)
@@ -101,7 +101,7 @@ def createShapePoint(shapeName, epsg, photoPath):
         vectorWriter.addFeature(feature)
     #return vectorWriter
     
-    
+#createShapePoint('a','A')    
 
 def findNeighbour(parID, currentDict):
     #path = 'U:/Photos\\q18067_226_rgb.par'

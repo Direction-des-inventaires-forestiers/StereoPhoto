@@ -24,9 +24,10 @@ Les valeurs du fichier «.par» qui sont obligatoires pour le fonctionnement de 
 - $FOC00 
 - $XYZ00
 - $OPK00
-- $FSCALE00
+
 
 Les valeurs du fichier «.par» qui sont facultatives : 
 
+- $FSCALE00
 - $PPA
 - $PIXELSIZE
