@@ -80,13 +80,15 @@ class pictureManager():
             self.fscale = self.Z0/self.Focal
 
         if "$PPA" in values:
-            ppa_x = float(values["$PPA"][-2])
-            ppa_y = float(values["$PPA"][-1])
-            self.PPCx = self.AffineA * ppa_x + self.AffineB * ppa_y + self.AffineC 
-            self.PPCy = self.AffineD * ppa_x + self.AffineE * ppa_y + self.AffineF 
+            self.PPAx = float(values["$PPA"][-2])
+            self.PPAy = float(values["$PPA"][-1])
+            self.PPCx = self.AffineA * self.PPAx + self.AffineB * self.PPAy + self.AffineC 
+            self.PPCy = self.AffineD * self.PPAx + self.AffineE * self.PPAy + self.AffineF 
         else:
             self.PPCx = 0
             self.PPCy = 0
+            self.PPAx = self.sizePicture[0] / 2
+            self.PPAy = self.sizePicture[1] / 2
 
         self.groundPixelSize = self.fscale * self.pixelSize
         

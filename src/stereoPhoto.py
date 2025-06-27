@@ -92,66 +92,12 @@ class stereoPhoto(object):
 
         if self.action.isChecked() :
 
+            self.initGlobalParam()           
+
             self.paramMenu = paramWindow()
-
-            self.showThreadLeftInProcess = False
-            self.newLeftRequest = False
-            self.showThreadRightInProcess = False
-            self.newRightRequest = False
-            self.enableDraw = False
-            self.enableShow = False
-            self.ignoreMouseAction = False
-
-            self.zoomClick = False
-            self.longClick = False
-
-            self.firstDrawClick = True
-            self.listDrawCoord = []
-            self.listCutCoord = []
-
-            self.list2DPoint = []
-            self.list3DPoint = []
-
-            self.listLeftLineObj = []
-            self.listRightLineObj = []
-            self.currentLeftLineObj = None
-            self.currentRightLineObj = None
-
-            self.polygonOnLeftScreen = []
-            self.polygonOnRightScreen = []
-            self.polygonL2Draw = {}
-            self.polygonR2Draw = {}
-            
-            self.greyRectOnLeftScreen = []
-            self.greyRectOnRightScreen = []
-
-            self.listParam = [0, 0, 0, 0, 0, 0, 0, False, False, []]
-            self.lastEnhanceParam = [0, 0, 0, 0, 0, 0, 0, False, False, []]
-
-            self.buttonPosition = None
-
-            #À retirer, mais je dois tester avant
-            self.leftOrientation = self.rightOrientation = self.leftMiroir = self.rightMiroir = 0
-            
-
             self.optWindow = optionWindow(self.iface)
             
-            self.optWindow.ui.importLineProject.textChanged.connect(self.newPictureFile)
-            self.optWindow.ui.importLineVectorLayer.textChanged.connect(self.mNewVectorLayer)
-            self.optWindow.ui.pushButtonShowPicture.clicked.connect(self.createGraphicsWindows)
-            self.optWindow.ui.pushButtonShowIDList.clicked.connect(self.showIDList)
-            self.optWindow.ui.enhanceButton.clicked.connect(self.enhanceClick)
-            self.optWindow.ui.pushButtonFindBestPair.clicked.connect(self.findPairWithPosition)
-            self.optWindow.ui.pushButtonOpenParam.clicked.connect(lambda : self.paramMenu.show())
-
-            
-            self.optWindow.ui.pushButtonRemoveShape.clicked.connect(self.removePolygonOnScreen)
-            self.optWindow.closeWindow.connect(self.optWindowClose)
-            self.optWindow.ui.pushButtonCloseWindow.clicked.connect(self.closeAllSideWindows)
-
-            nbScreen = QApplication.desktop().screenCount()-1
-            self.paramMenu.ui.spinBoxScreenLeft.setMaximum(nbScreen)
-            self.paramMenu.ui.spinBoxScreenRight.setMaximum(nbScreen)
+            self.setConnection() 
 
             self.iface.addDockWidget(Qt.RightDockWidgetArea, self.optWindow)
             self.optWindow.raise_()
@@ -172,6 +118,59 @@ class stereoPhoto(object):
             del self.optWindow
             try : del self.currentParDict
             except: pass
+
+    def initGlobalParam(self):
+        self.showThreadLeftInProcess = False
+        self.newLeftRequest = False
+        self.showThreadRightInProcess = False
+        self.newRightRequest = False
+        self.enableDraw = False
+        self.enableShow = False
+        self.ignoreMouseAction = False
+
+        self.zoomClick = False
+        self.longClick = False
+
+        self.firstDrawClick = True
+        self.listDrawCoord = []
+        self.listCutCoord = []
+
+        self.list2DPoint = []
+        self.list3DPoint = []
+
+        self.listLeftLineObj = []
+        self.listRightLineObj = []
+        self.currentLeftLineObj = None
+        self.currentRightLineObj = None
+
+        self.polygonOnLeftScreen = []
+        self.polygonOnRightScreen = []
+        self.polygonL2Draw = {}
+        self.polygonR2Draw = {}
+        
+        self.greyRectOnLeftScreen = []
+        self.greyRectOnRightScreen = []
+
+        self.listParam = [0, 0, 0, 0, 0, 0, 0, False, False, []]
+        self.lastEnhanceParam = [0, 0, 0, 0, 0, 0, 0, False, False, []]
+
+        self.buttonPosition = None
+
+        #À retirer, mais je dois tester avant
+        self.leftOrientation = self.rightOrientation = self.leftMiroir = self.rightMiroir = 0
+    
+    def setConnection(self) : 
+
+        self.optWindow.ui.importLineProject.textChanged.connect(self.newPictureFile)
+        self.optWindow.ui.importLineVectorLayer.textChanged.connect(self.mNewVectorLayer)
+        self.optWindow.ui.pushButtonShowPicture.clicked.connect(self.createGraphicsWindows)
+        self.optWindow.ui.pushButtonShowIDList.clicked.connect(self.showIDList)
+        self.optWindow.ui.enhanceButton.clicked.connect(self.enhanceClick)
+        self.optWindow.ui.pushButtonFindBestPair.clicked.connect(self.findPairWithPosition)
+        self.optWindow.ui.pushButtonOpenParam.clicked.connect(self.showParamMenu)
+        self.optWindow.ui.pushButtonRemoveShape.clicked.connect(self.removePolygonOnScreen)
+        self.optWindow.closeWindow.connect(self.optWindowClose)
+        self.optWindow.ui.pushButtonCloseWindow.clicked.connect(self.closeAllSideWindows)
 
     #Fonction appelée lors de la fermeture du mOpt
     #Si l'on ferme le mOpt toutes les autres fenêtres Qt se ferment
@@ -207,6 +206,14 @@ class stereoPhoto(object):
         self.closeAllSideWindows()
         self.optWindow.close()
         self.action.setChecked(False)
+    
+    def showParamMenu(self): 
+
+        nbScreen = QApplication.desktop().screenCount()-1
+        self.paramMenu.ui.spinBoxScreenLeft.setMaximum(nbScreen)
+        self.paramMenu.ui.spinBoxScreenRight.setMaximum(nbScreen)
+
+        self.paramMenu.show()
     
     def newPictureFile(self):
         
@@ -244,8 +251,6 @@ class stereoPhoto(object):
             #self.optWindow.removeImportMNT()
             self.removePolygonOnScreen()
             parToUse = next(iter(self.currentParDict))
-            #for key in self.currentParDict :
-            #    if self.setPairID(key) : break
             
         self.paramMenu.currentDictParam['LastPath'] = self.currentMainPath
 
@@ -313,16 +318,10 @@ class stereoPhoto(object):
 
         elif infoNeighborR['rightPic'][0] : self.currentRightID = True
         else : self.currentRightID = False
-
-        #on doit regarder si suite à l'image de droite est-ce qu'une paire existe
-        #rightNeighbor = self.infoNeighbors['right']
-        #self.infoNeighbors = get_neighbors_and_pairs(self.leftParID, self.currentParDict)
-        #self.infoNeighbors = rightNeighbor 
-        #self.currentRightID = True if infoNeighborR['rightPic'][0] is None else False
         
         self.currentUpID = True if len(self.infoNeighbors['up']) != 0 else False
         self.currentDownID = True if len(self.infoNeighbors['down']) != 0 else False
-        print(self.infoNeighbors)
+        #print(self.infoNeighbors)
 
         
     def setLastView(self) :
@@ -479,27 +478,6 @@ class stereoPhoto(object):
         self.leftPictureManager = pictureManager(self.fullLeftPicSize, self.currentLeftPAR)
         self.rightPictureManager = pictureManager(self.fullRightPicSize, self.currentRightPAR)
 
-
-        #xLStart = int((bboxOverlap[0] - leftBbox[2])/gpzL)
-        #yLStart = int((bboxOverlap[1] - leftBbox[3])/gpzL)
-        
-        #xLEnd = int((bboxOverlap[2] - leftBbox[4])/gpzL) + self.fullLeftPicSize[0]
-        #yLEnd = int((bboxOverlap[3] - leftBbox[5])/gpzL) + self.fullLeftPicSize[1]
-        
-        #Éventuellement sera géré par le QTransform 
-        #if self.rightMiroir == 1 :
-        #    xRStart = int(abs((bboxOverlap[2] - rightBbox[4])/gpzR))
-        #    xREnd = self.fullRightPicSize[0] - int((bboxOverlap[0] - rightBbox[2])/gpzR)
-        #else :
-        #    xRStart = int((bboxOverlap[0] - rightBbox[2])/gpzR)
-        #    xREnd = int((bboxOverlap[2] - rightBbox[4])/gpzR) + self.fullRightPicSize[0]
-            
-        #yRStart = int((bboxOverlap[1] - rightBbox[3])/gpzR)
-        #yREnd = int((bboxOverlap[3] - rightBbox[5])/gpzR) + self.fullRightPicSize[1]
-
-        #Il faut déterminer la taille avec les coordonnées 
-        #Distance Début vs overlap + transfert coord vers pixel avec un calcul grossier peut etre faire une fonction dans pictureManager
-        
         #xLeft = (self.fullLeftPicSize[0])*((100-self.paramMenu.ui.spinBoxRecouvrementH.value())/100)
         #xRight = (self.fullRightPicSize[0])*((100-self.paramMenu.ui.spinBoxRecouvrementH.value())/100)
         
@@ -527,14 +505,10 @@ class stereoPhoto(object):
 
         r11R = self.rightPictureManager.r11
         r12R = self.rightPictureManager.r12
-        #print('Left')
-        #print(bboxOverlap,leftBbox,gpzL,r11L,r12L)
+
         self.cropValueLeft = self.calculDecoupageAvecRotation(self.fullLeftPicSize,bboxOverlap,leftBbox,gpzL,r11L,r12L)
-        #print(self.cropValueLeft)
-        #print('Right')
-        #print(bboxOverlap,rightBbox,gpzR,r11R,r12R)
         self.cropValueRight = self.calculDecoupageAvecRotation(self.fullRightPicSize,bboxOverlap,rightBbox,gpzR,r11R,r12R)
-        #print(self.cropValueRight)
+        
         self.leftPicSize = (self.cropValueLeft[2]-self.cropValueLeft[0],self.cropValueLeft[3]-self.cropValueLeft[1])
         self.rightPicSize = (self.cropValueRight[2]-self.cropValueRight[0],self.cropValueRight[3]-self.cropValueRight[1])
         
@@ -555,19 +529,13 @@ class stereoPhoto(object):
         
         if mouseAction : self.windowHandler('picture')
 
-        
-
         pixel = self.pointTranslator(onlyPixel=True)
-        #self.centerPixelLeft = pixel[0]
-        #self.centerPixelRight = pixel[1]
         
         Z = self.dualManager.calculateZ(pixel[0], pixel[1])
         self.initAltitude = Z
         self.afficherPositionDepart()
 
         self.optWindow.ui.labelAltitude.setText(str(round(Z,5)))
-
-        
 
         self.polygonOnLeftScreen = []
         self.polygonOnRightScreen = []
@@ -604,8 +572,20 @@ class stereoPhoto(object):
         else :
             self.newRightRequest = True
 
-        leftTransform = QTransform(self.leftPictureManager.r11, self.leftPictureManager.r12, -self.leftPictureManager.r12, self.leftPictureManager.r11,0,0)                    
-        rightTransform = QTransform(self.rightPictureManager.r11, self.rightPictureManager.r12, -self.rightPictureManager.r12, self.rightPictureManager.r11,0,0)                    
+        #t1 = QTransform().translate(ppa_x, ppa_y)
+
+        # Step 2: apply rotation matrix
+        #rotation = QTransform(r11, r12, r21, r22, 0, 0)
+
+        # Step 3: translate back
+        #t2 = QTransform().translate(-ppa_x, -ppa_y)
+        
+        #leftTransform = QTransform(self.leftPictureManager.r11, self.leftPictureManager.r12, -self.leftPictureManager.r12, self.leftPictureManager.r11,0,0)                    
+        #rightTransform = QTransform(self.rightPictureManager.r11, self.rightPictureManager.r12, -self.rightPictureManager.r12, self.rightPictureManager.r11,0,0)                    
+        
+        leftTransform = self.getQtransform(self.leftPictureManager)
+        rightTransform = self.getQtransform(self.rightPictureManager)
+
         if not self.paramMenu.ui.checkBoxFlip.isChecked() : 
 
             mirror_transform = QTransform()
@@ -623,6 +603,21 @@ class stereoPhoto(object):
         if self.enableDraw : 
             self.startPolygonThread()
 
+    def getQtransform(self, pictureManager : pictureManager):
+        r11 = pictureManager.r11
+        r12 = pictureManager.r12
+        r21 = pictureManager.r21
+        r22 = pictureManager.r22
+        ppa_x = pictureManager.PPAx
+        ppa_y =  pictureManager.PPAy
+        
+        
+        t = QTransform()
+        t.translate(ppa_x, ppa_y)
+        t *= QTransform(r11, r12, r21, r22, 0, 0)
+        t.translate(-ppa_x, -ppa_y)
+        return t
+    
     def afficherPositionDepart(self) : 
         
         if self.buttonPosition : 
@@ -795,7 +790,7 @@ class stereoPhoto(object):
 
             _, bboxOverlap = compute_overlap(leftBbox, rightBbox) #(overlap_xmin, overlap_ymin, overlap_xmax, overlap_ymax)
 
-            rectL = QgsRectangle(QgsPointXY(bboxOverlap[0]-700, bboxOverlap[1]+700), QgsPointXY(bboxOverlap[2]+700, bboxOverlap[3]-700))
+            rectL = QgsRectangle(QgsPointXY(bboxOverlap[0]-700, bboxOverlap[1]-700), QgsPointXY(bboxOverlap[2]+700, bboxOverlap[3]+700))
             
             #tester avec crop value 0,1 remplacer par 0
             #rectL = QgsRectangle(QgsPointXY(topXL-700, topYL+700), QgsPointXY(botXL+700, botYL-700))
@@ -1129,12 +1124,6 @@ class stereoPhoto(object):
             self.lastY = centerView.y()
             #self.graphWindowLeft.ui.widget.setMouseTracking(True)
 
-        #leftView.horizontalScrollBar().setValue(leftView.horizontalScrollBar().value() + self.deltaX)
-        #leftView.verticalScrollBar().setValue(leftView.verticalScrollBar().value() + self.deltaY)
-        #if self.rightMiroir == 0 : rightView.horizontalScrollBar().setValue(rightView.horizontalScrollBar().value() + self.deltaX)
-        #else : rightView.horizontalScrollBar().setValue(rightView.horizontalScrollBar().value() - self.deltaX)
-        #rightView.verticalScrollBar().setValue(rightView.verticalScrollBar().value() + self.deltaY)
-
         pourcent = 2/100
         startX = int(self.leftPicSize[0]*pourcent)
         startY = int(self.leftPicSize[1]*pourcent)
@@ -1143,15 +1132,8 @@ class stereoPhoto(object):
 
         self.endDrawPointLeft = self.graphWindowLeft.ui.graphicsView.mapToScene(QPoint(self.panCenterLeft[0], self.panCenterLeft[1]))
         self.endDrawPointRight = self.graphWindowRight.ui.graphicsView.mapToScene(QPoint(self.panCenterRight[0], self.panCenterRight[1]))
-        #viewPtLeft = QPoint(self.panCenterLeft[0], self.panCenterLeft[1])
-        # Find which item is under that point in the view
-        #itemLeft = self.graphWindowLeft.ui.graphicsView.itemAt(viewPtLeft)
-        #scenePtLeft = self.graphWindowLeft.ui.graphicsView.mapToScene(viewPtLeft)
-        #imgPtLeft = itemLeft.mapFromScene(scenePtLeft)
-        print(self.endDrawPointLeft, self.endDrawPointRight)
-        #print(scenePtLeft,imgPtLeft)
-        print(rangeX,rangeY)
-        coord = self.pointTranslator()#ignoreMNT=True) #,only2D=True)
+
+        coord = self.pointTranslator()
 
         if self.firstDrawClick and (int(self.endDrawPointLeft.x()) not in rangeX or int(self.endDrawPointLeft.y()) not in rangeY) :
             threshold_deg=10
@@ -1304,14 +1286,12 @@ class stereoPhoto(object):
                 
                     
         elif self.enableDraw and self.vectorLayer.geometryType() == QgsWkbTypes.PointGeometry :
-            coordTuple = self.pointTranslator() #QgsPointXY(coordTuple[0],coordTuple[1])    
+            coordTuple = self.pointTranslator() 
             if QgsWkbTypes.hasZ(self.vectorLayer.wkbType()) : geo = QgsGeometry(QgsPoint(coordTuple[0],coordTuple[1],coordTuple[2]))
             else : geo = QgsGeometry.fromPointXY(QgsPointXY(coordTuple[0],coordTuple[1]))
             
-            
             self.windowHandler('qgis')
             feature = addPoint(self.vectorLayer, geo)
-            
             
             #self.vectorLayer.select(feature.id())
             self.vectorLayer.startEditing()
@@ -1322,7 +1302,6 @@ class stereoPhoto(object):
             self.vectorLayer.commitChanges()
             self.vectorLayer.triggerRepaint()
             self.windowHandler('picture')
-            
             
             self.startPolygonThread()    
 
@@ -1349,8 +1328,6 @@ class stereoPhoto(object):
                 rightView.verticalScrollBar().setValue(rightView.verticalScrollBar().value() - 3)
             else :
                 rightView.verticalScrollBar().setValue(rightView.verticalScrollBar().value() + 3)
-
-        
 
         else : 
 

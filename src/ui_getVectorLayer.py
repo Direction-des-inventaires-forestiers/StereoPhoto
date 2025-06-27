@@ -31,6 +31,9 @@ class CustomListItem(QtWidgets.QWidget):
         self.color = QtGui.QColor(0,0,0)
         self.color_button.setStyleSheet(f"background-color: {self.color.name()};")
 
+        self.checkboxUse3D = QtWidgets.QCheckBox()
+        layout.addWidget(self.checkboxUse3D)
+
     def choose_color(self):
         color = QtWidgets.QColorDialog.getColor()
         if color.isValid():
@@ -81,7 +84,7 @@ class getVectorLayerCustomList(QtWidgets.QDialog):
         self.ui = Ui_getVectorLayer()
         self.ui.setupUi(self)
         self.currentItemNames = []
-    
+
     def setItem(self,dictName) : 
         # Adding custom items to the list widget
         for cle in dictName:
