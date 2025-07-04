@@ -142,7 +142,7 @@ def addPoint(vectorLayer,geometry) :
 
 
 class calculatePolygon(QThread):
-    def __init__(self, vectorToShow, rectCoord, leftPicMan, rightPicMan, value, mntPath, useLayerZ=False):
+    def __init__(self, vectorToShow, rectCoord, leftPicMan, rightPicMan, value, mntPath):
         QThread.__init__(self)
         #self.features = featList
         self.vectorToShow = vectorToShow
@@ -152,7 +152,7 @@ class calculatePolygon(QThread):
         self.dualManag = dualManager(self.leftManager,self.rightManager)
         self.keyVal = value #cropValueLeft,rightMiroir,rightPicSize[0],cropValueRight,initAltitude
         self.mntPath = mntPath 
-        self.useLayerZ = useLayerZ
+        self.useLayerZ = False
         self.oldMNTPath = ''
         self.dictPolyL = {}
         self.dictPolyR = {}
@@ -183,10 +183,14 @@ class calculatePolygon(QThread):
             for layer in iface.mapCanvas().layers():
                 try :
                     name = layer.name()
+                    if name not in self.vectorToShow : continue
+                    couleur = self.vectorToShow[name][0]
+                    self.useLayerZ = self.vectorToShow[name][1]
+
 
                     if layer.type() == QgsMapLayerType.VectorLayer and name in self.vectorToShow.keys() : 
                         
-                        self.dictPolyL[name] = [[],self.vectorToShow[name],layer.geometryType()]
+                        self.dictPolyL[name] = [[],couleur,layer.geometryType()]
                         self.dictPolyR[name] = [[]]
                         features = layer.getFeatures(self.rectCoord)
             

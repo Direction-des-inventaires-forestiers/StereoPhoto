@@ -136,6 +136,9 @@
      </property>
     </widget>
     <widget class="QLabel" name="label">
+     <property name="enabled">
+      <bool>false</bool>
+     </property>
      <property name="geometry">
       <rect>
        <x>20</x>
@@ -149,6 +152,9 @@
      </property>
     </widget>
     <widget class="QSpinBox" name="spinBoxAltitude">
+     <property name="enabled">
+      <bool>false</bool>
+     </property>
      <property name="geometry">
       <rect>
        <x>130</x>
@@ -224,7 +230,7 @@
     <property name="geometry">
      <rect>
       <x>30</x>
-      <y>20</y>
+      <y>40</y>
       <width>171</width>
       <height>121</height>
      </rect>
@@ -570,47 +576,6 @@
     </property>
     <property name="text">
      <string>OK</string>
-    </property>
-   </widget>
-   <widget class="QSpinBox" name="spinBoxRecouvrementH">
-    <property name="geometry">
-     <rect>
-      <x>80</x>
-      <y>160</y>
-      <width>42</width>
-      <height>22</height>
-     </rect>
-    </property>
-    <property name="accessibleName">
-     <string>PourcentageRetirer</string>
-    </property>
-    <property name="minimum">
-     <number>0</number>
-    </property>
-    <property name="maximum">
-     <number>100</number>
-    </property>
-    <property name="value">
-     <number>60</number>
-    </property>
-   </widget>
-   <widget class="QLabel" name="label_7">
-    <property name="geometry">
-     <rect>
-      <x>20</x>
-      <y>140</y>
-      <width>181</width>
-      <height>20</height>
-     </rect>
-    </property>
-    <property name="font">
-     <font>
-      <weight>75</weight>
-      <bold>true</bold>
-     </font>
-    </property>
-    <property name="text">
-     <string>Recouvrement des images (%)  </string>
     </property>
    </widget>
   </widget>

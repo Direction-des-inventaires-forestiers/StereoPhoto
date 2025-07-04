@@ -8,101 +8,132 @@
 
 
 from qgis.PyQt import QtCore, QtGui, QtWidgets
-
-class CustomListItem(QtWidgets.QWidget):
-    def __init__(self, text, parent=None):
-        super().__init__(parent)
-        layout = QtWidgets.QHBoxLayout(self)
-
-        # Checkbox
-        self.checkbox = QtWidgets.QCheckBox()
-        layout.addWidget(self.checkbox)
-
-        # Text label
-        self.label = QtWidgets.QLabel(text)
-        layout.addWidget(self.label)
-
-        # Color button
-        self.color_button = QtWidgets.QPushButton("Choose Color")
-        self.color_button.clicked.connect(self.choose_color)
-        layout.addWidget(self.color_button)
-
-        # Store the selected color
-        self.color = QtGui.QColor(0,0,0)
-        self.color_button.setStyleSheet(f"background-color: {self.color.name()};")
-
-        self.checkboxUse3D = QtWidgets.QCheckBox()
-        layout.addWidget(self.checkboxUse3D)
-
-    def choose_color(self):
-        color = QtWidgets.QColorDialog.getColor()
-        if color.isValid():
-            self.color = color
-            self.color_button.setStyleSheet(f"background-color: {color.name()};")
+from qgis.core import *
 
 
-class Ui_getVectorLayer(object):
-    def setupUi(self, getVectorLayer):
-        getVectorLayer.setObjectName("getVectorLayer")
-        getVectorLayer.resize(351, 358)
-        self.buttonBox = QtWidgets.QDialogButtonBox(getVectorLayer)
+class Ui_getVectorList(object):
+    def setupUi(self, getVectorList):
+        getVectorList.setObjectName("getVectorList")
+        getVectorList.resize(391, 358)
+        self.buttonBox = QtWidgets.QDialogButtonBox(getVectorList)
         self.buttonBox.setGeometry(QtCore.QRect(180, 320, 156, 23))
         self.buttonBox.setStandardButtons(QtWidgets.QDialogButtonBox.Ok|QtWidgets.QDialogButtonBox.Cancel)
         self.buttonBox.setObjectName("buttonBox")
-        self.listWidget = QtWidgets.QListWidget(getVectorLayer)
-        self.listWidget.setGeometry(QtCore.QRect(30, 50, 291, 261))
-        self.listWidget.setObjectName("listWidget")
-        #item = QtWidgets.QListWidgetItem()
-        #font = QtGui.QFont()
-        #font.setPointSize(12)
-        #item.setFont(font)
-        #item.setFlags(QtCore.Qt.ItemIsSelectable|QtCore.Qt.ItemIsDragEnabled|QtCore.Qt.ItemIsEnabled)
-        #self.listWidget.addItem(item)
-        self.label = QtWidgets.QLabel(getVectorLayer)
-        self.label.setGeometry(QtCore.QRect(110, 10, 141, 21))
+        self.tableWidget = QtWidgets.QTableWidget(0, 4,getVectorList)
+        self.tableWidget.setHorizontalHeaderLabels(["Afficher", "Nom de la couche", "Couleur", "Altitude 3D"])
+        self.tableWidget.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
+        header = self.tableWidget.horizontalHeader()
+        header.setSectionResizeMode(0, QtWidgets.QHeaderView.ResizeToContents) 
+        self.tableWidget.setColumnWidth(3, 70) 
+        self.tableWidget.setGeometry(QtCore.QRect(30, 50, 331, 261))
+        self.tableWidget.setObjectName("tableWidget")
+        self.label = QtWidgets.QLabel(getVectorList)
+        self.label.setGeometry(QtCore.QRect(120, 10, 260, 21)) 
         font = QtGui.QFont()
         font.setPointSize(12)
         self.label.setFont(font)
         self.label.setObjectName("label")
 
-        self.retranslateUi(getVectorLayer)
-        QtCore.QMetaObject.connectSlotsByName(getVectorLayer)
+        self.retranslateUi(getVectorList)
+        QtCore.QMetaObject.connectSlotsByName(getVectorList)
 
-    def retranslateUi(self, getVectorLayer):
+    def retranslateUi(self, getVectorList):
         _translate = QtCore.QCoreApplication.translate
-        getVectorLayer.setWindowTitle(_translate("getVectorLayer", "Choix de la couche"))
-        __sortingEnabled = self.listWidget.isSortingEnabled()
-        self.listWidget.setSortingEnabled(False)
-        #item = self.listWidget.item(0)
-        #item.setText(_translate("getVectorLayer", "New Item"))
-        self.listWidget.setSortingEnabled(__sortingEnabled)
-        self.label.setText(_translate("getVectorLayer", "Couche vectorielle"))
+        getVectorList.setWindowTitle(_translate("getVectorList", "Choix des couches"))
+        self.label.setText(_translate("getVectorList", "Couches vectorielles"))
+
 
 class getVectorLayerCustomList(QtWidgets.QDialog): 
     def __init__(self):
         super(getVectorLayerCustomList, self).__init__()
-        self.ui = Ui_getVectorLayer()
+        self.ui = Ui_getVectorList()
         self.ui.setupUi(self)
         self.currentItemNames = []
 
-    def setItem(self,dictName) : 
+    def setItem(self,vectorLayers) : 
         # Adding custom items to the list widget
-        for cle in dictName:
+        currentVectorNames = []
+        for cle in vectorLayers:
+            currentVectorNames.append(cle)
             if cle not in self.currentItemNames : 
-                item = QtWidgets.QListWidgetItem()
-                custom_widget = CustomListItem(cle)
-                item.setSizeHint(custom_widget.sizeHint())
-                self.ui.listWidget.addItem(item)
-                self.ui.listWidget.setItemWidget(item, custom_widget)
+                row_position = self.ui.tableWidget.rowCount()
+                self.ui.tableWidget.insertRow(row_position)
+
+                # Column 0: checkbox
+                checkbox_item = QtWidgets.QCheckBox()
+                checkbox_item.setChecked(False)
+                self.ui.tableWidget.setCellWidget(row_position, 0, checkbox_item)
+
+                # Column 1: name text
+                name_item = QtWidgets.QTableWidgetItem(cle)
+                self.ui.tableWidget.setItem(row_position, 1, name_item)
+
+                # Column 2: color button
+                color_button = QtWidgets.QPushButton("Choisir Couleur")
+                color_button.setStyleSheet(f"background-color: {QtGui.QColor(0,0,0).name()};")
+                color_button.setProperty("color", QtGui.QColor(0,0,0))
+                color_button.clicked.connect(lambda _, r=row_position: self.choose_color(r))
+                self.ui.tableWidget.setCellWidget(row_position, 2, color_button)
+
+                # Column 3: altitude checkbox
+                checkbox_3d = QtWidgets.QCheckBox()
+                checkbox_3d.setChecked(False)
+                if QgsWkbTypes.hasZ(vectorLayers[cle].wkbType()) : checkbox_3d.setEnabled(True)
+                else : checkbox_3d.setEnabled(False)
+        
+                self.ui.tableWidget.setCellWidget(row_position, 3, checkbox_3d)
+
                 self.currentItemNames.append(cle)
 
-        if self.ui.listWidget.count() > 0 and self.ui.listWidget.currentRow() == -1:
-            self.ui.listWidget.setCurrentRow(0)
+        for currentItem in self.currentItemNames[:] : 
+            if currentItem not in currentVectorNames : 
+                for row in reversed(range(self.ui.tableWidget.rowCount())):  
+                    item = self.ui.tableWidget.item(row, 1)
+                    if item and item.text() == currentItem:
+                        self.ui.tableWidget.removeRow(row)
+                        self.currentItemNames.remove(currentItem)
+                        break
 
-class getVectorLayer(QtWidgets.QDialog): 
-    def __init__(self, dictName):
-        super(getVectorLayer, self).__init__()
-        self.ui = Ui_getVectorLayer()
+        
+    def choose_color(self,row):
+        color = QtWidgets.QColorDialog.getColor()
+        if color.isValid():
+            button = self.ui.tableWidget.cellWidget(row, 2)
+            if button: 
+                button.setStyleSheet(f"background-color: {color.name()};")
+                button.setProperty("color", color)
+                
+
+class Ui_getImageList(object):
+    def setupUi(self, getImageList):
+        getImageList.setObjectName("getImageList")
+        getImageList.resize(351, 358)
+        self.buttonBox = QtWidgets.QDialogButtonBox(getImageList)
+        self.buttonBox.setGeometry(QtCore.QRect(180, 320, 156, 23))
+        self.buttonBox.setStandardButtons(QtWidgets.QDialogButtonBox.Ok|QtWidgets.QDialogButtonBox.Cancel)
+        self.buttonBox.setObjectName("buttonBox")
+        self.listWidget = QtWidgets.QListWidget(getImageList)
+        self.listWidget.setGeometry(QtCore.QRect(30, 50, 291, 261))
+        self.listWidget.setObjectName("listWidget")
+        self.label = QtWidgets.QLabel(getImageList)
+        self.label.setGeometry(QtCore.QRect(50, 10, 260, 21)) 
+        font = QtGui.QFont()
+        font.setPointSize(12)
+        self.label.setFont(font)
+        self.label.setObjectName("label")
+
+        self.retranslateUi(getImageList)
+        QtCore.QMetaObject.connectSlotsByName(getImageList)
+
+    def retranslateUi(self, getImageList):
+        _translate = QtCore.QCoreApplication.translate
+        getImageList.setWindowTitle(_translate("getImageList", "Choix de l'image"))
+        self.label.setText(_translate("getImageList", "Image disponible dans le dossier"))
+
+class getImageListDialog(QtWidgets.QDialog): 
+    def __init__(self, dictName,currentName):
+        super(getImageListDialog, self).__init__()
+        self.ui = Ui_getImageList()
         self.ui.setupUi(self)
         for cle in dictName:
             item = QtWidgets.QListWidgetItem()
@@ -114,5 +145,11 @@ class getVectorLayer(QtWidgets.QDialog):
             self.ui.listWidget.addItem(item)
         
         if self.ui.listWidget.count() > 0:
-            self.ui.listWidget.setCurrentRow(0)
+            for i in range(self.ui.listWidget.count()):
+                item = self.ui.listWidget.item(i)
+                if item.text() == currentName :
+                    self.ui.listWidget.setCurrentRow(i)
+                    break
+            
+            else : self.ui.listWidget.setCurrentRow(0)
        

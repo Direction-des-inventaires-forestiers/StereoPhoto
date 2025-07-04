@@ -18,12 +18,12 @@ from .ui_getVectorLayer import getVectorLayerCustomList
 class Ui_StereoDockWidget(object):
     def setupUi(self, StereoDockWidget):
         StereoDockWidget.setObjectName("StereoDockWidget")
-        StereoDockWidget.resize(434, 302)
+        StereoDockWidget.resize(434, 305)
         StereoDockWidget.setMinimumSize(QtCore.QSize(165, 300))
         self.dockWidgetContents = QtWidgets.QWidget()
         self.dockWidgetContents.setObjectName("dockWidgetContents")
         self.groupBoxMainPath = dropedit(self.dockWidgetContents)
-        self.groupBoxMainPath.setGeometry(QtCore.QRect(20, 10, 401, 45))
+        self.groupBoxMainPath.setGeometry(QtCore.QRect(20, 10, 401, 51))
         font = QtGui.QFont()
         font.setBold(True)
         font.setWeight(75)
@@ -47,16 +47,16 @@ class Ui_StereoDockWidget(object):
         self.importToolProject.setObjectName("importToolProject")
         self.pushButtonShowIDList = QtWidgets.QPushButton(self.dockWidgetContents)
         self.pushButtonShowIDList.setEnabled(False)
-        self.pushButtonShowIDList.setGeometry(QtCore.QRect(290, 95, 101, 23))
+        self.pushButtonShowIDList.setGeometry(QtCore.QRect(290, 100, 101, 23))
         self.pushButtonShowIDList.setObjectName("pushButtonShowIDList")
         self.enhanceButton = QtWidgets.QPushButton(self.dockWidgetContents)
         self.enhanceButton.setEnabled(False)
-        self.enhanceButton.setGeometry(QtCore.QRect(260, 130, 71, 23))
+        self.enhanceButton.setGeometry(QtCore.QRect(260, 140, 71, 23))
         self.enhanceButton.setCheckable(False)
         self.enhanceButton.setObjectName("enhanceButton")
         self.pushButtonShowPicture = QtWidgets.QPushButton(self.dockWidgetContents)
         self.pushButtonShowPicture.setEnabled(False)
-        self.pushButtonShowPicture.setGeometry(QtCore.QRect(30, 230, 71, 23))
+        self.pushButtonShowPicture.setGeometry(QtCore.QRect(30, 235, 71, 23))
         font = QtGui.QFont()
         font.setPointSize(8)
         font.setBold(False)
@@ -65,7 +65,7 @@ class Ui_StereoDockWidget(object):
         self.pushButtonShowPicture.setObjectName("pushButtonShowPicture")
         self.importLineVectorLayer = QtWidgets.QLineEdit(self.dockWidgetContents)
         self.importLineVectorLayer.setEnabled(True)
-        self.importLineVectorLayer.setGeometry(QtCore.QRect(70, 130, 141, 20))
+        self.importLineVectorLayer.setGeometry(QtCore.QRect(100, 155, 141, 20))
         font = QtGui.QFont()
         font.setPointSize(8)
         font.setBold(False)
@@ -74,25 +74,8 @@ class Ui_StereoDockWidget(object):
         self.importLineVectorLayer.setText("")
         self.importLineVectorLayer.setReadOnly(True)
         self.importLineVectorLayer.setObjectName("importLineVectorLayer")
-        self.importToolVectorLayer = QtWidgets.QToolButton(self.dockWidgetContents)
-        self.importToolVectorLayer.setGeometry(QtCore.QRect(210, 130, 25, 19))
-        font = QtGui.QFont()
-        font.setPointSize(8)
-        font.setBold(False)
-        font.setWeight(50)
-        self.importToolVectorLayer.setFont(font)
-        self.importToolVectorLayer.setObjectName("importToolVectorLayer")
-        self.pushButtonRemoveShape = QtWidgets.QPushButton(self.dockWidgetContents)
-        self.pushButtonRemoveShape.setEnabled(False)
-        self.pushButtonRemoveShape.setGeometry(QtCore.QRect(10, 160, 91, 23))
-        font = QtGui.QFont()
-        font.setPointSize(8)
-        font.setBold(False)
-        font.setWeight(50)
-        self.pushButtonRemoveShape.setFont(font)
-        self.pushButtonRemoveShape.setObjectName("pushButtonRemoveShape")
         self.label_11 = QtWidgets.QLabel(self.dockWidgetContents)
-        self.label_11.setGeometry(QtCore.QRect(10, 130, 71, 16))
+        self.label_11.setGeometry(QtCore.QRect(10, 155, 91, 16))
         self.label_11.setObjectName("label_11")
         self.groupBoxMNT = dropEventMNT(self.dockWidgetContents)
         self.groupBoxMNT.setGeometry(QtCore.QRect(210, 180, 201, 91))
@@ -148,7 +131,7 @@ class Ui_StereoDockWidget(object):
         self.pushButtonRemoveMNT.setFont(font)
         self.pushButtonRemoveMNT.setObjectName("pushButtonRemoveMNT")
         self.pushButtonOpenParam = QtWidgets.QPushButton(self.dockWidgetContents)
-        self.pushButtonOpenParam.setGeometry(QtCore.QRect(340, 130, 71, 23))
+        self.pushButtonOpenParam.setGeometry(QtCore.QRect(340, 140, 71, 23))
         self.pushButtonOpenParam.setStyleSheet("background-color: rgb(255, 255, 127);")
         self.pushButtonOpenParam.setObjectName("pushButtonOpenParam")
         self.labelRightName = QtWidgets.QLabel(self.dockWidgetContents)
@@ -173,13 +156,9 @@ class Ui_StereoDockWidget(object):
         font.setWeight(75)
         self.label_2.setFont(font)
         self.label_2.setObjectName("label_2")
-        self.checkBoxUseLayerZ = QtWidgets.QCheckBox(self.dockWidgetContents)
-        self.checkBoxUseLayerZ.setEnabled(False)
-        self.checkBoxUseLayerZ.setGeometry(QtCore.QRect(110, 160, 141, 17))
-        self.checkBoxUseLayerZ.setObjectName("checkBoxUseLayerZ")
         self.pushButtonCloseWindow = QtWidgets.QPushButton(self.dockWidgetContents)
         self.pushButtonCloseWindow.setEnabled(False)
-        self.pushButtonCloseWindow.setGeometry(QtCore.QRect(110, 230, 71, 23))
+        self.pushButtonCloseWindow.setGeometry(QtCore.QRect(110, 235, 71, 23))
         font = QtGui.QFont()
         font.setPointSize(8)
         font.setBold(False)
@@ -188,7 +167,7 @@ class Ui_StereoDockWidget(object):
         self.pushButtonCloseWindow.setObjectName("pushButtonCloseWindow")
         self.pushButtonFindBestPair = QtWidgets.QPushButton(self.dockWidgetContents)
         self.pushButtonFindBestPair.setEnabled(False)
-        self.pushButtonFindBestPair.setGeometry(QtCore.QRect(290, 65, 101, 23))
+        self.pushButtonFindBestPair.setGeometry(QtCore.QRect(290, 70, 101, 23))
         self.pushButtonFindBestPair.setObjectName("pushButtonFindBestPair")
         self.label_5 = QtWidgets.QLabel(self.dockWidgetContents)
         self.label_5.setGeometry(QtCore.QRect(40, 190, 141, 16))
@@ -201,6 +180,9 @@ class Ui_StereoDockWidget(object):
         self.labelAltitude = QtWidgets.QLabel(self.dockWidgetContents)
         self.labelAltitude.setGeometry(QtCore.QRect(60, 210, 81, 16))
         self.labelAltitude.setObjectName("labelAltitude")
+        self.pushButtonAffVecteur = QtWidgets.QPushButton(self.dockWidgetContents)
+        self.pushButtonAffVecteur.setGeometry(QtCore.QRect(30, 125, 181, 23))
+        self.pushButtonAffVecteur.setObjectName("pushButtonAffVecteur")
         StereoDockWidget.setWidget(self.dockWidgetContents)
 
         self.retranslateUi(StereoDockWidget)
@@ -214,9 +196,7 @@ class Ui_StereoDockWidget(object):
         self.pushButtonShowIDList.setText(_translate("StereoDockWidget", "Parcourir la liste"))
         self.enhanceButton.setText(_translate("StereoDockWidget", "Rehausser"))
         self.pushButtonShowPicture.setText(_translate("StereoDockWidget", "Naviguer"))
-        self.importToolVectorLayer.setText(_translate("StereoDockWidget", "..."))
-        self.pushButtonRemoveShape.setText(_translate("StereoDockWidget", "Retirer la couche"))
-        self.label_11.setText(_translate("StereoDockWidget", "Polygones"))
+        self.label_11.setText(_translate("StereoDockWidget", "Couche en édition"))
         self.groupBoxMNT.setTitle(_translate("StereoDockWidget", "Modèle numérique de terrrain"))
         self.radioButtonDraw.setText(_translate("StereoDockWidget", "Dessiner"))
         self.radioButtonCut.setText(_translate("StereoDockWidget", "Découper"))
@@ -225,11 +205,12 @@ class Ui_StereoDockWidget(object):
         self.pushButtonOpenParam.setText(_translate("StereoDockWidget", "Paramètres"))
         self.label.setText(_translate("StereoDockWidget", "Image Gauche :"))
         self.label_2.setText(_translate("StereoDockWidget", "Image Droite :"))
-        self.checkBoxUseLayerZ.setText(_translate("StereoDockWidget", "Afficher avec l\'altitude"))
         self.pushButtonCloseWindow.setText(_translate("StereoDockWidget", "Fermer"))
         self.pushButtonFindBestPair.setText(_translate("StereoDockWidget", "Trouver la paire"))
         self.label_5.setText(_translate("StereoDockWidget", "Altitude du curseur"))
         self.labelAltitude.setText(_translate("StereoDockWidget", "100.000000000"))
+        self.pushButtonAffVecteur.setText(_translate("StereoDockWidget", "Gestion des couches vectorielles"))
+
         
 
 class dropEventMNT(QtWidgets.QGroupBox): 
@@ -285,7 +266,7 @@ class optionWindow(QtWidgets.QDockWidget):
         self.ui = Ui_StereoDockWidget()
         self.ui.setupUi(self)
         self.ui.importToolProject.clicked.connect(self.showImportDirectory)
-        self.ui.importToolVectorLayer.clicked.connect(self.showImportVector)
+        self.ui.pushButtonAffVecteur.clicked.connect(self.showImportVector)
         self.ui.importToolMNT.clicked.connect(self.showImportMNT)
         self.ui.groupBoxMNT.validMNT.connect(self.dropImportMNT)
         self.ui.pushButtonRemoveMNT.clicked.connect(self.removeImportMNT)
@@ -310,6 +291,7 @@ class optionWindow(QtWidgets.QDockWidget):
         if self.dictLayerName : 
             self.vectorWindow.setItem(self.dictLayerName)
             self.vectorWindow.show()
+            self.vectorWindow.raise_()
             self.vectorWindow.ui.buttonBox.accepted.connect(self.importVectorAccept)
             self.vectorWindow.ui.buttonBox.rejected.connect(self.importVectorCancel)
 
@@ -320,14 +302,22 @@ class optionWindow(QtWidgets.QDockWidget):
     #Création de l'objet qui réprésente la couche vectorielle
     def importVectorAccept(self):
         self.vectorToShow = {}
-        for i in range(self.vectorWindow.ui.listWidget.count()) : 
-            item = self.vectorWindow.ui.listWidget.item(i)
-            widget = self.vectorWindow.ui.listWidget.itemWidget(item)
-            if widget.checkbox.isChecked() : self.vectorToShow[widget.label.text()] = widget.color
+        for i in range(self.vectorWindow.ui.tableWidget.rowCount()) : 
+            afficher = self.vectorWindow.ui.tableWidget.cellWidget(i,0)
+            nomCouche = self.vectorWindow.ui.tableWidget.item(i,1).text()
+            couleur = self.vectorWindow.ui.tableWidget.cellWidget(i,2).property("color")
+            utiliser3D = self.vectorWindow.ui.tableWidget.cellWidget(i,3).isChecked()
+            if afficher.isChecked() : self.vectorToShow[nomCouche] = [couleur,utiliser3D]
 
-        self.vLayerName = self.vectorWindow.ui.listWidget.itemWidget(self.vectorWindow.ui.listWidget.selectedItems()[0]).label.text()
-        self.vLayer = self.dictLayerName[self.vLayerName]
-        self.ui.importLineVectorLayer.setText(self.vLayerName)
+        currentRow = self.vectorWindow.ui.tableWidget.currentRow()
+        currentVectors = list(self.vectorToShow.keys())
+        if len(currentVectors) > 0 : 
+            if currentRow == -1  : editLayer = ''
+            else : editLayer = self.vectorWindow.ui.tableWidget.item(currentRow,1).text()
+            self.vLayerName = editLayer if editLayer in currentVectors else currentVectors[0]  
+            #self.vLayerName = self.vectorWindow.ui.tableWidget.itemWidget(self.vectorWindow.ui.listWidget.selectedItems()[0]).label.text()
+            self.vLayer = self.dictLayerName[self.vLayerName]
+            self.ui.importLineVectorLayer.setText(self.vLayerName)
         self.vectorWindow.close()
 
     def importVectorCancel(self):
