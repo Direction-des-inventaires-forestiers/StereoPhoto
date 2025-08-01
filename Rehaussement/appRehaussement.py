@@ -29,7 +29,7 @@ Image.MAX_IMAGE_PIXELS = 1000000000
 #from win32com.shell import shell, shellcon
 #file to save current project shell.SHGetFolderPath(0, shellcon.CSIDL_APPDATA, None, 0) + "\\appRehaussement"
 
-acceptType = ["jpg", "jpeg", "tiff", "tif", "bmp", "png"]
+acceptType = ["jpg", "jpeg", "tiff", "tif", "bmp", "png", "JPG"]
 
 class app(QApplication):
     def __init__(self, argv):
