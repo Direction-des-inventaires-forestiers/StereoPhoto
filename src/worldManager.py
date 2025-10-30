@@ -70,9 +70,9 @@ class pictureManager():
         self.omega, self.phi, self.kappa = radians(omega), radians(phi), radians(kappa)
 
         if "$PIXELSIZE" in values:
-            self.pixelSize = float(values["$PIXELSIZE"][-1]) * 1e-3
+            self.pixelSize = abs(float(values["$PIXELSIZE"][-1]) * 1e-3)
         else :
-            self.pixelSize = self.AffineA 
+            self.pixelSize = abs(self.AffineA) 
 
         if "$FSCALE00" in values:   
             self.fscale = float(values["$FSCALE00"][-1]) * 1e-3

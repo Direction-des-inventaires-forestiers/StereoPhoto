@@ -272,8 +272,8 @@ class optionWindow(QtWidgets.QDockWidget):
         self.ui.pushButtonRemoveMNT.clicked.connect(self.removeImportMNT)
         self.vLayer = None
         self.vectorWindow = getVectorLayerCustomList()
-        self.projectPath = os.environ["USERPROFILE"]
-        self.mntLocation = os.environ["USERPROFILE"]
+        self.projectPath = os.path.expanduser("~")
+        self.mntLocation = os.path.expanduser("~")
         #self.currentMNTPath = ''
 
     def showImportDirectory(self) :
