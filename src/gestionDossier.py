@@ -27,7 +27,7 @@ def getParDict(dossierImages) :
         #L'image associée n'existe pas, on rejète le PAR
         if not os.path.exists(pathImg) : continue
         else : 
-            imgDS = gdal.Open(pathImg)
+            imgDS = gdal.Open(pathImg,gdal.GA_ReadOnly)
             sizeImg = (imgDS.RasterXSize, imgDS.RasterYSize)
             imgDS = None
         

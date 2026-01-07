@@ -221,6 +221,7 @@ class dropedit(QtWidgets.QGroupBox):
     def __init__(self, parent=None):
         super(dropedit, self).__init__(parent)
         self.setAcceptDrops(True)
+        self.importList = []
 
     def dragEnterEvent(self, event):
         event.accept()
