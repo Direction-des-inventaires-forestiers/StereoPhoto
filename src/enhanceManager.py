@@ -27,7 +27,7 @@ La fonction pictureLayout réalise les effets de rotation et de miroir
 Optimisation futur 
     Gestion des photos à 4 couches (RGBA) et à une seule couche (Grayscale)
 '''
-from PIL import Image, ImageDraw, ImageEnhance
+
 import numpy as np
 
 from qgis.gui import *
@@ -36,18 +36,13 @@ from qgis.PyQt.QtWidgets import *
 from qgis.PyQt.QtCore import *
 from qgis.PyQt.QtGui import *
 
-#from PyQt5.QtWidgets import *
-#from PyQt5.QtCore import *
-#from PyQt5.QtGui import *
 
 from .ui_enhancement import enhanceWindow
-import sys, os, time, threading, traceback
+import sys, os, time, threading, traceback, gc
+from scipy.ndimage import uniform_filter
+from osgeo import gdal
 from math import ceil
 
-Image.MAX_IMAGE_PIXELS = 1000000000 
-
-#from win32com.shell import shell, shellcon
-#file to save current project shell.SHGetFolderPath(0, shellcon.CSIDL_APPDATA, None, 0) + "\\appRehaussement"
 
 #Gestionnaire de la QMainWindow qui permet le rehaussement d'image
 class enhanceManager(QObject):
@@ -67,11 +62,16 @@ class enhanceManager(QObject):
         self.colorWindow.ui.currentStatusButton.pressed.connect(self.keepCurrentView)
         self.colorWindow.ui.applyButton.pressed.connect(self.applyEnhance)
         self.colorWindow.ui.cancelButton.pressed.connect(self.cancelEnhance)
-        self.colorWindow.ui.graphicsView.show()
+        self.colorWindow.closeEvent = self.cancelEnhance
+        
+        self.spinBoxesTimer = QTimer(self)
+        self.spinBoxesTimer.setSingleShot(True)
+        self.spinBoxesTimer.timeout.connect(self.enhancePicture)
+        
+        self.scene = QGraphicsScene(self.colorWindow.ui.graphicsView)
+        self.colorWindow.ui.graphicsView.setScene(self.scene)
         self.colorWindow.show()
 
-        self.showThreadInProcess = False
-        self.newRequest = False
         self.statusKeepCurrentView = False
 
         self.colorWindow.ui.zoomInButton.clicked.connect(self.zoomIn)
@@ -79,35 +79,15 @@ class enhanceManager(QObject):
         
         self.colorWindow.setWindowState(Qt.WindowMaximized)
 
-        self.firstPicture = True
-        self.loadPicture(self.pathLeft)
-    
-    #Fonction de lancement du chargement d'une nouvelle photo
-    def loadPicture(self, path) : 
-        self.picture = Image.open(path)
-
-        if hasattr(self.picture, "n_frames") and self.picture.n_frames > 4:
-            self.picture.seek(3)
-            self.isTIF = True
-
-        elif self.picture.size[0] > self.picture.size[1] :
-            self.picture = self.picture.resize((1000,700))
-            self.isTIF = False
-        else :
-            self.picture = self.picture.resize((700,1000))
-            self.isTIF = False
-
         self.zoomState = 0
-
-        if self.firstPicture : 
-            self.setConnection(True)
-            self.colorWindow.ui.buttonBoxReset.clicked.connect(self.reset)
-            self.firstPicture = False
-            if self.prevListParam :
-                self.reset("set")
-            else:
-                self.reset()
-
+        self.setConnection(True)
+        self.colorWindow.ui.buttonBoxReset.clicked.connect(self.reset)
+        
+        if self.prevListParam :
+            self.reset("set")
+        else:
+            self.reset()
+    
     #Remet la photo à son affichage d'origine ou à l'état en cours du rehaussement
     def reset(self, setBox=False) : 
         self.setConnection(False)
@@ -118,62 +98,53 @@ class enhanceManager(QObject):
         self.enhancePicture("reset")
         self.setConnection(True)
 
+    def removeCurrentScene(self) : 
+
+        if hasattr(self, "tSeek"):
+            if self.tSeek.showThreadInProcess : 
+                self.tSeek.blockSignals(True)
+                self.tSeek.keepRunning = False
+                self.tSeek.wait()
+                self.tSeek.showThreadInProcess = False
+            del self.tSeek
+        
+        for item in list(self.scene.items()):
+            if isinstance(item, QGraphicsPixmapItem):
+                self.scene.removeItem(item)
+        
+        gc.collect()
+        QApplication.processEvents()
+
     #Fonction appeler pour démarrer le rehaussement
     #Elle affiche le rehaussement sur une version de basse résolution 
     #puis lance un thread pour gérer les images de plus grande résolution
     #Elle peut annoncer au thread d'annuler son processus 
     #si elle désire repartir le traitement avec des nouveaux paramètres
-    def enhancePicture(self, ajustView):
-        if hasattr(self, "tSeek"): 
-            try :
-                self.tSeek.newImage.disconnect(self.addPixmap)
-            except: 
-                pass
-            self.tSeek.keepRunning = False
+    def enhancePicture(self, ajustView=False):
 
-        self.getBoxValues(ajustView)
-        t = imageEnhancing(self.picture, self.listParam)
-        t.start()
-        r = t.join()      
-        p = Image.merge("RGB", (r[0],r[1],r[2]))   
-        pictureArray = np.array(p)
-        height, width, channel = pictureArray.shape
-        q_image = QImage(pictureArray.data, width, height, (width*3), QImage.Format_RGB888)
-        #a = qimage2ndarray.array2qimage(pictureArray)
-        scene = QGraphicsScene()
-        scene.addPixmap(QPixmap.fromImage(q_image))
-        self.colorWindow.ui.graphicsView.setScene(scene)
-
-        if ajustView == "reset":
-            self.colorWindow.ui.graphicsView.fitInView(self.colorWindow.ui.graphicsView.sceneRect(), Qt.KeepAspectRatio)
-            self.zoomState = 0
-
+        self.removeCurrentScene()
         
-        if self.isTIF :
-            pointZero = self.colorWindow.ui.graphicsView.mapToScene(QPoint(0,0))
-            GV = self.colorWindow.ui.graphicsView
-            pointMax = self.colorWindow.ui.graphicsView.mapToScene(QPoint(GV.width(),GV.height()))
-            if self.showThreadInProcess == False :
-                self.threadSeekNewQuality(pointZero, pointMax, 4, 1, 0.25)
-                self.showThreadInProcess = True
-            else :
-                self.newRequest = True
-    
-    #Fonction qui permet de lancer le thread d'affichage des images de plus grande qualité
-    def threadSeekNewQuality(self, pointZero, pointMax, multiFactor, seekFactor, scaleFactor):
-
+        self.getBoxValues(ajustView)
         if self.colorWindow.ui.radioButtonPremiere.isChecked():        
             currentPath = self.pathLeft
         else :
             currentPath = self.pathRight
-        self.getBoxValues()
-        self.tSeek = threadShow(currentPath, pointZero, pointMax, multiFactor, seekFactor, scaleFactor, self.listParam)
+
+        pointZero = self.colorWindow.ui.graphicsView.mapToScene(QPoint(0,0))
+        GV = self.colorWindow.ui.graphicsView
+        pointMax = self.colorWindow.ui.graphicsView.mapToScene(QPoint(GV.width(),GV.height()))
+        self.tSeek = threadShow(currentPath, pointZero, pointMax, self.listParam)
         self.tSeek.newImage.connect(self.addPixmap)
         self.tSeek.finished.connect(self.seekDone)
-        self.showThreadInProcess = True
-        self.newRequest = False
+        self.tSeek.setOverview()
+        
         self.tSeek.start(QThread.IdlePriority)
-    
+        
+        if ajustView == "reset":
+            self.colorWindow.ui.graphicsView.fitInView(self.tSeek.rect, Qt.KeepAspectRatio)
+            self.zoomState = 0
+
+        
     #Fonction appelée par le emit du thread pour ajouter une portion de l'image sur l'affichage
     def addPixmap(self, pixmap, scaleFactor, topX, topY) :
         d = self.colorWindow.ui.graphicsView.scene().addPixmap(pixmap)
@@ -184,21 +155,10 @@ class enhanceManager(QObject):
     #Elle relance le thread avec la même résolution si une requête a été faite sinon
     #elle relance le thread avec une plus grande résolution d'image 
     def seekDone(self):
-
-        if self.newRequest : 
-            pointZero = self.colorWindow.ui.graphicsView.mapToScene(QPoint(0,0))
-            GV = self.colorWindow.ui.graphicsView
-            pointMax = self.colorWindow.ui.graphicsView.mapToScene(QPoint(GV.width(),GV.height()))
-            self.threadSeekNewQuality(pointZero, pointMax, 4, 1, 0.25)
-
-        elif self.tSeek.seekFactor == 1 :
-            pointZero = self.colorWindow.ui.graphicsView.mapToScene(QPoint(0,0))
-            GV = self.colorWindow.ui.graphicsView
-            pointMax = self.colorWindow.ui.graphicsView.mapToScene(QPoint(GV.width(),GV.height()))
-            self.threadSeekNewQuality(pointZero, pointMax, 8, 0, 0.125)
-
-        else :
-            self.showThreadInProcess = False
+        sender = self.sender()
+        sender.showThreadInProcess = False
+        gc.collect()
+        QApplication.processEvents()
 
     #Fonction qui permet de réaliser le Pan 
     def mMoveEvent(self, ev):
@@ -271,23 +231,22 @@ class enhanceManager(QObject):
         self.cancelEnhance()
 
     #Ferme la fenêtre sans conserver les paramètres modifiés
-    def cancelEnhance(self):
-        scene = QGraphicsScene()
-        self.colorWindow.ui.graphicsView.setScene(scene)
+    def cancelEnhance(self,event=None):
+        self.removeCurrentScene()
+        self.scene.clear()
         self.colorWindow.close()
+
+    def closeEvent(self,event):
+        self.cancelEnhance()
 
     #Permet de changer la photo selon les 2 déjà importées
     def switchPicture(self, value) :
-        if self.colorWindow.ui.radioButtonPremiere.isChecked():
-            self.loadPicture(self.pathLeft)
-        else :
-            self.loadPicture(self.pathRight)
         self.enhancePicture("reset")
         
     #Fonction appellée quand le checkbox min/max est utilisé
     #Active les radios button du groupBox Min/Max
     def minmaxActivate(self, value):
-        self.colorWindow.ui.radioButtonCurrent.setEnabled(value)
+        self.colorWindow.ui.radioButtonCurrent.setEnabled(False)
         self.colorWindow.ui.radioButtonComplete.setEnabled(value)
         self.enhancePicture(value)
 
@@ -305,6 +264,9 @@ class enhanceManager(QObject):
             self.colorWindow.ui.currentStatusButton.setText("Conserver")
             self.enhancePicture(True)
 
+    def startSpinboxesTimer(self,value):
+        self.spinBoxesTimer.start(250)
+    
     #Active/Desactive les connections des différents objets (boutons) de l'application
     def setConnection(self, enable) : 
 
@@ -313,26 +275,26 @@ class enhanceManager(QObject):
         self.colorWindow.ui.zoomPanButton.setEnabled(enable)
 
         if enable : 
-            self.colorWindow.ui.spinBoxContrast.valueChanged.connect(self.enhancePicture)
-            self.colorWindow.ui.spinBoxLuminosite.valueChanged.connect(self.enhancePicture)
-            self.colorWindow.ui.spinBoxSaturation.valueChanged.connect(self.enhancePicture)
-            self.colorWindow.ui.spinBoxNettete.valueChanged.connect(self.enhancePicture)
-            self.colorWindow.ui.spinBoxRed.valueChanged.connect(self.enhancePicture)
-            self.colorWindow.ui.spinBoxGreen.valueChanged.connect(self.enhancePicture)
-            self.colorWindow.ui.spinBoxBlue.valueChanged.connect(self.enhancePicture)
+            self.colorWindow.ui.spinBoxContrast.valueChanged.connect(self.startSpinboxesTimer)
+            self.colorWindow.ui.spinBoxLuminosite.valueChanged.connect(self.startSpinboxesTimer)
+            self.colorWindow.ui.spinBoxSaturation.valueChanged.connect(self.startSpinboxesTimer)
+            self.colorWindow.ui.spinBoxNettete.valueChanged.connect(self.startSpinboxesTimer)
+            self.colorWindow.ui.spinBoxRed.valueChanged.connect(self.startSpinboxesTimer)
+            self.colorWindow.ui.spinBoxGreen.valueChanged.connect(self.startSpinboxesTimer)
+            self.colorWindow.ui.spinBoxBlue.valueChanged.connect(self.startSpinboxesTimer)
             self.colorWindow.ui.groupBoxMinMax.toggled.connect(self.minmaxActivate)
             self.colorWindow.ui.graphicsView.mouseMoveEvent = self.mMoveEvent
             self.colorWindow.ui.graphicsView.mousePressEvent = self.mPressEvent
             self.colorWindow.ui.graphicsView.mouseReleaseEvent = self.mReleaseEvent
             self.colorWindow.ui.graphicsView.wheelEvent = self.wheelEvent   
         else : 
-            self.colorWindow.ui.spinBoxContrast.valueChanged.disconnect(self.enhancePicture)
-            self.colorWindow.ui.spinBoxLuminosite.valueChanged.disconnect(self.enhancePicture)   
-            self.colorWindow.ui.spinBoxSaturation.valueChanged.disconnect(self.enhancePicture)   
-            self.colorWindow.ui.spinBoxNettete.valueChanged.disconnect(self.enhancePicture)  
-            self.colorWindow.ui.spinBoxRed.valueChanged.disconnect(self.enhancePicture) 
-            self.colorWindow.ui.spinBoxGreen.valueChanged.disconnect(self.enhancePicture) 
-            self.colorWindow.ui.spinBoxBlue.valueChanged.disconnect(self.enhancePicture) 
+            self.colorWindow.ui.spinBoxContrast.valueChanged.disconnect(self.startSpinboxesTimer)
+            self.colorWindow.ui.spinBoxLuminosite.valueChanged.disconnect(self.startSpinboxesTimer)   
+            self.colorWindow.ui.spinBoxSaturation.valueChanged.disconnect(self.startSpinboxesTimer)   
+            self.colorWindow.ui.spinBoxNettete.valueChanged.disconnect(self.startSpinboxesTimer)  
+            self.colorWindow.ui.spinBoxRed.valueChanged.disconnect(self.startSpinboxesTimer) 
+            self.colorWindow.ui.spinBoxGreen.valueChanged.disconnect(self.startSpinboxesTimer) 
+            self.colorWindow.ui.spinBoxBlue.valueChanged.disconnect(self.startSpinboxesTimer) 
             self.colorWindow.ui.groupBoxMinMax.toggled.disconnect(self.minmaxActivate)
             self.colorWindow.ui.graphicsView.mouseMoveEvent = QGraphicsView.mouseMoveEvent 
             self.colorWindow.ui.graphicsView.mousePressEvent = QGraphicsView.mousePressEvent
@@ -401,7 +363,7 @@ class enhanceManager(QObject):
         self.colorWindow.ui.groupBoxMinMax.setChecked(self.prevListParam[7])
 
         if self.prevListParam[7] :
-            self.colorWindow.ui.radioButtonCurrent.setEnabled(True)
+            self.colorWindow.ui.radioButtonCurrent.setEnabled(False)
             self.colorWindow.ui.radioButtonComplete.setEnabled(True)
             if self.prevListParam[8] :
                 self.statusKeepCurrentView = True
@@ -409,7 +371,7 @@ class enhanceManager(QObject):
                 self.colorWindow.ui.currentStatusButton.setEnabled(True)
                 self.colorWindow.ui.groupBoxMinMax.setChecked(True)
                 self.colorWindow.ui.radioButtonCurrent.toggled.disconnect(self.currentViewActivate)
-                self.colorWindow.ui.radioButtonCurrent.setChecked(True)
+                self.colorWindow.ui.radioButtonCurrent.setChecked(False)
                 self.colorWindow.ui.radioButtonCurrent.toggled.connect(self.currentViewActivate)
                 self.currentPixVal = self.prevListParam[9]
                     
@@ -418,6 +380,7 @@ class enhanceManager(QObject):
     #Calcul de l'histogramme sur une portion de la photo lorsque l'on veut conserver le min/max pour la vue courante
     def calculHistogram(self, top, low):
 
+        return [0,255,0,255,0,255]
         h = self.picture.crop((top.x(), top.y(), low.x(), low.y())).histogram()
         a = sum(h)
         cutValue = [round(a*0.05/3), round(a*0.95/3), round(a*1.05/3), round(a*1.95/3), round(a*2.05/3), round(a*2.95/3)]
@@ -434,314 +397,258 @@ class enhanceManager(QObject):
                     break
         return pixValue
     
-#Thread qui permet l'affichage, le rehaussement, la rotation et l'effet miroir des images de plus grandes résolutions
-#Il ajoute des petites portions de l'image à chaque itération
-#Il concidère toujours la vue courante dans la priorité d'affichage
 class threadShow(QThread):
     newImage = pyqtSignal(QPixmap, float, int, int)
-    def __init__(self, picture, pointZero, pointMax, multiFactor, seekFactor, scaleFactor, listParam, rotation=0, miroir=0, cropValue=None):
-        QThread.__init__(self)
-        self.picture = Image.open(picture)
+    
+    def __init__(self, picturePath, pointZero, pointMax, listParam, cropValue=None):
+        super().__init__()
+        self.picturePath = picturePath
         self.pointZero = pointZero
         self.pointMax = pointMax
-        self.multiFactor = multiFactor
-        self.seekFactor = seekFactor
-        self.scaleFactor = scaleFactor
         self.listParam = listParam
-        self.keepRunning = True
-        self.rotation = rotation
-        self.miroir = miroir
         self.cropValue = cropValue
-    
-    #Optimisation possible : Offrir le placement selon la proximité 
-    def run(self):
-        try : 
+        self.perform_Enhancing = True if self.listParam[:8] != [0,0,0,0,0,0,0,False] else False
+        self.keepRunning = True
+        self.showThreadInProcess = False 
 
-            self.picture.seek(self.seekFactor)
-            #Cause un bug dans le GUI, les spinboxs ne sont plus instantanées
-            #Constraste netteté et saturation cause les plus gros ralentissements
-            t = imageEnhancing(self.picture, self.listParam)
-            t.start()
-            r = t.join() 
-
-            pictureEnhance = Image.merge("RGB",(r[0],r[1],r[2]))
-
-            pictureAdjust = pictureLayout(pictureEnhance, self.rotation, self.miroir, False) 
-            
-            if self.cropValue:
-                pictureAdjust = pictureAdjust.crop(self.cropValue)
-
-            topX = round(self.pointZero.x()*self.multiFactor) if round(self.pointZero.x()*self.multiFactor) >= 0 else 0
-            topY = round(self.pointZero.y()*self.multiFactor) if round(self.pointZero.y()*self.multiFactor) >= 0 else 0
-            lowX = round(self.pointMax.x()*self.multiFactor)  if round(self.pointMax.x()*self.multiFactor) <= pictureAdjust.size[0] else pictureAdjust.size[0]
-            lowY = round(self.pointMax.y()*self.multiFactor)  if round(self.pointMax.y()*self.multiFactor) <= pictureAdjust.size[1] else pictureAdjust.size[1]
-            
-            sizePixelX = abs(lowX - topX)
-            sizePixelY = abs(lowY - topY)
+        # Open GDAL dataset ONCE here
+        gdal.SetCacheMax(256 * 1024 * 1024)
+        self.ds = gdal.Open(self.picturePath, gdal.GA_ReadOnly)
+        self.height = self.ds.RasterYSize
+        self.width = self.ds.RasterXSize
+        self.rect = QRectF(0,0,self.width,self.height)
+        if self.ds is None:
+            raise ValueError("Cannot open image")
         
-            maxX = 750 
-            maxY = 750
+    def setOverview(self) : 
+        
+        self.stats, overViewArray = self.get_global_stats_from_overview()
 
-            middleRect = [topX, topY, lowX, lowY]
-            firstRect = [0,0,topX, pictureAdjust.size[1]]
-            secondRect = [lowX, 0, pictureAdjust.size[0], pictureAdjust.size[1]]
-            thridRect = [topX, 0, topX+sizePixelX , topY]
-            fourthRect = [topX, topY+sizePixelY, lowX, pictureAdjust.size[1]]
+        if overViewArray is not None: 
+            overViewArray = self.applyEnhancements(overViewArray,self.listParam)
+            he, wi, _ = overViewArray.shape
+            q_image = QImage(overViewArray.data, wi, he, wi*3, QImage.Format_RGB888)
+            pixmap = QPixmap.fromImage(q_image)
+            scale = min(self.width/self.widthOverview, self.height/self.heightOverview)
+            self.newImage.emit(pixmap, scale, self.overviewStartX, self.overviewStartY)
+        
+        
+        
+    
+    def run(self):
 
-            rect = [middleRect, firstRect, secondRect, thridRect, fourthRect]
-            #print(rect)
-            for item in rect :
+        self.showThreadInProcess = True 
+        maxX, maxY = 2048,2048 
+        
+        if self.cropValue is not None:
+            x0 = self.cropValue[0]
+            y0 = self.cropValue[1]
+            x1 = self.cropValue[2]
+            y1 = self.cropValue[3]
+        else:
+            x0 = 0
+            y0 = 0
+            x1 = self.width
+            y1 = self.height
 
-                nbDivX = ceil(abs(item[2] - item[0])/maxX)
-                nbDivY = ceil(abs(item[3] - item[1])/maxY)
+        topX = max(x0, int(self.pointZero.x() - 1024))
+        topY = max(y0, int(self.pointZero.y() - 1024))
+        lowX = min(x1, int(self.pointMax.x() + 1024))
+        lowY = min(y1, int(self.pointMax.y() + 1024))
 
-                currentTopX = item[0]
+
+        middleRect = [topX, topY, lowX, lowY]
+        firstRect = [x0,y0,topX, y1]
+        secondRect = [lowX, y0, x1, y1]
+        thridRect = [topX, y0, lowX, topY]
+        fourthRect = [topX, lowY, lowX, y1]
+        
+        rects = [middleRect, firstRect, secondRect, thridRect, fourthRect]
+
+        for item in rects:
+            nbDivX = ceil((item[2] - item[0]) / maxX)
+            nbDivY = ceil((item[3] - item[1]) / maxY)
+            currentTopX, currentTopY = item[0], item[1]
+            
+            for x in range(nbDivX):
+                currentLowX = min(currentTopX + maxX, item[2])
+                for y in range(nbDivY):
+                    if not self.keepRunning:
+                        return
+                    currentLowY = min(currentTopY + maxY, item[3])
+                    
+                    # Load ONLY this tile from disk
+                    tile_width = currentLowX - currentTopX
+                    tile_height = currentLowY - currentTopY
+                    
+                    tile = self.loadImageTile(
+                        xoff=currentTopX,
+                        yoff=currentTopY,
+                        xsize=tile_width,
+                        ysize=tile_height
+                    )
+                    if self.perform_Enhancing : tile = self.applyEnhancements(tile,self.listParam)
+                    h, w, _ = tile.shape
+                    q_image = QImage(tile.data, w, h, w*3, QImage.Format_RGB888)
+                    pixmap = QPixmap.fromImage(q_image)
+
+                    self.newImage.emit(pixmap, 1, currentTopX, currentTopY)
+                    
+                    del tile
+                    
+                    currentTopY += maxY
+                currentTopX += maxX
                 currentTopY = item[1]
-                
-                for x in range(nbDivX) :
-                    
-                    currentLowX = currentTopX + maxX if (currentTopX + maxX) < item[2] else item[2]
-                    
-                    for y in range(nbDivY) : 
+    
+    def loadImageTile(self, xoff=0, yoff=0, xsize=None, ysize=None, bands=[1,2,3]):
+        """Load a specific tile from the GDAL dataset"""
+        if xsize is None:
+            xsize = self.ds.RasterXSize - xoff
+        if ysize is None:
+            ysize = self.ds.RasterYSize - yoff
 
-                        if self.keepRunning == False : 
-                            self.picture.close()
-                            return
-                        
-                        currentLowY = currentTopY + maxY if (currentTopY + maxY) < item[3] else item[3]
-                        #print(f"Trying to crop: ({currentTopX},{currentTopY}) -> ({currentLowX},{currentLowY})")
-                        
-                        cropPicture = np.array(pictureAdjust.crop((currentTopX,currentTopY,currentLowX,currentLowY)))
-                        height, width, channel = cropPicture.shape
-                        q_image = QImage(cropPicture.data, width, height, (width*3), QImage.Format_RGB888)
-                        #QtImg = qimage2ndarray.array2qimage(cropPicture)
-                        
-                        QtPixImg = QPixmap.fromImage(q_image)
+        band_arrays = []
+        for idx in bands:
+            band = self.ds.GetRasterBand(idx)
+            arr = band.ReadAsArray(xoff, yoff, xsize, ysize)
+            band_arrays.append(arr)
+        img = np.stack(band_arrays, axis=2) 
+        return img 
 
-                        self.newImage.emit(QtPixImg, self.scaleFactor, currentTopX, currentTopY)
+    def applyEnhancements(self, arr, params):
+        arr = arr.astype(np.float32, copy=False)
 
-                        currentTopY += maxY
-                    
-                    currentTopX += maxX
-                    currentTopY = item[1]
+        # --- Min–Max Stretch ---
+        if params[7]:  # stretch flag
+            stats = []
+            if self.stats is None : 
+                for c in range(3) : 
+                    ch = arr[:,:,c]
+                    low, high = np.percentile(ch, [5, 95])
+                    stats.append((low, high))
+
+            else : stats = self.stats
+
+            lows  = np.array([s[0] for s in self.stats], np.float32).reshape(1,1,3)
+            highs = np.array([s[1] for s in self.stats], np.float32).reshape(1,1,3)
+
+            # In-place: (arr - lows) / (highs - lows) * 255
+            arr -= lows               
+            arr /= (highs - lows)  
+            arr *= 255.0    
+        
+
+        # Contrast
+        contrast = params[0]
+        if contrast != 0:
+            if contrast > 0:
+                if contrast < 50:
+                    factor = 1 + (0.02 * contrast)  # 1.0 to 2.0
+                elif contrast < 80:
+                    factor = 2 + (0.1 * (contrast - 50))  # 2.0 to 5.0
+                else:
+                    factor = 5 + (contrast - 80)  # 5.0 to 25.0
+            else:
+                factor = 1 + (contrast / 100)
+
+            # Convert to grayscale using PIL weights
+            grayscale = (arr[:, :, 0] * 0.299 + 
+                        arr[:, :, 1] * 0.587 + 
+                        arr[:, :, 2] * 0.114)
             
-            self.picture.close()
+            # Get mean of grayscale
+            mean = float(grayscale.mean())
+            for c in range(3):
+                channel = arr[:, :, c]
+                channel[:] = mean + (channel - mean) * factor
 
-        except Exception as e:
-            print("Error in QThread:", e)
-            traceback.print_exc()
+        #Saturation
+        saturation = params[2]
+        if saturation != 0:
 
-#Thread qui reçoit une image PIL ainsi que la liste des paramètres de rehaussement
-#Le thread permet de réaliser le rehaussement
-#Il retourne un objet list qui contient les trois couches de l'image  
-class imageEnhancing(threading.Thread):
-
-    def __init__(self, image, listParam, rotation=0, miroir=0):
-        threading.Thread.__init__(self)
-        self.image = image
-        self.listParam = listParam
-        self.rotation = rotation
-        self.miroir = miroir
-
-    def run(self):
-        p = self.image
-
-        if  self.listParam[0] != 0 :
-            value =  self.listParam[0]
-            if value > 0:
-                if value < 50 :
-                    p = ImageEnhance.Contrast(p).enhance(1 + (0.02*value))
-                elif value < 80:
-                    p = ImageEnhance.Contrast(p).enhance(2 + (0.1*(value-50)))
-                else :
-                    p = ImageEnhance.Contrast(p).enhance(5 + (value-80))
-
-            else : 
-                p = ImageEnhance.Contrast(p).enhance(1 +(value/100))
+            if saturation > 0:
+                factor = 1 + (0.05 * saturation)
+            else:
+                factor = 1 + (saturation / 100)
+            
+            # Convert to grayscale using PIL weights
+            grayscale = (arr[:, :, 0] * 0.299 + 
+                        arr[:, :, 1] * 0.587 + 
+                        arr[:, :, 2] * 0.114)
+            
+            
+            for c in range(3):
+                channel = arr[:, :, c]
+                channel[:] = grayscale + (channel - grayscale) * factor
 
 
-        if self.listParam[2] != 0 :    
-            value = self.listParam[2]
-            if value > 0 :
-                p = ImageEnhance.Color(p).enhance(1 + (0.05 * value))
-            else :
-                p = ImageEnhance.Color(p).enhance(1 + int(value/100))
+        # R/G/B adjustment
+        for i, ch_param in enumerate(params[4:7]):
+            if ch_param != 0:
+                factor = 1.0 + (ch_param / 100.0)
+                arr[:,:,i] *= factor
 
-        if self.listParam[3] != 0 :
-            p = ImageEnhance.Sharpness(p).enhance(self.listParam[3]/10 + 1)
-        
-        s = p.split()
-        
-        if self.listParam[7] : 
 
-            if self.listParam[4] != 0 or self.listParam[1] != 0 :
-                mr = s[0].point(self.redEnhance)
-            else :
-                mr = s[0]
+        # Sharpness 
+        sharpness = params[3]
+        if sharpness != 0:
+            sharp_factor = sharpness / 10.0 + 1  
+            blurred = uniform_filter(arr,size=(3, 3, 1))
+            arr[:] = blurred + (arr - blurred) * sharp_factor
+                  
+        # Brightness
+        brightness = params[1]
+        if brightness != 0:
+            arr += 128 * (brightness / 100.0)
 
-            if self.listParam[5] != 0 or self.listParam[1] != 0 :
-                mg = s[1].point(self.greenEnhance)
-            else : 
-                mg = s[1]
+        # Final clamp
+        np.clip(arr, 0, 255, out=arr)
 
-            if self.listParam[6] != 0 or self.listParam[1] != 0 :
-                mb = s[2].point(self.blueEnhance)
-            else :
+        return arr.astype(np.uint8, copy=False)
 
-                mb = s[2]
+
+    
+    def get_global_stats_from_overview(self,band_numbers=[1,2,3], lower=5, upper=95):
+        stats = []
+        band_arrays = []
+        for bandNumber in band_numbers:
+            band = self.ds.GetRasterBand(bandNumber)
+
+            ovr_count = band.GetOverviewCount()
+            if ovr_count > 0:
+                ovr_band = band.GetOverview(3)
+                self.widthOverview = ovr_band.XSize
+                self.heightOverview = ovr_band.YSize
+                if self.cropValue is not None: 
+                    
+                    scale = min(self.width/self.widthOverview, self.height/self.heightOverview)
+                    oX = max(0,int(self.cropValue[0]/ scale))
+                    oY = max(0,int(self.cropValue[1]/ scale))
+                    sX = min(self.widthOverview ,int((self.cropValue[2] - self.cropValue[0])/ scale))
+                    sY = min(self.heightOverview,int((self.cropValue[3] - self.cropValue[1])/ scale))
+
+                    arr = ovr_band.ReadAsArray(oX,oY,sX,sY).astype(np.float32)
+                    self.overviewStartX = oX
+                    self.overviewStartY = oY 
+
                 
-            if self.listParam[8] :
-                self.pixValue = self.listParam[9]
-            else :
-                self.calculHistogram(mr,mg,mb)
+                else : 
+                    arr = ovr_band.ReadAsArray().astype(np.float32)
+                    self.overviewStartX = 0
+                    self.overviewStartY = 0 
 
-            r = mr.point(self.redEqualization)
-            g = mg.point(self.greenEqualization)
-            b = mb.point(self.blueEqualization)
+            else:
+                return None, None
 
+            arr_flat = arr[np.isfinite(arr)]
+
+            # percentile min/max stretch values
+            low, high = np.percentile(arr_flat, [lower, upper])
+
+            stats.append((low, high))
+
+            band_arrays.append(arr)
         
-        else :
-            if self.listParam[4] != 0 or self.listParam[1] != 0 :
-                r = s[0].point(self.redEnhance)
-            else :
-                r = s[0]
-
-            if self.listParam[5] != 0 or self.listParam[1] != 0 :
-                g = s[1].point(self.greenEnhance)
-            else : 
-                g = s[1]
-
-            if self.listParam[6] != 0 or self.listParam[1] != 0 :
-                b = s[2].point(self.blueEnhance)
-            else :
-                b = s[2]
-
-        self.ret = [r,g,b]
-
-    #Fonction de fin de thread
-    def join(self):
-        threading.Thread.join(self)
-        return self.ret
+        img = np.stack(band_arrays, axis=2)
+        return stats, img
     
-    #Modification de la couche Rouge, considère aussi la luminosité
-    def redEnhance(self, value):
-        if self.listParam[4] > 0 :
-            return int(value * (1 + (self.listParam[4]/100))) + int(128*self.listParam[1]/100)
-        else :
-            return int(value * (1 - (0.5*(self.listParam[4]/-100)))) + int(128*self.listParam[1]/100)
-    
-    #Modification de la couche Verte, considère aussi la luminosité
-    def greenEnhance(self, value):
-        if self.listParam[5] > 0 :
-            return int(value * (1 + (self.listParam[5]/100))) + int(128*self.listParam[1]/100)
-        else :
-            return int(value * (1 - (0.5*(self.listParam[5]/-100)))) + int(128*self.listParam[1]/100)
-
-    #Modification de la couche Bleue, considère aussi la luminosité
-    def blueEnhance(self, value):
-        if self.listParam[6] > 0 :
-            return int(value * (1 + (self.listParam[6]/100))) + int(128*self.listParam[1]/100)
-        else :
-            return int(value * (1 - (0.5*(self.listParam[6]/-100)))) + int(128*self.listParam[1]/100)
-
-
-    #Modification de la couche Rouge selon le Min Max
-    def redEqualization(self,value):
-        oldMin = self.pixValue[0]
-        oldMax = self.pixValue[1]
-        newMin = 0 
-        newMax = 255
-        v = ((value-oldMin)*(newMax-newMin))/(oldMax - oldMin) + newMin
-        return round(v)
-
-    #Modification de la couche Verte selon le Min Max
-    def greenEqualization(self,value):
-        oldMin = self.pixValue[2]
-        oldMax = self.pixValue[3]
-        newMin = 0 
-        newMax = 255
-        v = ((value-oldMin)*(newMax-newMin))/(oldMax - oldMin) + newMin
-        return round(v)
-
-    #Modification de la couche Bleue selon le Min Max
-    def blueEqualization(self,value):
-        oldMin = self.pixValue[4]
-        oldMax = self.pixValue[5] 
-        newMin = 0 
-        newMax = 255
-        v = ((value-oldMin)*(newMax-newMin))/(oldMax - oldMin) + newMin
-        return round(v)
-
-    #Calcul de l'histogramme et repérage des valeur min et max dans les trois couleurs
-    def calculHistogram(self, red, green, blue):
-
-        redHis = red.histogram()
-        redSum = sum(redHis)
-        greenHis = green.histogram()
-        greenSum = sum(greenHis)
-        blueHis = blue.histogram()
-        blueSum = sum(blueHis)
-        cutValue = [round(redSum*0.05), round(redSum*0.95), round(greenSum*0.05), round(greenSum*0.95), round(blueSum*0.05), round(blueSum*0.95)]
-        self.pixValue = []
-        buff = 0
-        count = 0
-        for i in range(len(redHis)):
-            buff += redHis[i] 
-            if buff > cutValue[count] : 
-                self.pixValue.append(i)
-                count += 1
-                if count == 2 :
-                    break
-        
-        buff = 0
-        for i in range(len(greenHis)):
-            buff += greenHis[i] 
-            if buff > cutValue[count] : 
-                self.pixValue.append(i)
-                count += 1
-                if count == 4 :
-                    break
-        
-        buff = 0
-        for i in range(len(blueHis)):
-            buff += blueHis[i] 
-            if buff > cutValue[count] : 
-                self.pixValue.append(i)
-                count += 1
-                if count == 6 :
-                    break
-    
-
-#Fonction qui réalise une rotation et/ou un effet miroir d'une photo PIL
-#Elle retourne une photo PIL ou une QImage selon le choix retQImage (True/False) 
-def pictureLayout(picture, rotation, miroir, retQImage, cropValue=None):
-    
-    if rotation == 0 and miroir == 0 :
-        pic = picture
-
-    else :
-        pic = picture
-        if rotation == 3 :
-            pic = pic.rotate(90, expand=1)
-        elif rotation == 2 :
-            pic = pic.rotate(180, expand=0)
-        elif rotation == 1 :
-            pic = pic.rotate(270, expand=1)
-        
-        if miroir == 1 :
-            pic = pic.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
-        elif miroir == 2 :
-            pic = pic.transpose(Image.Transpose.FLIP_TOP_BOTTOM)
-
-    if cropValue:
-        pic = pic.crop(cropValue)
-        
-
-    if retQImage : 
-        npPicture = np.array(pic)
-        height, width, channel = npPicture.shape
-        q_image = QImage(npPicture.data, width, height, (width*3), QImage.Format_RGB888)
-        #qtI = qimage2ndarray.array2qimage(npPicture)
-        return q_image
-    else :
-        return pic

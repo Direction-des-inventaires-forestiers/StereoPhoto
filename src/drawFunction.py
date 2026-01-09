@@ -25,18 +25,12 @@ from qgis.utils import iface
 from qgis.PyQt.QtWidgets import *
 from qgis.PyQt.QtCore import *
 from qgis.PyQt.QtGui import *
-#from PyQt5.QtWidgets import *
-#from PyQt5.QtCore import *
-#from PyQt5.QtGui import *
 
 import math, threading, traceback
 from osgeo import gdal
+import numpy as np
 from .worldManager import pictureManager, dualManager
 
-#rect signifie la zone d'inspection désirer (QgsRectangle de coordonnée)
-#un feature partiellement dans le rectangle se considérer dans la liste -> ce qu'on désire
-#list(QgsVectorLayer.getFeatures(rect))[0] -> retourne le premier feature de la liste .geometry()
-#QgsProject.instance().fileName()
 
 #Création d'un vector layer dans QGIS
 #Ajout d'un ID pour être similaire à la création normale de QGIS
@@ -92,8 +86,6 @@ def reshapeLayer(lineString,listFeatures,vectorLayer) :
 #Découpe la couche en fonction d'une ligne tracer par l'utilisateur
 #Si les lignes tracées se croisent aucune coupe à lieu (IDEM à QGIS)
 def cutPolygon(vectorLayer, line):
-    #p1 = p2 = QgsPointXY(float, float)
-    #line = [p1, p2, ...]
     vectorLayer.startEditing()
     vectorLayer.removeSelection()
     vectorLayer.splitFeatures(line)
@@ -124,8 +116,6 @@ def automaticPolygon(oldGeo, currentIndex, newGeo, vectorLayer):
 def addPoint(vectorLayer,geometry) :
     vectorLayer.startEditing()
     
-    #feature = QgsFeature(vectorLayer.fields())  
-    #feature.setGeometry(geometry)
     feature = QgsFeature()
     #geom = QgsGeometry()
     feature.setGeometry(geometry)
@@ -142,7 +132,7 @@ def addPoint(vectorLayer,geometry) :
 
 
 class calculatePolygon(QThread):
-    def __init__(self, vectorToShow, rectCoord, leftPicMan, rightPicMan, value, mntPath):
+    def __init__(self, vectorToShow, rectCoord, leftPicMan, rightPicMan, initAltitude, mntPath):
         QThread.__init__(self)
         #self.features = featList
         self.vectorToShow = vectorToShow
@@ -150,7 +140,7 @@ class calculatePolygon(QThread):
         self.leftManager = pictureManager(leftPicMan[0], leftPicMan[1])
         self.rightManager = pictureManager(rightPicMan[0], rightPicMan[1])
         self.dualManag = dualManager(self.leftManager,self.rightManager)
-        self.keyVal = value #cropValueLeft,rightMiroir,rightPicSize[0],cropValueRight,initAltitude
+        self.initAltitude = initAltitude 
         self.mntPath = mntPath 
         self.useLayerZ = False
         self.oldMNTPath = ''
@@ -162,23 +152,56 @@ class calculatePolygon(QThread):
     def run(self):
         while self.running : 
             if self.mntPath != '' :
-                self.mntDS = gdal.Open(self.mntPath)
+                self.mntDS = gdal.Open(self.mntPath,gdal.GA_ReadOnly)
                 self.mntBand = self.mntDS.GetRasterBand(1)
                 self.mntGeo = self.mntDS.GetGeoTransform()
                 self.mntSize = (self.mntDS.RasterXSize, self.mntDS.RasterYSize)
                 self.mntNodata = self.mntBand.GetNoDataValue()
 
-                self.pxStart = math.floor((self.rectCoord.xMinimum() - self.mntGeo[0]) / self.mntGeo[1]) 
-                self.pyStart = math.floor((self.rectCoord.yMaximum() - self.mntGeo[3]) / self.mntGeo[5])
-                pxEnd = math.floor((self.rectCoord.xMaximum() - self.mntGeo[0]) / self.mntGeo[1]) 
+                pxStart = math.floor((self.rectCoord.xMinimum() - self.mntGeo[0]) / self.mntGeo[1])
+                pyStart = math.floor((self.rectCoord.yMaximum() - self.mntGeo[3]) / self.mntGeo[5])
+
+                pxEnd = math.floor((self.rectCoord.xMaximum() - self.mntGeo[0]) / self.mntGeo[1])
                 pyEnd = math.floor((self.rectCoord.yMinimum() - self.mntGeo[3]) / self.mntGeo[5])
-                
-                sizeX = int(pxEnd-self.pxStart) if pxEnd < self.mntSize[0] else int(self.mntSize[0]-self.pxStart)
-                sizeY = int(pyEnd-self.pyStart) if pyEnd < self.mntSize[1] else int(self.mntSize[1]-self.pyStart)
-                
-                #Lecture du MNT sur la zone couverte par les images
-                try : self.mntArr = self.mntBand.ReadAsArray(self.pxStart,self.pyStart,sizeX,sizeY)
-                except : self.mntArr = self.mntNodata
+
+                # Requested output size
+                sizeX = pxEnd - pxStart
+                sizeY = pyEnd - pyStart            
+                mntArr = np.full((sizeY, sizeX), self.mntNodata, dtype=np.float32)
+
+                if (pxStart >= self.mntSize[0] or pxStart + sizeX <= 0 or
+                    pyStart >= self.mntSize[1] or pyStart + sizeY <= 0):
+
+                    self.mntArr = mntArr
+
+
+                else : 
+                    # Where the read starts *in the raster*
+                    read_xoff = max(0, pxStart)
+                    read_yoff = max(0, pyStart)
+
+                    # Where the read starts *inside the output array*
+                    arr_xoff = max(0, -pxStart)
+                    arr_yoff = max(0, -pyStart)
+
+                    # Compute read size inside raster bounds
+                    read_xsize = min(pxStart + sizeX, self.mntSize[0]) - read_xoff
+                    read_ysize = min(pyStart + sizeY, self.mntSize[1]) - read_yoff
+
+                    if read_xsize > 0 and read_ysize > 0:
+                        try:
+                            sub = self.mntBand.ReadAsArray(read_xoff, read_yoff,
+                                                        read_xsize, read_ysize)
+                            # Place into output array
+                            mntArr[arr_yoff:arr_yoff + read_ysize,
+                                arr_xoff:arr_xoff + read_xsize] = sub
+
+                        except Exception as e:
+                            # Reading failed → keep nodata-filled array
+                            print("ReadAsArray failed:", e)
+
+                    # Store final result
+                    self.mntArr = mntArr
                 
             for layer in iface.mapCanvas().layers():
                 try :
@@ -269,34 +292,39 @@ class calculatePolygon(QThread):
                 
         xPixel, yPixel = self.leftManager.coordToPixel((point.x() , point.y()), z)
         #keyVal  = cropValueLeft,rightMiroir,rightPicSize[0],cropValueRight,initAltitude
-        pixL = (xPixel-self.keyVal[0][0], yPixel-self.keyVal[0][1])            
+        pixL = (xPixel, yPixel)            
 
         xPixel, yPixel = self.rightManager.coordToPixel((point.x() , point.y()), z)          
-        if self.keyVal[1] == 1 :
-            mirrorX = self.keyVal[2] - xPixel
-            pixR = (mirrorX, yPixel)
-        else : pixR = (xPixel-self.keyVal[3][0], yPixel-self.keyVal[3][1])  
+      
+        pixR = (xPixel, yPixel)  
         
         return pixL, pixR
 
     def getAltitude(self,x,y,z=None) : 
         mntAlt = None
     
-        if self.mntPath != '' and  self.mntArr is not self.mntNodata:
+        if self.mntPath != '' : #and  self.mntArr is not self.mntNodata:
 
             pxPoint = math.floor((x - self.mntGeo[0]) / self.mntGeo[1]) 
             pyPoint = math.floor((y - self.mntGeo[3]) / self.mntGeo[5])
+
             try : 
                 #Array numpy l'axe Y en premier
                 mntAlt = self.mntArr[pyPoint-self.pyStart,pxPoint-self.pxStart]
                 if mntAlt != self.mntNodata : 
                     return mntAlt
+            #if pxPoint in range(0,self.mntSize[0]) and pyPoint in range(0,self.mntSize[1]) :
+            #    try : 
+            #        
+            #        mntAlt = self.mntBand.ReadAsArray(pxPoint,pyPoint,1,1)
+            #        if mntAlt != self.mntNodata : 
+            #            return mntAlt
 
             except : pass
         
         if z is None  :
-            pl = self.leftManager.coordToPixel((x,y), self.keyVal[4])
-            pr = self.rightManager.coordToPixel((x,y), self.keyVal[4]) 
+            pl = self.leftManager.coordToPixel((x,y), self.initAltitude)
+            pr = self.rightManager.coordToPixel((x,y), self.initAltitude) 
             mntAlt = self.dualManag.calculateZ(pl,pr)
         else : mntAlt = z
         

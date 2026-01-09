@@ -195,12 +195,12 @@ class graphicsView(QtWidgets.QGraphicsView):
   
 
 class enhanceWindow(QtWidgets.QMainWindow): 
+    
     def __init__(self):
         super(enhanceWindow, self).__init__()
         self.ui = Ui_enhanceWindow()
         self.initSize = self.size()
         self.ui.setupUi(self)
-
     
     #Revoir cette méthode, semble inversé le state un fois lancé, jamais State maximized quand on le max seulement quand on réduit ---> à décalage!
     def resizeEvent(self, event) :
