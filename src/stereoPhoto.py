@@ -647,8 +647,8 @@ class stereoPhoto(object):
                 corrX = self.lastCurrentView[-2] /2     
                 corrY = self.lastCurrentView[-1] /2     
 
-                pixLCustom = (pxL-corrX,pxL-corrY)
-                pixRCustom = (pxR-corrX,pxR-corrY)
+                pixLCustom = (pxL-corrX,pyL-corrY)
+                pixRCustom = (pxR-corrX,pyR-corrY)
                 
                 customView = pixLCustom + pixRCustom + self.lastCurrentView[-2:]
                 self.zoomToScale(-1, customView=customView)
