@@ -8,8 +8,7 @@ class ImageRoot(QtWidgets.QGraphicsObject):
         super().__init__(parent)
 
     def boundingRect(self):
-        # Doesn't draw anything, but must exist
-        return QtCore.QRectF()
+        return QtCore.QRectF(-100000, -100000, 200000, 200000)
 
     def paint(self, painter, option, widget=None):
         pass
@@ -82,14 +81,24 @@ class graphicsWindow(QtWidgets.QMainWindow):
         self.scene.setItemIndexMethod(QtWidgets.QGraphicsScene.NoIndex)
         self.ui.graphicsView.setScene(self.scene)
 
+        self.imageRoot = ImageRoot()
+        self.scene.addItem(self.imageRoot)
+
         self.resetTileGroup(remove=False)
 
-        self.imageRoot = ImageRoot()
-        self.currentScale = 1
+        self.geometryItemGroup = QtWidgets.QGraphicsItemGroup()
+        self.geometryItemGroup.setZValue(100)
+        self.scene.addItem(self.geometryItemGroup)
+
+        self.offboundRectGroup = QtWidgets.QGraphicsItemGroup()
+        self.offboundRectGroup.setZValue(200)
+        self.scene.addItem(self.offboundRectGroup)
+
 
         self.cursor = CursorItem(radius=20)
         self.scene.addItem(self.cursor)
 
+        self.tileGroupAction = 'safety' 
 
 
     def keyPressEvent(self, event):
@@ -114,7 +123,12 @@ class graphicsWindow(QtWidgets.QMainWindow):
     def custom_centerOn(self,target_scene_pos,scale) :
         view = self.ui.graphicsView
         view_center = view.viewport().rect().center()
-        
+
+        def findScaleAction(scale) :
+            if scale < 0.1 : return 'safety'
+            elif scale < 0.5 : return 'overview'
+            else : return 'full'
+
         tx = view_center.x() - (target_scene_pos.x() * scale)
         ty = view_center.y() - (target_scene_pos.y() * scale)
         
@@ -123,8 +137,12 @@ class graphicsWindow(QtWidgets.QMainWindow):
         transform.scale(scale, scale)
         
         view.setTransform(transform)
-        
         self.centerCrosshair()
+
+        newAction = findScaleAction(scale)
+        if self.tileGroupAction != newAction : 
+            self.manageTileGroupViewing(newAction)
+            self.tileGroupAction = newAction
         
     def addPixmap(self,pixmap, scaleFactor, topX, topY,groupId) :
         if groupId == 0 : tileGroup = self.fullviewTileGroup 
@@ -132,10 +150,11 @@ class graphicsWindow(QtWidgets.QMainWindow):
         else : tileGroup = self.safetyTileGroup
 
         item = QtWidgets.QGraphicsPixmapItem(pixmap,self.imageRoot)
+        item.setTransformationMode(Qt.FastTransformation) 
         item.setPos(topX, topY)
         item.setScale(scaleFactor)
-        item.setTransformationMode(Qt.FastTransformation) 
         tileGroup.addToGroup(item)
+        
 
     def resetTileGroup(self,remove=True) :
 
@@ -156,3 +175,23 @@ class graphicsWindow(QtWidgets.QMainWindow):
         self.safetyTileGroup = QtWidgets.QGraphicsItemGroup()
         self.safetyTileGroup.setZValue(-100)
         self.scene.addItem(self.safetyTileGroup)
+
+    def manageTileGroupViewing(self, action='full'):
+        
+        if action == 'full':
+            self.fullviewTileGroup.show()
+            self.overviewTileGroup.hide()
+            self.safetyTileGroup.show() 
+
+        elif action == 'overview':
+            self.fullviewTileGroup.hide()
+            self.overviewTileGroup.show()
+            self.safetyTileGroup.show()
+
+        elif action == 'safety':
+            self.fullviewTileGroup.hide()
+            self.overviewTileGroup.hide()
+            self.safetyTileGroup.show()
+
+        self.ui.graphicsView.viewport().update()
+

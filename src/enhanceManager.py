@@ -532,27 +532,11 @@ class threadShow(QThread):
                 band_arrays.append(ovr_band.ReadAsArray(x, y, w, h))
             return np.stack(band_arrays, axis=2)
 
-        # 2. Convert raw bytes from ReadRaster into a Numpy Array
-        # ReadRaster returns data in (Bands, Height, Width) order
         img = np.frombuffer(raw_data, dtype=np.uint8)
         img = img.reshape((3, h, w))
         
         # 3. Transpose to (Height, Width, Bands) for QImage/OpenCV
         return np.transpose(img, (1, 2, 0))
-
-    def fetch_tile2(self, x, y, w, h, ovr_index):
-        """Helper to read from either main band or overview band"""
-        band_arrays = []
-        for i in range(1, 4):
-            band = self.ds.GetRasterBand(i)
-            if ovr_index == -1:
-                target = band
-            else:
-                target = band.GetOverview(ovr_index)
-            
-            arr = target.ReadAsArray(x, y, w, h)
-            band_arrays.append(arr)
-        return np.stack(band_arrays, axis=2)
 
     def applyEnhancements(self, arr, params):
         arr = arr.astype(np.float32, copy=False)

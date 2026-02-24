@@ -1,6 +1,7 @@
 import os, math
 from osgeo import gdal, ogr, osr
 import numpy as np
+from qgis.core import QgsApplication
 
 def getParDict(dossierImages) :
     
@@ -20,6 +21,7 @@ def getParDict(dossierImages) :
     for i in listpath : 
         #On traite seulement les fichiers PAR du dossier
         if not i.endswith('.par') : continue
+        QgsApplication.processEvents()
         
         pathPAR = os.path.join(dossierImages,i)
 
@@ -30,7 +32,11 @@ def getParDict(dossierImages) :
             imgDS = gdal.Open(pathImg,gdal.GA_ReadOnly)
             sizeImg = (imgDS.RasterXSize, imgDS.RasterYSize)
             imgDS = None
-        
+        #info = gdal.Info(pathImg, format='json')
+
+        #with Image.open(pathImg) as img:
+        #    sizeImg = img.size 
+        #sizeImg = (info['size'][0], info['size'][1])
         try:
             with open(pathPAR, encoding='utf-8') as f:
                 lines = f.read().splitlines()
@@ -270,9 +276,15 @@ def createShapePoint(shapeName, epsg):
         feature.setGeometry(geo)
         vectorWriter.addFeature(feature)
     #return vectorWriter
-    
-#createShapePoint('a','A')    
-'''
+
+
+'''    
+#createShapePoint('a','A')   
+import time
+t = time.time()
+a= getParDict('E:/c24104/modeles_photos/rgb/Photo20rvb2023_20cm_Rvb/Mtm8/Tiff_Par')
+print(time.time()-t)
+
 a = getParDict('E:/Probleme_photos_paysage/fonctionne_pas_MTM6')
 result = get_neighbors_and_pairs("Q24226_002_NIR", a)
 print(result)
