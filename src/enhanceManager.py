@@ -130,13 +130,12 @@ class enhanceManager(QObject):
         else :
             currentPath = self.pathRight
 
-        pointZero = self.colorWindow.ui.graphicsView.mapToScene(QPoint(0,0))
         GV = self.colorWindow.ui.graphicsView
-        pointMax = self.colorWindow.ui.graphicsView.mapToScene(QPoint(GV.width(),GV.height()))
-        self.tSeek = threadShow(currentPath, pointZero, pointMax, self.listParam)
+        vp = GV.viewport()
+        sceneRect = GV.mapToScene(vp.rect()).boundingRect()
+        self.tSeek = threadShow(currentPath, self.listParam,sceneRect=sceneRect)
         self.tSeek.newImage.connect(self.addPixmap)
         self.tSeek.finished.connect(self.seekDone)
-        self.tSeek.setOverview()
         
         self.tSeek.start(QThread.IdlePriority)
         
@@ -146,10 +145,10 @@ class enhanceManager(QObject):
 
         
     #Fonction appelée par le emit du thread pour ajouter une portion de l'image sur l'affichage
-    def addPixmap(self, pixmap, scaleFactor, topX, topY) :
+    def addPixmap(self, pixmap, scaleFactor, topX, topY, groupId) :
         d = self.colorWindow.ui.graphicsView.scene().addPixmap(pixmap)
+        d.setPos(topX, topY)
         d.setScale(scaleFactor)
-        d.setOffset(topX, topY)
     
     #Fonction exécutée lorsque le thread d'affichage se termine
     #Elle relance le thread avec la même résolution si une requête a été faite sinon
@@ -398,18 +397,18 @@ class enhanceManager(QObject):
         return pixValue
     
 class threadShow(QThread):
-    newImage = pyqtSignal(QPixmap, float, int, int)
+    newImage = pyqtSignal(QPixmap, float, float, float, int)
     
-    def __init__(self, picturePath, pointZero, pointMax, listParam, cropValue=None):
+    def __init__(self, picturePath, listParam,cropValue=None, sceneRect=None):
         super().__init__()
         self.picturePath = picturePath
-        self.pointZero = pointZero
-        self.pointMax = pointMax
+        self.sceneRect = sceneRect
         self.listParam = listParam
         self.cropValue = cropValue
         self.perform_Enhancing = True if self.listParam[:8] != [0,0,0,0,0,0,0,False] else False
         self.keepRunning = True
         self.showThreadInProcess = False 
+        self.target_tile_size = 512
 
         # Open GDAL dataset ONCE here
         gdal.SetCacheMax(256 * 1024 * 1024)
@@ -420,26 +419,34 @@ class threadShow(QThread):
         if self.ds is None:
             raise ValueError("Cannot open image")
         
-    def setOverview(self) : 
-        
-        self.stats, overViewArray = self.get_global_stats_from_overview()
-
-        if overViewArray is not None: 
-            overViewArray = self.applyEnhancements(overViewArray,self.listParam)
-            he, wi, _ = overViewArray.shape
-            q_image = QImage(overViewArray.data, wi, he, wi*3, QImage.Format_RGB888)
-            pixmap = QPixmap.fromImage(q_image)
-            scale = min(self.width/self.widthOverview, self.height/self.heightOverview)
-            self.newImage.emit(pixmap, scale, self.overviewStartX, self.overviewStartY)
-        
-        
+        self.stats = self.get_global_stats_from_overview()
         
     
     def run(self):
 
         self.showThreadInProcess = True 
-        maxX, maxY = 2048,2048 
+        rects_L0 = self.calculate_load_rects()
         
+        for i in range(0, 5):
+            if not self.keepRunning: return
+            self.load_tiled_rect(rects_L0[i], ovr_index=1, groupId=2)
+        
+        self.load_tiled_rect(rects_L0[0], ovr_index=0, groupId=1)
+        self.load_tiled_rect(rects_L0[0], ovr_index=-1, groupId=0)
+        
+
+        for i in range(1, 5):
+            if not self.keepRunning: return
+            self.load_tiled_rect(rects_L0[i], ovr_index=0, groupId=1)
+        
+        for i in range(1, 5):
+            if not self.keepRunning: return
+            self.load_tiled_rect(rects_L0[i], ovr_index=-1, groupId=0)
+
+        self.showThreadInProcess = False
+
+    def calculate_load_rects(self):
+
         if self.cropValue is not None:
             x0 = self.cropValue[0]
             y0 = self.cropValue[1]
@@ -451,10 +458,10 @@ class threadShow(QThread):
             x1 = self.width
             y1 = self.height
 
-        topX = max(x0, int(self.pointZero.x() - 1024))
-        topY = max(y0, int(self.pointZero.y() - 1024))
-        lowX = min(x1, int(self.pointMax.x() + 1024))
-        lowY = min(y1, int(self.pointMax.y() + 1024))
+        topX = max(x0, int(self.sceneRect.left() - 1024))
+        topY = max(y0, int(self.sceneRect.top() - 1024))
+        lowX = min(x1, int(self.sceneRect.right() + 1024))
+        lowY = min(y1, int(self.sceneRect.bottom() + 1024))
 
 
         middleRect = [topX, topY, lowX, lowY]
@@ -464,56 +471,88 @@ class threadShow(QThread):
         fourthRect = [topX, lowY, lowX, y1]
         
         rects = [middleRect, firstRect, secondRect, thridRect, fourthRect]
-
-        for item in rects:
-            nbDivX = ceil((item[2] - item[0]) / maxX)
-            nbDivY = ceil((item[3] - item[1]) / maxY)
-            currentTopX, currentTopY = item[0], item[1]
-            
-            for x in range(nbDivX):
-                currentLowX = min(currentTopX + maxX, item[2])
-                for y in range(nbDivY):
-                    if not self.keepRunning:
-                        return
-                    currentLowY = min(currentTopY + maxY, item[3])
-                    
-                    # Load ONLY this tile from disk
-                    tile_width = currentLowX - currentTopX
-                    tile_height = currentLowY - currentTopY
-                    
-                    tile = self.loadImageTile(
-                        xoff=currentTopX,
-                        yoff=currentTopY,
-                        xsize=tile_width,
-                        ysize=tile_height
-                    )
-                    if self.perform_Enhancing : tile = self.applyEnhancements(tile,self.listParam)
-                    h, w, _ = tile.shape
-                    q_image = QImage(tile.data, w, h, w*3, QImage.Format_RGB888)
-                    pixmap = QPixmap.fromImage(q_image)
-
-                    self.newImage.emit(pixmap, 1, currentTopX, currentTopY)
-                    
-                    del tile
-                    
-                    currentTopY += maxY
-                currentTopX += maxX
-                currentTopY = item[1]
+        return rects
     
-    def loadImageTile(self, xoff=0, yoff=0, xsize=None, ysize=None, bands=[1,2,3]):
-        """Load a specific tile from the GDAL dataset"""
-        if xsize is None:
-            xsize = self.ds.RasterXSize - xoff
-        if ysize is None:
-            ysize = self.ds.RasterYSize - yoff
+    def load_tiled_rect(self, rect_full_res, ovr_index, groupId):
+        """
+        ovr_index: -1 (Full) or 0+ (Overview)
+        """
 
+        if ovr_index == -1:
+            scale = 1.0
+        else:
+            ovr_band = self.ds.GetRasterBand(1).GetOverview(ovr_index)
+            scale = min(self.width/ovr_band.XSize , self.height/ovr_band.YSize) 
+
+            
+        # We divide the coordinates by the scale factor
+        lx0 = int(rect_full_res[0] / scale)
+        ly0 = int(rect_full_res[1] / scale)
+        lx1 = int(rect_full_res[2] / scale)
+        ly1 = int(rect_full_res[3] / scale)
+
+        # 3. Tile and Load
+        nbDivX = ceil((lx1 - lx0) / self.target_tile_size)
+        nbDivY = ceil((ly1 - ly0) / self.target_tile_size)
+
+        for i in range(nbDivX):
+            curr_lx = lx0 + i * self.target_tile_size
+            tile_w = min(self.target_tile_size, lx1 - curr_lx)
+            if tile_w <= 0: continue
+            
+            for j in range(nbDivY):
+                if not self.keepRunning: return
+                curr_ly = ly0 + j * self.target_tile_size
+                tile_h = min(self.target_tile_size, ly1 - curr_ly)
+                if tile_h <= 0: continue
+
+                # Fetch the actual pixels from GDAL
+                tile = self.fetch_tile(curr_lx, curr_ly, tile_w, tile_h, ovr_index)
+                
+                if self.perform_Enhancing:
+                    tile = self.applyEnhancements(tile, self.listParam)
+                
+                q_img = QImage(bytes(tile.data), tile_w, tile_h, tile_w * 3, QImage.Format_RGB888)
+                pixmap = QPixmap.fromImage(q_img)
+                
+                self.newImage.emit(pixmap, scale, curr_lx * scale, curr_ly * scale, groupId)
+    
+    #import numpy as np
+
+    def fetch_tile(self, x, y, w, h, ovr_index):
+        
+        if ovr_index == -1:
+            raw_data = self.ds.ReadRaster(x, y, w, h, 
+                                        band_list=[1, 2, 3],
+                                        buf_type=gdal.GDT_Byte)
+        else:
+            band_arrays = []
+            for i in range(1, 4):
+                ovr_band = self.ds.GetRasterBand(i).GetOverview(ovr_index)
+                band_arrays.append(ovr_band.ReadAsArray(x, y, w, h))
+            return np.stack(band_arrays, axis=2)
+
+        # 2. Convert raw bytes from ReadRaster into a Numpy Array
+        # ReadRaster returns data in (Bands, Height, Width) order
+        img = np.frombuffer(raw_data, dtype=np.uint8)
+        img = img.reshape((3, h, w))
+        
+        # 3. Transpose to (Height, Width, Bands) for QImage/OpenCV
+        return np.transpose(img, (1, 2, 0))
+
+    def fetch_tile2(self, x, y, w, h, ovr_index):
+        """Helper to read from either main band or overview band"""
         band_arrays = []
-        for idx in bands:
-            band = self.ds.GetRasterBand(idx)
-            arr = band.ReadAsArray(xoff, yoff, xsize, ysize)
+        for i in range(1, 4):
+            band = self.ds.GetRasterBand(i)
+            if ovr_index == -1:
+                target = band
+            else:
+                target = band.GetOverview(ovr_index)
+            
+            arr = target.ReadAsArray(x, y, w, h)
             band_arrays.append(arr)
-        img = np.stack(band_arrays, axis=2) 
-        return img 
+        return np.stack(band_arrays, axis=2)
 
     def applyEnhancements(self, arr, params):
         arr = arr.astype(np.float32, copy=False)
@@ -606,8 +645,6 @@ class threadShow(QThread):
 
         return arr.astype(np.uint8, copy=False)
 
-
-    
     def get_global_stats_from_overview(self,band_numbers=[1,2,3], lower=5, upper=95):
         stats = []
         band_arrays = []
@@ -628,8 +665,8 @@ class threadShow(QThread):
                     sY = min(self.heightOverview,int((self.cropValue[3] - self.cropValue[1])/ scale))
 
                     arr = ovr_band.ReadAsArray(oX,oY,sX,sY).astype(np.float32)
-                    self.overviewStartX = oX
-                    self.overviewStartY = oY 
+                    self.overviewStartX = self.cropValue[0]
+                    self.overviewStartY = self.cropValue[1]
 
                 
                 else : 
@@ -647,8 +684,6 @@ class threadShow(QThread):
 
             stats.append((low, high))
 
-            band_arrays.append(arr)
         
-        img = np.stack(band_arrays, axis=2)
-        return stats, img
+        return stats
     
