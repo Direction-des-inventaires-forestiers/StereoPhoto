@@ -175,3 +175,25 @@ class navigationMapTool(QgsMapTool):
 
     def keyPressEvent(self, event):
         self.keybordSignal.emit(event)
+
+
+#Autre méthode pour le mouse trap Windows seulement
+
+'''
+    # Windows cursor clip
+    def _clip_windows(self):
+        rect = self.canvas.rect()
+        top_left = self.canvas.mapToGlobal(rect.topLeft())
+        bottom_right = self.canvas.mapToGlobal(rect.bottomRight())
+        class RECT(ctypes.Structure):
+            _fields_ = [("left", ctypes.c_long),
+                        ("top", ctypes.c_long),
+                        ("right", ctypes.c_long),
+                        ("bottom", ctypes.c_long)]
+        r = RECT(top_left.x(), top_left.y(), bottom_right.x(), bottom_right.y())
+        ctypes.windll.user32.ClipCursor(ctypes.byref(r))
+
+    def _release_windows(self):
+        ctypes.windll.user32.ClipCursor(None)
+
+    '''
