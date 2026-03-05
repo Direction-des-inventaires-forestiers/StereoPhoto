@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>280</width>
+    <width>279</width>
     <height>604</height>
    </rect>
   </property>
@@ -247,15 +247,15 @@
         </widget>
        </item>
        <item row="1" column="1">
-        <widget class="QSpinBox" name="spinBox"/>
+        <widget class="QSpinBox" name="spinBoxDownScreen"/>
        </item>
        <item row="3" column="1">
-        <widget class="QSpinBox" name="spinBox_2"/>
+        <widget class="QSpinBox" name="spinBoxUpScreen"/>
        </item>
        <item row="4" column="1">
-        <widget class="QPushButton" name="pushButton">
+        <widget class="QPushButton" name="pushButtonShowScreenNumber">
          <property name="text">
-          <string>Numéro</string>
+          <string>Voir Numéro</string>
          </property>
         </widget>
        </item>
@@ -533,6 +533,19 @@ color: rgb(220, 147, 0);</string>
        <set>Qt::AlignCenter</set>
       </property>
      </widget>
+    </item>
+    <item>
+     <spacer name="verticalSpacer">
+      <property name="orientation">
+       <enum>Qt::Vertical</enum>
+      </property>
+      <property name="sizeHint" stdset="0">
+       <size>
+        <width>20</width>
+        <height>1</height>
+       </size>
+      </property>
+     </spacer>
     </item>
    </layout>
   </widget>

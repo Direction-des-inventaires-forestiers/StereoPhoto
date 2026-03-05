@@ -17,7 +17,7 @@ class keyboardInterceptor(QObject):
         return False
 
 class navigationMapTool(QgsMapTool):
-    mouseClicked = pyqtSignal()
+    mouseClicked = pyqtSignal(Qt.MouseButton,tuple)
     mouseMoved = pyqtSignal(tuple)
     wheelActivate = pyqtSignal(int, Qt.KeyboardModifier, tuple)
     keybordSignal = pyqtSignal(QKeyEvent)
@@ -30,20 +30,19 @@ class navigationMapTool(QgsMapTool):
         self.currentMouseCoord = None
         self.lastEmittedCoord = None
         
-        # This flag prevents the tool from freezing during recentering
         self.ignoringSyntheticMove = False
 
         self.rubberBand = QgsRubberBand(self.canvas, QgsWkbTypes.GeometryType.LineGeometry)
         self.rubberBand.setColor(Qt.red)
         self.rubberBand.setWidth(2)
         self.drawing = False
-        self.activateDrawing = True
+        self.activateDrawing = False
         
-        self.borderRange = 150 # Larger border for 3D comfort
+        self.borderRange = 150
         self.safeRect = None
         self.centerGlobalPos = None
 
-        # 125Hz Timer (8ms) for butter-smooth stereoscopic panning
+        # 125Hz Timer (8ms) 
         self.sendPosTimer = QTimer()
         self.sendPosTimer.setInterval(8)
         self.sendPosTimer.setTimerType(Qt.PreciseTimer)
@@ -52,27 +51,21 @@ class navigationMapTool(QgsMapTool):
         self.interceptor = keyboardInterceptor(self)
 
     def eventFilter(self, obj, event):
-        """
-        This is the new "Trap" logic. 
-        It replaces canvasMoveEvent for the centering check.
-        """
+
         if event.type() == QEvent.MouseMove:
-            # 1. Kill the loop: if we are currently warping, ignore this event
+
             if self.ignoringSyntheticMove:
                 return True 
 
             new_pixel_pos = event.pos()
             
-            # Update coordinates for the timer
             self.currentMouseCoord = self.toMapCoordinates(new_pixel_pos)
             self.lastMousePos = new_pixel_pos
 
-            # 2. The Trap: If we cross the border, warp back
             if self.safeRect and not self.safeRect.contains(new_pixel_pos):
                 self.recenterMouse()
-                return True # Swallow the event so the mouse never 'leaves'
+                return True 
             
-            # 3. Handle Rubberband drawing during the move
             if self.drawing:
                 mapPoint = self.currentMouseCoord
                 if self.rubberBand.numberOfVertices() > 1:
@@ -80,36 +73,43 @@ class navigationMapTool(QgsMapTool):
                 else:
                     self.rubberBand.addPoint(mapPoint)
 
-        return False # Let clicks/wheel pass through
+        return False 
 
     def canvasPressEvent(self, event):
-        if event.button() == Qt.LeftButton: 
-            self.mouseClicked.emit()
-
+            
+        mapPoint = self.toMapCoordinates(event.pos())   
+        coordFormat = (float(mapPoint.x()), float(mapPoint.y())) 
+        self.mouseClicked.emit(event.button(),coordFormat)
+        
         if self.activateDrawing: 
             if event.button() == Qt.LeftButton:
-                mapPoint = self.toMapCoordinates(event.pos())
+                
                 if not self.drawing:
                     self.rubberBand.reset(QgsWkbTypes.GeometryType.LineGeometry)
                     self.rubberBand.addPoint(mapPoint)
                     self.drawing = True
                 else:
                     self.rubberBand.addPoint(mapPoint)
+            
             elif event.button() == Qt.RightButton and self.drawing:
                 self.drawing = False
                 self.rubberBand.reset(QgsWkbTypes.GeometryType.LineGeometry)
+        
         event.accept()
 
     def recenterMouse(self):
         if not self.centerGlobalPos or not self.currentMouseCoord:
             return
+        
+        if self.ignoringSyntheticMove:
+            return
 
+        # Lock the filter and warp
+        self.ignoringSyntheticMove = True   
         # Snap map to current coord
         self.canvas.setCenter(self.currentMouseCoord)
         self.canvas.refresh()
-            
-        # Lock the filter and warp
-        self.ignoringSyntheticMove = True        
+        
         QCursor.setPos(self.centerGlobalPos)        
         
         # Wait 20ms for OS to finish the jump before unlocking the filter
@@ -120,10 +120,10 @@ class navigationMapTool(QgsMapTool):
 
     def sendMouseMovePos(self): 
         if self.currentMouseCoord != self.lastEmittedCoord:
-            # Emit floats for sub-pixel accuracy in GraphicsView
+
             coordFormat = (float(self.currentMouseCoord.x()), float(self.currentMouseCoord.y()))
             self.mouseMoved.emit(coordFormat)
-            self.lastEmittedCoord = QgsPointXY(self.currentMouseCoord)
+            self.lastEmittedCoord = self.currentMouseCoord
 
     def wheelEvent(self, event):
         factor = event.angleDelta().y()
@@ -151,18 +151,21 @@ class navigationMapTool(QgsMapTool):
             QTimer.singleShot(20, self.clearSyntheticGuard) 
             
         self.sendPosTimer.start()
+        #self.iface.mainWindow().installEventFilter(self.interceptor)
+        qApp.installEventFilter(self.interceptor)
         self.canvas.setFocus()
-        self.iface.mainWindow().installEventFilter(self.interceptor)
 
     def deactivate(self):
         self.canvas.viewport().removeEventFilter(self)
         self.sendPosTimer.stop()
         self.rubberBand.reset(QgsWkbTypes.GeometryType.LineGeometry)
-        self.iface.mainWindow().removeEventFilter(self.interceptor)
+        #self.iface.mainWindow().removeEventFilter(self.interceptor)
+        qApp.removeEventFilter(self.interceptor)
+        self.drawing = False
         super().deactivate()
 
     def updateSafeZone(self):
-        # Always use viewport for coordinate trapping
+        
         rect = self.canvas.viewport().rect()
         self.safeRect = rect.adjusted(
             self.borderRange, self.borderRange,

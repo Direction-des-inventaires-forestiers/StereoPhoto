@@ -94,6 +94,9 @@ class graphicsWindow(QtWidgets.QMainWindow):
         self.offboundRectGroup.setZValue(200)
         self.scene.addItem(self.offboundRectGroup)
 
+        self.drawingLineGroup = QtWidgets.QGraphicsItemGroup()
+        self.drawingLineGroup.setZValue(300)
+        self.scene.addItem(self.drawingLineGroup)
 
         self.cursor = CursorItem(radius=20)
         self.scene.addItem(self.cursor)
@@ -120,7 +123,7 @@ class graphicsWindow(QtWidgets.QMainWindow):
         self.cursor.prepareGeometryChange()
         self.cursor.setPos(scene_center)
 
-    def custom_centerOn(self,target_scene_pos,scale) :
+    def custom_centerOn(self,target_scene_pos,scale,forceGroupCall=False) :
         view = self.ui.graphicsView
         view_center = view.viewport().rect().center()
 
@@ -140,10 +143,10 @@ class graphicsWindow(QtWidgets.QMainWindow):
         self.centerCrosshair()
 
         newAction = findScaleAction(scale)
-        if self.tileGroupAction != newAction : 
+        if self.tileGroupAction != newAction or forceGroupCall : 
             self.manageTileGroupViewing(newAction)
             self.tileGroupAction = newAction
-        
+
     def addPixmap(self,pixmap, scaleFactor, topX, topY,groupId) :
         if groupId == 0 : tileGroup = self.fullviewTileGroup 
         elif groupId == 1 : tileGroup = self.overviewTileGroup
@@ -193,5 +196,4 @@ class graphicsWindow(QtWidgets.QMainWindow):
             self.overviewTileGroup.hide()
             self.safetyTileGroup.show()
 
-        self.ui.graphicsView.viewport().update()
 

@@ -370,7 +370,7 @@ class paramWindow(QtWidgets.QMainWindow):
                 center = (int(screenGeo.width()/2), int(screenGeo.height()/2))
                 #rect = QtCore.QRect(center[0]-50,center[1]-50,center[0]+50,center[1]+50)
                 rect = QtCore.QRect(0,0,125,175)
-                graphWin = graphicsWindow("Numéro de l'écran")
+                graphWin = graphicsWindow()
                 graphWin.resize(125,175)
                 graphWin.ui.graphicsView.setGeometry(rect)
                 graphWin.move(QtCore.QPoint(screenGeo.x()+center[0]-50,screenGeo.y()+center[1]-50))                
@@ -396,10 +396,10 @@ class paramWindow(QtWidgets.QMainWindow):
                 graphWin.close()
         
 class graphicsWindow(QtWidgets.QMainWindow): 
-    def __init__(self, nom):
+    def __init__(self):
         QtWidgets.QMainWindow.__init__(self)
         self.ui = Ui_graphicsWindow()
-        self.ui.setupUi(self, nom)
+        self.ui.setupUi(self)
 
 
 if __name__ == "__main__":

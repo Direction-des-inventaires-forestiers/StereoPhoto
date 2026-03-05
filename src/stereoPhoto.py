@@ -53,6 +53,7 @@ from .worldManager import pictureManager, dualManager, createWKTString
 from .enhanceManager import enhanceManager, threadShow
 from .drawFunction import *
 from .navigationQgsMapTool import navigationMapTool
+#from .ui_widgetStereoPhoto import optionWindow
 
 from .gestionDossier import getParDict, get_neighbors_and_pairs, findPairWithCoord, compute_overlap
 import sys, os, time, math, gc
@@ -141,14 +142,9 @@ class stereoPhoto(object):
         self.tSeekLeft = None
         self.tSeekRight = None
 
-        self.polygonOnLeftScreen = []
-        self.polygonOnRightScreen = []
         self.polygonL2Draw = {}
         self.polygonR2Draw = {}
         
-        self.greyRectOnLeftScreen = []
-        self.greyRectOnRightScreen = []
-
         self.listParam = [0, 0, 0, 0, 0, 0, 0, False, False, []]
         self.lastEnhanceParam = [0, 0, 0, 0, 0, 0, 0, False, False, []]
 
@@ -411,7 +407,10 @@ class stereoPhoto(object):
         if self.enableShow : 
             self.windowHandler('picture')
             self.setExtent2Canvas()
-            if self.enableDraw : self.startPolygonThread()
+            if self.enableDraw : 
+                self.startPolygonThread()
+                if self.optWindow.currentMNTPath and self.vectorLayer.geometryType() == QgsWkbTypes.PolygonGeometry :self.navigMapTool.activateDrawing = True
+                else : self.navigMapTool.activateDrawing = False
             return
 
         self.intLeftScreen = self.paramMenu.ui.spinBoxScreenLeft.value()
@@ -425,13 +424,13 @@ class stereoPhoto(object):
 
         self.graphWindowLeft = graphicsWindow()
         self.graphWindowLeft.setWindowFlags(Qt.Window | Qt.FramelessWindowHint)
-        self.graphWindowLeft.setAttribute(Qt.WA_ShowWithoutActivating)
+        #self.graphWindowLeft.setAttribute(Qt.WA_ShowWithoutActivating)
         self.graphWindowLeft.move(screenLeft_geom.topLeft())
         self.graphWindowLeft.keyPressed.connect(self.keyboardHandler)
 
         self.graphWindowRight = graphicsWindow()
         self.graphWindowRight.setWindowFlags(Qt.Window | Qt.FramelessWindowHint)
-        self.graphWindowRight.setAttribute(Qt.WA_ShowWithoutActivating)
+        #self.graphWindowRight.setAttribute(Qt.WA_ShowWithoutActivating)
         self.graphWindowRight.move(screenRight_geom.topLeft())
         self.graphWindowRight.keyPressed.connect(self.keyboardHandler)
         
@@ -459,17 +458,9 @@ class stereoPhoto(object):
                 self.tSeekLeft.keepRunning = False
                 self.tSeekLeft.wait()
             self.tSeekLeft = None
-        #try : 
-        #    for item in list(self.sceneLeft.items()):
-        #        if isinstance(item, QGraphicsPixmapItem):
-        #            self.sceneLeft.removeItem(item)
-        #except : pass
+
         if hasattr(self, "graphWindowLeft"):
             self.graphWindowLeft.resetTileGroup()
-            #self.graphWindowLeft.scene.removeItem(self.graphWindowLeft.tileGroup)
-            #self.graphWindowLeft.tileGroup = QGraphicsItemGroup()
-            #self.graphWindowLeft.tileGroup.setZValue(0)
-            #self.graphWindowLeft.scene.addItem(self.graphWindowLeft.tileGroup)
         
         if self.tSeekRight is not None : 
             if self.tSeekRight.showThreadInProcess : 
@@ -477,20 +468,10 @@ class stereoPhoto(object):
                 self.tSeekRight.keepRunning = False
                 self.tSeekRight.wait()
             self.tSeekRight = None
-        #try : 
-        #    for item in list(self.sceneRight.items()):
-        #        if isinstance(item, QGraphicsPixmapItem):
-        #            self.sceneRight.removeItem(item)
-        #except : pass
 
         if hasattr(self, "graphWindowRight"):
             self.graphWindowRight.resetTileGroup()
-            #self.graphWindowRight.scene.removeItem(self.graphWindowRight.tileGroup)
-            #self.graphWindowRight.tileGroup = QGraphicsItemGroup()
-            #self.graphWindowRight.tileGroup.setZValue(0)
-            #self.graphWindowRight.scene.addItem(self.graphWindowRight.tileGroup)
         
-        gc.collect()
         QApplication.processEvents()
         
     def loadNewPair(self):
@@ -552,28 +533,30 @@ class stereoPhoto(object):
         self.setStartingView()
         self.setExtent2Canvas()
 
-        self.polygonOnLeftScreen = []
-        self.polygonOnRightScreen = []
         self.polygonL2Draw = {}
         self.polygonR2Draw = {}
-        self.greyRectOnLeftScreen = []
-        self.greyRectOnRightScreen = []
+        self.firstDrawClick = True
 
         LGV = self.graphWindowLeft.ui.graphicsView
         vpl = LGV.viewport()
-        sceneRectL = LGV.mapToScene(vpl.rect()).boundingRect().normalized()
-        self.tSeekLeft.sceneRect = sceneRectL
+        sceneRectL = LGV.mapToScene(vpl.rect()).boundingRect()
+        realLeftRect = self.graphWindowLeft.imageRoot.mapFromScene(sceneRectL).boundingRect()
+        self.tSeekLeft.set_SceneRect(realLeftRect)
         self.tSeekLeft.start(QThread.IdlePriority)
         
         RGV = self.graphWindowRight.ui.graphicsView
         vpr = RGV.viewport()
-        sceneRectR = RGV.mapToScene(vpr.rect()).boundingRect().normalized()
-        self.tSeekRight.sceneRect = sceneRectR
+        sceneRectR = RGV.mapToScene(vpr.rect()).boundingRect()
+        realRigthRect = self.graphWindowRight.imageRoot.mapFromScene(sceneRectR).boundingRect()
+
+        self.tSeekRight.set_SceneRect(realRigthRect)
         self.tSeekRight.start(QThread.IdlePriority)
         
         
         if self.enableDraw : 
             self.startPolygonThread()
+            if self.optWindow.currentMNTPath and self.vectorLayer.geometryType() == QgsWkbTypes.PolygonGeometry :self.navigMapTool.activateDrawing = True
+            else : self.navigMapTool.activateDrawing = False
 
     def getQtransform(self, pictureManager : pictureManager):
         r11 = pictureManager.r11
@@ -650,7 +633,6 @@ class stereoPhoto(object):
     #Fonction qui détermine la région approximative des photos
     #Retourne le rectangle de coordonnée
     def getShowRect(self) :
-
         try :
             leftBbox = self.currentParDict[self.leftParID]
             rightBbox = self.currentParDict[self.rightParID]
@@ -658,10 +640,8 @@ class stereoPhoto(object):
             _, bboxOverlap = compute_overlap(leftBbox, rightBbox) 
 
             rectL = QgsRectangle(QgsPointXY(bboxOverlap[0]-700, bboxOverlap[1]-700), QgsPointXY(bboxOverlap[2]+700, bboxOverlap[3]+700))
-            
 
             return rectL
-        
         except :
             return QgsRectangle(QgsPointXY(0, 0), QgsPointXY(0, 0))
         
@@ -680,9 +660,6 @@ class stereoPhoto(object):
         self.optWindow.ui.importLineVectorLayer.setText("")
         self.optWindow.ui.importLineVectorLayer.blockSignals(False)
 
-
-
-    #Ralentie l'app et fait des crash très fréquent, peut être pas donner l'object au complet...
     def startPolygonThread(self) : 
         if hasattr(self,'tPolygon'): 
             if self.tPolygon.isRunning():
@@ -714,22 +691,10 @@ class stereoPhoto(object):
             for item in self.graphWindowRight.geometryItemGroup.childItems():
                 self.graphWindowRight.scene.removeItem(item)
         
-        #if self.polygonOnLeftScreen :
-        #    for item in self.polygonOnLeftScreen :
-        #        try : self.graphWindowLeft.ui.graphicsView.scene().removeItem(item)
-        #        except : pass
-        #self.polygonOnLeftScreen = []
-
-        #if self.polygonOnRightScreen :
-        #    for item in self.polygonOnRightScreen :
-        #        try : self.graphWindowRight.ui.graphicsView.scene().removeItem(item)
-        #        except : pass
-        #self.polygonOnRightScreen = []
-
     def drawPolygon(self) :   
         self.deleteOldPolygon()
         if self.polygonL2Draw : 
-            #ajouter un group de graphics item avec un zvalue de 10 changer del pour juste del le group
+            
             for name, arr in self.polygonL2Draw.items() : 
                 geoType = arr[2]
                 color = arr[1]
@@ -746,26 +711,18 @@ class stereoPhoto(object):
                         leftObj = QGraphicsPolygonItem(polyLeft[i],self.graphWindowLeft.imageRoot)
                         rightObj = QGraphicsPolygonItem(polyRight[i],self.graphWindowRight.imageRoot)
 
-                        #leftObj = self.graphWindowLeft.ui.graphicsView.scene().addPolygon(polyLeft[i], layerPen)
-                        #rightObj = self.graphWindowRight.ui.graphicsView.scene().addPolygon(polyRight[i], layerPen)
                     elif geoType == QgsWkbTypes.LineGeometry : 
                         leftObj = QGraphicsPathItem(polyLeft[i],self.graphWindowLeft.imageRoot)
                         rightObj = QGraphicsPathItem(polyRight[i],self.graphWindowRight.imageRoot)
 
-
-                        #leftObj = self.graphWindowLeft.ui.graphicsView.scene().addPath(polyLeft[i], layerPen)
-                        #rightObj = self.graphWindowRight.ui.graphicsView.scene().addPath(polyRight[i], layerPen)
                     elif geoType == QgsWkbTypes.PointGeometry : 
                         radius = 9  #rayon pour la taille des points 
-                        leftObj = QGraphicsEllipseItem(polyLeft[i][0] - radius, polyLeft[i][1] - radius, 2*radius, 2*radius,self.graphWindowLeft.imageRoot)
-                        #pointLeft.setPen(layerPen)
-                        leftObj.setBrush(color)
-                        rightObj = QGraphicsEllipseItem(polyRight[i][0] - radius, polyRight[i][1] - radius, 2*radius, 2*radius,self.graphWindowRight.imageRoot)
-                        #pointRight.setPen(layerPen)
-                        rightObj.setBrush(color)
-                        #leftObj = self.graphWindowLeft.ui.graphicsView.scene().addItem(pointLeft)
                         
-                        #rightObj = self.graphWindowRight.ui.graphicsView.scene().addItem(pointRight)
+                        leftObj = QGraphicsEllipseItem(polyLeft[i][0] - radius, polyLeft[i][1] - radius, 2*radius, 2*radius,self.graphWindowLeft.imageRoot)
+                        leftObj.setBrush(color)
+                        
+                        rightObj = QGraphicsEllipseItem(polyRight[i][0] - radius, polyRight[i][1] - radius, 2*radius, 2*radius,self.graphWindowRight.imageRoot)
+                        rightObj.setBrush(color)
                     
                     leftObj.setPen(layerPen)
                     rightObj.setPen(layerPen)
@@ -809,8 +766,6 @@ class stereoPhoto(object):
         rectObj.setPen(QPen(color))
         self.graphWindowLeft.offboundRectGroup.addToGroup(rectObj)
 
-        #self.greyRectOnLeftScreen.append(sceneL.addRect(gr1L, QColor(182,182,182), QColor(182,182,182)))
-
         # Right side
         gr2L = QtCore.QRectF(x1, y0 - dval, dval, (y1 - y0) + 2*dval)
         rectObj = QGraphicsRectItem(gr2L,self.graphWindowLeft.imageRoot)
@@ -818,7 +773,6 @@ class stereoPhoto(object):
         rectObj.setPen(QPen(color))
         self.graphWindowLeft.offboundRectGroup.addToGroup(rectObj)
         
-        #self.greyRectOnLeftScreen.append(sceneL.addRect(gr2L, QColor(182,182,182), QColor(182,182,182)))
 
         # Top
         gr3L = QtCore.QRectF(x0, y0 - dval, (x1 - x0), dval)
@@ -827,7 +781,6 @@ class stereoPhoto(object):
         rectObj.setPen(QPen(color))
         self.graphWindowLeft.offboundRectGroup.addToGroup(rectObj)
         
-        #self.greyRectOnLeftScreen.append(sceneL.addRect(gr3L, QColor(182,182,182), QColor(182,182,182)))
 
         # Bottom
         gr4L = QtCore.QRectF(x0, y1, (x1 - x0), dval)
@@ -835,9 +788,6 @@ class stereoPhoto(object):
         rectObj.setBrush(QBrush(color))
         rectObj.setPen(QPen(color))
         self.graphWindowLeft.offboundRectGroup.addToGroup(rectObj)
-        
-        #self.greyRectOnLeftScreen.append(sceneL.addRect(gr4L, QColor(182,182,182), QColor(182,182,182)))
-
 
         # For RIGHT screen 
         x0 = offRX
@@ -852,16 +802,12 @@ class stereoPhoto(object):
         rectObj.setPen(QPen(color))
         self.graphWindowRight.offboundRectGroup.addToGroup(rectObj)
 
-        #self.greyRectOnRightScreen.append(sceneR.addRect(gr1R, QColor(182,182,182), QColor(182,182,182)))
-
         # Right side
         gr2R = QtCore.QRectF(x1, y0 - dval, dval, (y1 - y0) + 2*dval)
         rectObj = QGraphicsRectItem(gr2R,self.graphWindowRight.imageRoot)
         rectObj.setBrush(QBrush(color))
         rectObj.setPen(QPen(color))
         self.graphWindowRight.offboundRectGroup.addToGroup(rectObj)
-
-        #self.greyRectOnRightScreen.append(sceneR.addRect(gr2R, QColor(182,182,182), QColor(182,182,182)))
 
         # Top
         gr3R = QtCore.QRectF(x0, y0 - dval, (x1 - x0), dval)
@@ -870,7 +816,6 @@ class stereoPhoto(object):
         rectObj.setPen(QPen(color))
         self.graphWindowRight.offboundRectGroup.addToGroup(rectObj)
 
-        #self.greyRectOnRightScreen.append(sceneR.addRect(gr3R, QColor(182,182,182), QColor(182,182,182)))
 
         # Bottom
         gr4R = QtCore.QRectF(x0, y1, (x1 - x0), dval)
@@ -878,9 +823,6 @@ class stereoPhoto(object):
         rectObj.setBrush(QBrush(color))
         rectObj.setPen(QPen(color))
         self.graphWindowRight.offboundRectGroup.addToGroup(rectObj)
-
-        #self.greyRectOnRightScreen.append(sceneR.addRect(gr4R, QColor(182,182,182), QColor(182,182,182)))
-        
 
 
     def seekLeftDone(self) : 
@@ -990,12 +932,7 @@ class stereoPhoto(object):
         if Z == self.mntNoData : return None
         return Z
 
-
-
     def setStartingView(self) : 
-
-        self.graphWindowLeft.tileGroupAction = 'safety' 
-        self.graphWindowRight.tileGroupAction = 'safety' 
 
         if self.buttonPosition : 
             
@@ -1014,8 +951,8 @@ class stereoPhoto(object):
                 scale = self.leftPictureManager.groundPixelSize / self.buttonMapUnit 
                 self.currentScale = scale
 
-                self.graphWindowLeft.custom_centerOn(scenePointL,scale)
-                self.graphWindowRight.custom_centerOn(scenePointR,scale)
+                self.graphWindowLeft.custom_centerOn(scenePointL,scale,forceGroupCall=True)
+                self.graphWindowRight.custom_centerOn(scenePointR,scale,forceGroupCall=True)
                 
 
 
@@ -1032,8 +969,8 @@ class stereoPhoto(object):
                 scale = self.lastCurrentView[-2]  
                 self.currentScale = scale
                 
-                self.graphWindowLeft.custom_centerOn(scenePointL,scale)
-                self.graphWindowRight.custom_centerOn(scenePointR,scale)
+                self.graphWindowLeft.custom_centerOn(scenePointL,scale,forceGroupCall=True)
+                self.graphWindowRight.custom_centerOn(scenePointR,scale,forceGroupCall=True)
 
         else : self.setCenterView()
         
@@ -1051,7 +988,7 @@ class stereoPhoto(object):
         cPixelR = self.graphWindowRight.imageRoot.mapFromScene(sceneCenterR)
 
         self.cursorAltitude = self.dualManager.calculateZ((cPixelL.x(), cPixelL.y()), (cPixelR.x(), cPixelR.y())) 
-        self.optWindow.ui.labelAltitude.setText(str(round(self.cursorAltitude,5)))
+        self.optWindow.ui.labelAltitude.setText(f"{self.cursorAltitude:.3f}")
         
 
 
@@ -1073,8 +1010,8 @@ class stereoPhoto(object):
         scale  = min(scaleX, scaleY)
         self.currentScale = scale
         
-        self.graphWindowLeft.custom_centerOn(scenePointL,scale)
-        self.graphWindowRight.custom_centerOn(scenePointR,scale)
+        self.graphWindowLeft.custom_centerOn(scenePointL,scale,forceGroupCall=True)
+        self.graphWindowRight.custom_centerOn(scenePointR,scale,forceGroupCall=True)
 
     def setBaseTransform(self) : 
         leftTransform = self.getQtransform(self.leftPictureManager)
@@ -1141,12 +1078,7 @@ class stereoPhoto(object):
         rangeX = (self.realCropValueLeft[0]+deltaX, self.realCropValueLeft[2]-deltaX)
         rangeY = (self.realCropValueLeft[1]+deltaY, self.realCropValueLeft[3]-deltaY)
 
-        if self.currentLeftLineObj:
-                self.graphWindowLeft.ui.graphicsView.scene().removeItem(self.currentLeftLineObj)
-            
-        if self.currentRightLineObj:
-            self.graphWindowRight.ui.graphicsView.scene().removeItem(self.currentRightLineObj)
-
+    
         out_x = self.endDrawPointLeft.x() <= rangeX[0]  or self.endDrawPointLeft.x() >= rangeX[1]
         out_y = self.endDrawPointLeft.y() <= rangeY[0] or self.endDrawPointLeft.y() >= rangeY[1]
         
@@ -1157,33 +1089,16 @@ class stereoPhoto(object):
             return
 
         if not self.firstDrawClick and self.enableDraw and self.optWindow.currentMNTPath :
-            lineL = QLineF(self.startDrawPointLeft, self.endDrawPointLeft) 
-            lineR = QLineF(self.startDrawPointRight, self.endDrawPointRight)  
             
-            self.currentLeftLineObj = self.graphWindowLeft.ui.graphicsView.scene().addLine(lineL, self.my_pen)
-            self.currentRightLineObj = self.graphWindowRight.ui.graphicsView.scene().addLine(lineR, self.my_pen)
-
+            self.editCurrentWorkingLine()
         
-    
-    def mousePressEvent(self) : 
-
-        gwL = self.graphWindowLeft.ui.graphicsView
-        gwR = self.graphWindowRight.ui.graphicsView
-        sceneCenterL = gwL.mapToScene(gwL.viewport().rect().center())
-        sceneCenterR = gwR.mapToScene(gwR.viewport().rect().center())
-
-
-        pixL = self.graphWindowLeft.imageRoot.mapFromScene(sceneCenterL)
-        pixR = self.graphWindowRight.imageRoot.mapFromScene(sceneCenterR)
-
-        print(pixL,pixR)
-
     def wheelActionEvent(self,direction,modifier,mousePos):
         #if mod ctrl zoom
         if modifier & Qt.ControlModifier:
             
             scale = self.leftPictureManager.groundPixelSize / self.canvas.mapUnitsPerPixel()
             self.currentScale = scale
+            newAltitude = self.cursorAltitude
 
         else : 
             zoom_level = math.log2(self.currentScale)
@@ -1197,11 +1112,14 @@ class stereoPhoto(object):
             if direction == 1 : meter_changer *= 1
             else : meter_changer *= -1
 
-            self.cursorAltitude += meter_changer
+            newAltitude = self.cursorAltitude + meter_changer
 
 
-        pxL, pyL = self.leftPictureManager.coordToPixel(mousePos,self.cursorAltitude)
-        pxR, pyR = self.rightPictureManager.coordToPixel(mousePos,self.cursorAltitude)
+        pxL, pyL = self.leftPictureManager.coordToPixel(mousePos,newAltitude)
+        pxR, pyR = self.rightPictureManager.coordToPixel(mousePos,newAltitude)
+
+        self.endDrawPointLeft = QPointF(pxL, pyL)
+        self.endDrawPointRight = QPointF(pxR, pyR)
 
         scenePointL = self.graphWindowLeft.imageRoot.mapToScene(QPointF(pxL, pyL))
         scenePointR = self.graphWindowRight.imageRoot.mapToScene(QPointF(pxR, pyR))
@@ -1210,6 +1128,26 @@ class stereoPhoto(object):
         self.graphWindowRight.custom_centerOn(scenePointR,self.currentScale)
 
         self.updateUserAltitude()
+
+        if not self.firstDrawClick and self.enableDraw and self.optWindow.currentMNTPath :
+            self.editCurrentWorkingLine()
+            
+    def editCurrentWorkingLine(self) : 
+        if not self.currentLeftLineObj:
+            self.currentLeftLineObj = QGraphicsLineItem(parent=self.graphWindowLeft.imageRoot) 
+            self.currentLeftLineObj.setPen(self.my_pen)
+            self.graphWindowLeft.drawingLineGroup.addToGroup(self.currentLeftLineObj)
+        
+        if not self.currentRightLineObj:
+            self.currentRightLineObj = QGraphicsLineItem(parent=self.graphWindowRight.imageRoot)
+            self.currentRightLineObj.setPen(self.my_pen)
+            self.graphWindowRight.drawingLineGroup.addToGroup(self.currentRightLineObj)
+
+        lineL = QLineF(self.startDrawPointLeft, self.endDrawPointLeft)
+        lineR = QLineF(self.startDrawPointRight, self.endDrawPointRight)
+        
+        self.currentLeftLineObj.setLine(lineL)
+        self.currentRightLineObj.setLine(lineR)
 
 
     def calculNextPairWithPos(self,rangeX,rangeY,qpoint)   :
@@ -1258,20 +1196,22 @@ class stereoPhoto(object):
             elif qpoint.y() > rangeY[1] and self.currentDownID :
                 self.findNextPair('D')
 
-    def mPressEvent(self, ev):
+    def mousePressEvent(self,mouseButton,mousePos) : 
+
+        altitude = self.readMNTWithCoordinate(mousePos)
+
+        coordTuple = (mousePos[0],mousePos[1],altitude)
         if self.optWindow.currentMNTPath and self.enableDraw and self.vectorLayer.geometryType() == QgsWkbTypes.PolygonGeometry :
 
             #if shape have 2d only2D = True
-            coordTuple = self.pointTranslator()
             
-            if ev.button() == Qt.LeftButton:
+            if mouseButton == Qt.LeftButton:
                 if self.firstDrawClick :
-                    viewL = self.graphWindowLeft.ui.graphicsView
-                    viewL_center = viewL.viewport().rect().center()
-                    self.startDrawPointLeft = viewL.mapToScene(viewL_center)
-                    viewR = self.graphWindowRight.ui.graphicsView
-                    viewR_center = viewR.viewport().rect().center()
-                    self.startDrawPointRight = viewR.mapToScene(viewR_center)
+                    pxL, pyL = self.leftPictureManager.coordToPixel(mousePos,self.cursorAltitude)
+                    pxR, pyR = self.rightPictureManager.coordToPixel(mousePos,self.cursorAltitude)
+
+                    self.startDrawPointLeft = QPointF(pxL, pyL)
+                    self.startDrawPointRight = QPointF(pxR, pyR)
 
                     self.firstDrawClick = False
                 else : 
@@ -1287,23 +1227,29 @@ class stereoPhoto(object):
                 self.list3DPoint.append(QgsPoint(coordTuple[0],coordTuple[1],coordTuple[2]))
                 self.listCutCoord.append(QgsPointXY(coordTuple[0],coordTuple[1]))
 
-            elif ev.button() == Qt.RightButton and len(self.listDrawCoord) > 0:
+            elif mouseButton == Qt.RightButton and len(self.listDrawCoord) > 0:
 
                 self.firstDrawClick = True
                 if self.currentLeftLineObj :
-                    self.graphWindowLeft.ui.graphicsView.scene().removeItem(self.currentLeftLineObj)
+                    self.graphWindowLeft.drawingLineGroup.removeFromGroup(self.currentLeftLineObj)
+                    self.graphWindowLeft.scene.removeItem(self.currentLeftLineObj)
                 self.currentLeftLineObj = None
 
                 if self.currentRightLineObj :
-                    self.graphWindowRight.ui.graphicsView.scene().removeItem(self.currentRightLineObj)
+                    self.graphWindowRight.drawingLineGroup.removeFromGroup(self.currentRightLineObj)
+                    self.graphWindowRight.scene.removeItem(self.currentRightLineObj)
                 self.currentRightLineObj = None
                 
                 for item in self.listLeftLineObj:
-                    self.graphWindowLeft.ui.graphicsView.scene().removeItem(item)
+                    if item:
+                        self.graphWindowLeft.drawingLineGroup.removeFromGroup(item)
+                        self.graphWindowLeft.scene.removeItem(item)
                 self.listLeftLineObj = []
 
                 for item in self.listRightLineObj:
-                    self.graphWindowRight.ui.graphicsView.scene().removeItem(item)
+                    if item:
+                        self.graphWindowRight.drawingLineGroup.removeFromGroup(item)
+                        self.graphWindowRight.scene.removeItem(item)
                 self.listRightLineObj = []
                 
                 if self.optWindow.ui.radioButtonDraw.isChecked(): 
@@ -1346,10 +1292,8 @@ class stereoPhoto(object):
                 self.list3DPoint = []
                 self.startPolygonThread()    
                 
-                
-                    
-        elif self.enableDraw and self.vectorLayer.geometryType() == QgsWkbTypes.PointGeometry and ev.button() == Qt.LeftButton :
-            coordTuple = self.pointTranslator() 
+        elif self.enableDraw and self.vectorLayer.geometryType() == QgsWkbTypes.PointGeometry and mouseButton == Qt.LeftButton :
+            
             if QgsWkbTypes.hasZ(self.vectorLayer.wkbType()) : geo = QgsGeometry(QgsPoint(coordTuple[0],coordTuple[1],coordTuple[2]))
             else : geo = QgsGeometry.fromPointXY(QgsPointXY(coordTuple[0],coordTuple[1]))
             

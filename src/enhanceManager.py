@@ -143,7 +143,7 @@ class enhanceManager(QObject):
             self.colorWindow.ui.graphicsView.fitInView(self.tSeek.rect, Qt.KeepAspectRatio)
             self.zoomState = 0
 
-        
+
     #Fonction appelée par le emit du thread pour ajouter une portion de l'image sur l'affichage
     def addPixmap(self, pixmap, scaleFactor, topX, topY, groupId) :
         d = self.colorWindow.ui.graphicsView.scene().addPixmap(pixmap)
@@ -445,6 +445,9 @@ class threadShow(QThread):
 
         self.showThreadInProcess = False
 
+    def set_SceneRect(self,rect) :
+        self.sceneRect = rect
+    
     def calculate_load_rects(self):
 
         if self.cropValue is not None:
@@ -474,10 +477,7 @@ class threadShow(QThread):
         return rects
     
     def load_tiled_rect(self, rect_full_res, ovr_index, groupId):
-        """
-        ovr_index: -1 (Full) or 0+ (Overview)
-        """
-
+        
         if ovr_index == -1:
             scale = 1.0
         else:
@@ -516,9 +516,7 @@ class threadShow(QThread):
                 pixmap = QPixmap.fromImage(q_img)
                 
                 self.newImage.emit(pixmap, scale, curr_lx * scale, curr_ly * scale, groupId)
-    
-    #import numpy as np
-
+        
     def fetch_tile(self, x, y, w, h, ovr_index):
         
         if ovr_index == -1:
@@ -552,8 +550,8 @@ class threadShow(QThread):
 
             else : stats = self.stats
 
-            lows  = np.array([s[0] for s in self.stats], np.float32).reshape(1,1,3)
-            highs = np.array([s[1] for s in self.stats], np.float32).reshape(1,1,3)
+            lows  = np.array([s[0] for s in stats], np.float32).reshape(1,1,3)
+            highs = np.array([s[1] for s in stats], np.float32).reshape(1,1,3)
 
             # In-place: (arr - lows) / (highs - lows) * 255
             arr -= lows               
