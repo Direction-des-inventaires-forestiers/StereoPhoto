@@ -145,7 +145,9 @@ class enhanceManager(QObject):
 
 
     #Fonction appelée par le emit du thread pour ajouter une portion de l'image sur l'affichage
-    def addPixmap(self, pixmap, scaleFactor, topX, topY, groupId) :
+    def addPixmap(self, tile, scaleFactor, topX, topY, groupId) :
+        q_img = QImage(tile.data, tile.shape[1], tile.shape[0],tile.shape[1]*3, QImage.Format_RGB888).copy()
+        pixmap = QPixmap.fromImage(q_img)
         d = self.colorWindow.ui.graphicsView.scene().addPixmap(pixmap)
         d.setPos(topX, topY)
         d.setScale(scaleFactor)
@@ -397,7 +399,7 @@ class enhanceManager(QObject):
         return pixValue
     
 class threadShow(QThread):
-    newImage = pyqtSignal(QPixmap, float, float, float, int)
+    newImage = pyqtSignal(object, float, float, float, int)
     
     def __init__(self, picturePath, listParam,cropValue=None, sceneRect=None):
         super().__init__()
@@ -411,7 +413,7 @@ class threadShow(QThread):
         self.target_tile_size = 512
 
         # Open GDAL dataset ONCE here
-        gdal.SetCacheMax(256 * 1024 * 1024)
+        #gdal.SetCacheMax(256 * 1024 * 1024)
         self.ds = gdal.Open(self.picturePath, gdal.GA_ReadOnly)
         self.height = self.ds.RasterYSize
         self.width = self.ds.RasterXSize
@@ -423,27 +425,34 @@ class threadShow(QThread):
         
     
     def run(self):
-
+        gc.disable()
         self.showThreadInProcess = True 
-        rects_L0 = self.calculate_load_rects()
-        
-        for i in range(0, 5):
-            if not self.keepRunning: return
-            self.load_tiled_rect(rects_L0[i], ovr_index=1, groupId=2)
-        
-        self.load_tiled_rect(rects_L0[0], ovr_index=0, groupId=1)
-        self.load_tiled_rect(rects_L0[0], ovr_index=-1, groupId=0)
-        
+        try : 
+            rects_L0 = self.calculate_load_rects()
+            
+            for i in range(0, 5):
+                if not self.keepRunning: return
+                self.load_tiled_rect(rects_L0[i], ovr_index=1, groupId=2)
+            
+            self.load_tiled_rect(rects_L0[0], ovr_index=0, groupId=1)
+            self.load_tiled_rect(rects_L0[0], ovr_index=-1, groupId=0)
+            
 
-        for i in range(1, 5):
-            if not self.keepRunning: return
-            self.load_tiled_rect(rects_L0[i], ovr_index=0, groupId=1)
-        
-        for i in range(1, 5):
-            if not self.keepRunning: return
-            self.load_tiled_rect(rects_L0[i], ovr_index=-1, groupId=0)
+            for i in range(1, 5):
+                if not self.keepRunning: return
+                self.load_tiled_rect(rects_L0[i], ovr_index=0, groupId=1)
+            
+            for i in range(1, 5):
+                if not self.keepRunning: return
+                self.load_tiled_rect(rects_L0[i], ovr_index=-1, groupId=0)
 
-        self.showThreadInProcess = False
+        except Exception as e:
+            print(f"Erreur lors du chargements des images: {e}")
+        
+        finally : 
+            gc.enable()
+            gc.collect() 
+            self.showThreadInProcess = False
 
     def set_SceneRect(self,rect) :
         self.sceneRect = rect
@@ -511,11 +520,12 @@ class threadShow(QThread):
                 
                 if self.perform_Enhancing:
                     tile = self.applyEnhancements(tile, self.listParam)
+                tile = np.ascontiguousarray(tile)
+                #q_img = QImage(tile.data, tile_w, tile_h, tile_w * 3, QImage.Format_RGB888)
+                #pixmap = QPixmap.fromImage(q_img)
                 
-                q_img = QImage(bytes(tile.data), tile_w, tile_h, tile_w * 3, QImage.Format_RGB888)
-                pixmap = QPixmap.fromImage(q_img)
-                
-                self.newImage.emit(pixmap, scale, curr_lx * scale, curr_ly * scale, groupId)
+                self.newImage.emit(tile, scale, curr_lx * scale, curr_ly * scale, groupId)
+                QThread.msleep(1)
         
     def fetch_tile(self, x, y, w, h, ovr_index):
         
@@ -558,9 +568,15 @@ class threadShow(QThread):
             arr /= (highs - lows)  
             arr *= 255.0    
         
+        contrast = params[0]
+        saturation = params[2]
+        need_grayscale = contrast != 0 or saturation != 0
+        
+        # Convert to grayscale using PIL weights
+        if need_grayscale : 
+            grayscale = (arr[:, :, 0] * 0.299 + arr[:, :, 1] * 0.587 + arr[:, :, 2] * 0.114)
 
         # Contrast
-        contrast = params[0]
         if contrast != 0:
             if contrast > 0:
                 if contrast < 50:
@@ -572,11 +588,6 @@ class threadShow(QThread):
             else:
                 factor = 1 + (contrast / 100)
 
-            # Convert to grayscale using PIL weights
-            grayscale = (arr[:, :, 0] * 0.299 + 
-                        arr[:, :, 1] * 0.587 + 
-                        arr[:, :, 2] * 0.114)
-            
             # Get mean of grayscale
             mean = float(grayscale.mean())
             for c in range(3):
@@ -584,19 +595,12 @@ class threadShow(QThread):
                 channel[:] = mean + (channel - mean) * factor
 
         #Saturation
-        saturation = params[2]
         if saturation != 0:
 
             if saturation > 0:
                 factor = 1 + (0.05 * saturation)
             else:
                 factor = 1 + (saturation / 100)
-            
-            # Convert to grayscale using PIL weights
-            grayscale = (arr[:, :, 0] * 0.299 + 
-                        arr[:, :, 1] * 0.587 + 
-                        arr[:, :, 2] * 0.114)
-            
             
             for c in range(3):
                 channel = arr[:, :, c]

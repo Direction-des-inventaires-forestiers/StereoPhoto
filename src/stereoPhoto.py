@@ -152,6 +152,7 @@ class stereoPhoto(object):
         self.buttonMapUnit  = None
 
         self.cursorAltitude = None
+        self.isLoadingPair = False
     
     def setConnection(self) : 
 
@@ -325,9 +326,9 @@ class stereoPhoto(object):
         sceneCenter = sceneRect.center()
         centerPixel = self.graphWindowLeft.imageRoot.mapFromScene(sceneCenter)
 
-        #currentTransform = LGV.transform()  
+        currentTransform = LGV.transform()  
 
-        scaleStore = self.currentScale  #currentTransform.m11() 
+        scaleStore = currentTransform.m11() #self.currentScale
 
         cx, cy = self.leftPictureManager.pixelToCoord((centerPixel.x(), centerPixel.y()), self.cursorAltitude)
         self.lastCurrentView = (cx,cy,self.cursorAltitude,scaleStore,scaleStore)
@@ -340,7 +341,12 @@ class stereoPhoto(object):
 
     
     def findNextPair(self, ori):
+        self.navigMapTool.deactivateMapTool() #canvas.unsetMapTool(self.navigMapTool)
         self.setLastView()
+        #self.navigMapTool.sendPosTimer.stop()
+        #self.navigMapTool.ignoringSyntheticMove = True
+        #self.isLoadingPair = True
+        
         secondID = None
         if ori == 'L': newID = self.infoNeighbors['left'][0]
         elif ori == 'R': newID = self.infoNeighbors['right'][0]
@@ -377,8 +383,8 @@ class stereoPhoto(object):
         
         #if self.setPairID(newID) :  self.addNewPair()
         self.setPairWithPARId(newID,secondID)
-
-        self.loadNewPair()
+        
+        self.loadNewPair(ignoreMapTool=True)
 
     def findPairWithPosition(self) :
 
@@ -405,8 +411,8 @@ class stereoPhoto(object):
     def createGraphicsWindows(self) : 
 
         if self.enableShow : 
-            self.windowHandler('picture')
             self.setExtent2Canvas()
+            self.windowHandler('picture')
             if self.enableDraw : 
                 self.startPolygonThread()
                 if self.optWindow.currentMNTPath and self.vectorLayer.geometryType() == QgsWkbTypes.PolygonGeometry :self.navigMapTool.activateDrawing = True
@@ -474,8 +480,7 @@ class stereoPhoto(object):
         
         QApplication.processEvents()
         
-    def loadNewPair(self):
-
+    def loadNewPair(self,ignoreMapTool=False):
         self.removeCurrentScene()
 
         self.graphWindowLeft.ui.graphicsView.resetTransform()
@@ -527,12 +532,17 @@ class stereoPhoto(object):
         self.openMNT()
         self.setInitialCursorAltitude()
         self.setBaseTransform()
-        
-        self.windowHandler('picture')
-        
         self.setStartingView()
         self.setExtent2Canvas()
-
+        
+        #if not ignoreMapTool : 
+        if ignoreMapTool : self.navigMapTool.activateMapTool() 
+        else : self.windowHandler('picture')
+        #if self.lastCurrentView:
+        #    newCenter = QgsPointXY(self.lastCurrentView[0], self.lastCurrentView[1])
+        #    self.navigMapTool.currentMouseCoord = newCenter
+        #    self.navigMapTool.lastEmittedCoord = newCenter
+        
         self.polygonL2Draw = {}
         self.polygonR2Draw = {}
         self.firstDrawClick = True
@@ -542,7 +552,7 @@ class stereoPhoto(object):
         sceneRectL = LGV.mapToScene(vpl.rect()).boundingRect()
         realLeftRect = self.graphWindowLeft.imageRoot.mapFromScene(sceneRectL).boundingRect()
         self.tSeekLeft.set_SceneRect(realLeftRect)
-        self.tSeekLeft.start(QThread.IdlePriority)
+        self.tSeekLeft.start(QThread.LowestPriority)
         
         RGV = self.graphWindowRight.ui.graphicsView
         vpr = RGV.viewport()
@@ -550,13 +560,14 @@ class stereoPhoto(object):
         realRigthRect = self.graphWindowRight.imageRoot.mapFromScene(sceneRectR).boundingRect()
 
         self.tSeekRight.set_SceneRect(realRigthRect)
-        self.tSeekRight.start(QThread.IdlePriority)
-        
+        self.tSeekRight.start(QThread.LowestPriority)
         
         if self.enableDraw : 
             self.startPolygonThread()
             if self.optWindow.currentMNTPath and self.vectorLayer.geometryType() == QgsWkbTypes.PolygonGeometry :self.navigMapTool.activateDrawing = True
             else : self.navigMapTool.activateDrawing = False
+        
+        self.isLoadingPair = False
 
     def getQtransform(self, pictureManager : pictureManager):
         r11 = pictureManager.r11
@@ -857,6 +868,10 @@ class stereoPhoto(object):
             self.setLastView()
 
         if window == 'picture' : 
+            self.graphWindowRight.raise_()
+            self.graphWindowRight.activateWindow()
+            self.graphWindowLeft.raise_()
+            self.graphWindowLeft.activateWindow()
             self.iface.mainWindow().raise_()       
             self.iface.mainWindow().activateWindow()
             self.canvas.setMapTool(self.navigMapTool)
@@ -876,7 +891,8 @@ class stereoPhoto(object):
                 val = event.key() - QtCore.Qt.Key_F5
                 self.keyboardZoom(val)
 
-            elif event.key() == int(self.paramMenu.currentDictParam['BindDraw']) : 
+            #elif event.key() == int(self.paramMenu.currentDictParam['BindDraw']) :     
+            elif event.key() == QtCore.Qt.Key_1 : 
                 if self.optWindow.ui.radioButtonDraw.isChecked() : self.optWindow.ui.radioButtonCut.setChecked(True)
                 else : self.optWindow.ui.radioButtonDraw.setChecked(True)
             
@@ -904,7 +920,7 @@ class stereoPhoto(object):
             altitude = self.readMNTWithCoordinate(middleCoordLeft)
             if altitude is not None : self.cursorAltitude = altitude
 
-        self.optWindow.ui.labelAltitude.setText(str(round(self.cursorAltitude,5)))
+        self.optWindow.ui.labelAltitude.setText(f"{self.cursorAltitude:.3f}")
 
     
     def openMNT(self) : 
@@ -957,9 +973,10 @@ class stereoPhoto(object):
 
 
         elif self.lastCurrentView : 
+
             pxL, pyL = self.leftPictureManager.coordToPixel(self.lastCurrentView[:2],self.cursorAltitude)
             pxR, pyR = self.rightPictureManager.coordToPixel(self.lastCurrentView[:2],self.cursorAltitude)
-
+            
             scenePointL = self.graphWindowLeft.imageRoot.mapToScene(QPointF(pxL, pyL))
             scenePointR = self.graphWindowRight.imageRoot.mapToScene(QPointF(pxR, pyR))
 
@@ -968,9 +985,17 @@ class stereoPhoto(object):
             else : 
                 scale = self.lastCurrentView[-2]  
                 self.currentScale = scale
+
+                print('scenePointL at restore:', scenePointL)
                 
                 self.graphWindowLeft.custom_centerOn(scenePointL,scale,forceGroupCall=True)
                 self.graphWindowRight.custom_centerOn(scenePointR,scale,forceGroupCall=True)
+
+                LGV = self.graphWindowLeft.ui.graphicsView
+                sceneRect = LGV.mapToScene(LGV.viewport().rect()).boundingRect()
+                sceneCenter = sceneRect.center()
+                checkPixel = self.graphWindowLeft.imageRoot.mapFromScene(sceneCenter)
+                print('pixel after centerOn:', checkPixel)
 
         else : self.setCenterView()
         
@@ -1025,8 +1050,8 @@ class stereoPhoto(object):
             rightTransform =  rightTransform * mirror_transform
             #rightTransform =  mirror_transform * rightTransform 
 
-        self.baseLeftTransform = leftTransform
-        self.baseRightTransform = rightTransform
+        #leftTransform = QTransform()
+        #rightTransform = QTransform()
        
         #self.graphWindowLeft.scene.addItem(self.graphWindowLeft.imageRoot)
         self.graphWindowLeft.imageRoot.setTransform(leftTransform)
@@ -1040,9 +1065,8 @@ class stereoPhoto(object):
         sceneRect = LGV.mapToScene(LGV.viewport().rect()).boundingRect()  
         sceneCenter = sceneRect.center()
         centerPixel = self.graphWindowLeft.imageRoot.mapFromScene(sceneCenter)
-
-        cx, cy = self.leftPictureManager.pixelToCoord((centerPixel.x(), centerPixel.y()), self.cursorAltitude)
         
+        cx, cy = self.leftPictureManager.pixelToCoord((centerPixel.x(), centerPixel.y()), self.cursorAltitude)
         meters_per_pixel = self.leftPictureManager.groundPixelSize / self.currentScale
         dpi = self.canvas.mapSettings().outputDpi()
         
@@ -1052,10 +1076,7 @@ class stereoPhoto(object):
         self.canvas.refresh()
 
     def mouseMoveEvent(self,coordinate) :
-
-        gwL = self.graphWindowLeft.ui.graphicsView
-        gwR = self.graphWindowRight.ui.graphicsView
-
+        if self.isLoadingPair : return
         pxL, pyL = self.leftPictureManager.coordToPixel(coordinate,self.cursorAltitude)
         pxR, pyR = self.rightPictureManager.coordToPixel(coordinate,self.cursorAltitude)
 
@@ -1083,7 +1104,6 @@ class stereoPhoto(object):
         out_y = self.endDrawPointLeft.y() <= rangeY[0] or self.endDrawPointLeft.y() >= rangeY[1]
         
         if self.firstDrawClick and (out_x or out_y) :
-
             self.calculNextPairWithPos(rangeX,rangeY,self.endDrawPointLeft)
 
             return
@@ -1093,6 +1113,7 @@ class stereoPhoto(object):
             self.editCurrentWorkingLine()
         
     def wheelActionEvent(self,direction,modifier,mousePos):
+        if self.isLoadingPair : return
         #if mod ctrl zoom
         if modifier & Qt.ControlModifier:
             

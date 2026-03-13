@@ -139,6 +139,9 @@ class navigationMapTool(QgsMapTool):
 
     def activate(self):
         super().activate()
+        self.activateMapTool()
+
+    def activateMapTool(self) : 
         self.updateSafeZone()
         
         # Install trap on the viewport
@@ -156,13 +159,17 @@ class navigationMapTool(QgsMapTool):
         self.canvas.setFocus()
 
     def deactivate(self):
+        self.deactivateMapTool()
+        super().deactivate()
+
+    def deactivateMapTool(self) : 
         self.canvas.viewport().removeEventFilter(self)
         self.sendPosTimer.stop()
         self.rubberBand.reset(QgsWkbTypes.GeometryType.LineGeometry)
         #self.iface.mainWindow().removeEventFilter(self.interceptor)
         qApp.removeEventFilter(self.interceptor)
         self.drawing = False
-        super().deactivate()
+        
 
     def updateSafeZone(self):
         

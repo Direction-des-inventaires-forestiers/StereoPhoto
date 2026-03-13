@@ -38,3 +38,7 @@
 **ui_paramWindow.py** : Interface graphique pour le menu des paramètres ainsi que les fonctions pour le faire fonctionner.  
 
 **worldManager.py** : Fichier qui contient les fonctions liées à la stéréoscopie/photogrammétrie. Il permet de transformer un point en coordonnée et vice-versa. Il permet aussi de calculer l’altitude Z à partir des deux images. 
+
+**ui_graphicsWindow.py** : Fichier qui contient un object QGraphicsView qui permet l'affichage d'un image. Il fait la gestion de l'affichage des différentes pyramides d'images, du curseur et du déplacement lors de la navigation¸
+
+**navigationQgsMapTool.py** : Outil MapTool compatible avec QGIS qui permet d'envoyer les signals de clavier et de souris ainsi que d'emprisonner la souris à l'intérieur du canvas QGIS
