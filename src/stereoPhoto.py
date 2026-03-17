@@ -45,15 +45,13 @@ from qgis.PyQt.QtGui import *
 import numpy as np
 from . import resources
 
-from .ui_optionWindow import optionWindow
 from .ui_graphicsWindow import graphicsWindow
 from .ui_getVectorLayer import getImageListDialog
-from .ui_paramWindow import paramWindow
 from .worldManager import pictureManager, dualManager, createWKTString
 from .enhanceManager import enhanceManager, threadShow
 from .drawFunction import *
 from .navigationQgsMapTool import navigationMapTool
-#from .ui_widgetStereoPhoto import optionWindow
+from .ui_widgetStereoPhoto import optionWindow
 
 from .gestionDossier import getParDict, get_neighbors_and_pairs, findPairWithCoord, compute_overlap
 import sys, os, time, math, gc
@@ -92,24 +90,13 @@ class stereoPhoto(object):
 
             self.initGlobalParam()           
 
-            self.paramMenu = paramWindow()
             self.optWindow = optionWindow(self.iface)
             self.navigMapTool= navigationMapTool(self.canvas,self.iface)
             
             self.setConnection() 
-
+            self.optWindow.loadParamFile()
             self.iface.addDockWidget(Qt.RightDockWidgetArea, self.optWindow)
             self.optWindow.raise_()
-
-            if self.paramMenu.currentDictParam['LastPath'] : self.optWindow.ui.importLineProject.setText(self.paramMenu.currentDictParam['LastPath'])
-            
-            if self.paramMenu.currentDictParam['MNTPath'] : 
-                self.optWindow.currentMNTPath = self.paramMenu.currentDictParam['MNTPath']
-                self.optWindow.ui.importLineMNT.setText(os.path.basename(self.optWindow.currentMNTPath))
-                self.optWindow.ui.radioButtonCut.setEnabled(True)
-                self.optWindow.ui.radioButtonDraw.setEnabled(True)
-                self.optWindow.ui.pushButtonRemoveMNT.setEnabled(True)
-            else : self.optWindow.currentMNTPath = ''
 
         else :
             self.iface.removeDockWidget(self.optWindow)
@@ -145,9 +132,6 @@ class stereoPhoto(object):
         self.polygonL2Draw = {}
         self.polygonR2Draw = {}
         
-        self.listParam = [0, 0, 0, 0, 0, 0, 0, False, False, []]
-        self.lastEnhanceParam = [0, 0, 0, 0, 0, 0, 0, False, False, []]
-
         self.buttonPosition = None
         self.buttonMapUnit  = None
 
@@ -162,7 +146,6 @@ class stereoPhoto(object):
         self.optWindow.ui.pushButtonShowIDList.clicked.connect(self.showIDList)
         self.optWindow.ui.enhanceButton.clicked.connect(self.enhanceClick)
         self.optWindow.ui.pushButtonFindBestPair.clicked.connect(self.findPairWithPosition)
-        self.optWindow.ui.pushButtonOpenParam.clicked.connect(self.showParamMenu)
         self.optWindow.closeWindow.connect(self.optWindowClose)
         self.optWindow.ui.pushButtonCloseWindow.clicked.connect(self.closeAllSideWindows)
 
@@ -181,37 +164,21 @@ class stereoPhoto(object):
         if hasattr(self, "graphWindowLeft"):
             self.graphWindowLeft.close()
             del self.graphWindowLeft
-            #del self.sceneLeft
         if hasattr(self, "graphWindowRight"):
             self.graphWindowRight.close()
             del self.graphWindowRight
-            #del self.sceneRight
         if hasattr(self, "enhanceManager"):
             self.enhanceManager.cancelEnhance()
-            #self.enhanceManager.colorWindow.close()
             del self.enhanceManager 
         self.optWindow.ui.pushButtonCloseWindow.setEnabled(False)
-        self.paramMenu.currentDictParam['MNTPath'] = self.optWindow.currentMNTPath
-        self.paramMenu.saveToJSON()
+        self.optWindow.saveParamFile()
     
     def optWindowClose(self):
         self.closeAllSideWindows()
         self.optWindow.close()
-        self.paramMenu.close()
         self.optWindow.vectorWindow.close()
         if self.action.isChecked() : self.action.setChecked(False)
-    
-    def showParamMenu(self): 
 
-        nbScreen = len(QGuiApplication.screens())-1
-        self.paramMenu.ui.spinBoxScreenLeft.setMaximum(nbScreen)
-        self.paramMenu.ui.spinBoxScreenRight.setMaximum(nbScreen)
-
-        self.paramMenu.show()
-        if self.paramMenu.isMinimized() : self.paramMenu.showNormal()
-        
-        self.paramMenu.raise_()
-        
     def newPictureFile(self):
         
         self.currentMainPath = self.optWindow.ui.importLineProject.text()
@@ -231,16 +198,17 @@ class stereoPhoto(object):
             self.optWindow.ui.enhanceButton.setEnabled(True)
             self.optWindow.ui.pushButtonShowPicture.setEnabled(True)
             self.optWindow.ui.pushButtonFindBestPair.setEnabled(True)
-
-        if self.paramMenu.currentDictParam['LastName'] in self.currentParDict.keys() : 
-            parToUse = self.paramMenu.currentDictParam['LastName']
-            if float(self.paramMenu.currentDictParam['LastX']) != 0.0 :
-                x = float(self.paramMenu.currentDictParam['LastX'])
-                y = float(self.paramMenu.currentDictParam['LastY'])
-                z = float(self.paramMenu.currentDictParam['LastZ'])
-                scaleX = float(self.paramMenu.currentDictParam['ScaleX'])
-                scaleY = float(self.paramMenu.currentDictParam['ScaleY'])
-                self.lastCurrentView = (x,y,z,scaleX,scaleY)
+        
+        userImage = self.optWindow.ParamDict['info_raster']['user_image']
+        lastPosition = self.optWindow.ParamDict['position']
+        if userImage in self.currentParDict.keys() : 
+            parToUse = userImage
+            if float(lastPosition['longitude']) != 0.0 :
+                x = float(lastPosition['longitude'])
+                y = float(lastPosition['latitude'])
+                z = float(lastPosition['altitude'])
+                scale = float(lastPosition['scale'])
+                self.lastCurrentView = (x,y,z,scale)
             else : self.lastCurrentView = ()
         
         else : 
@@ -249,7 +217,6 @@ class stereoPhoto(object):
             self.removePolygonOnScreen()
             parToUse = next(iter(self.currentParDict))
             
-        self.paramMenu.currentDictParam['LastPath'] = self.currentMainPath
 
         if self.enableShow : self.closeAllSideWindows()
         self.setPairWithPARId(parToUse)
@@ -262,7 +229,6 @@ class stereoPhoto(object):
     
     def pictureSelectionAccept(self):
         pictureID = self.pictureSelectWindow.ui.listWidget.selectedItems()[0].text()
-        #if self.setPairID(pictureID) :  self.addNewPair()
         self.setPairWithPARId(pictureID)
         
         if self.enableShow and self.leftParID != '': self.loadNewPair()
@@ -294,7 +260,6 @@ class stereoPhoto(object):
 
         self.optWindow.ui.labelLeftName.setText(self.leftParID)
         self.optWindow.ui.labelRightName.setText(self.rightParID)
-        self.paramMenu.currentDictParam['LastName'] = self.leftParID
 
         self.currentLeftTIF = self.currentMainPath + '/' + self.leftParID + '.tif'
         self.currentLeftPAR = self.currentMainPath  + '/' + self.leftParID + '.par'
@@ -315,7 +280,6 @@ class stereoPhoto(object):
         
         self.currentUpID = True if len(self.infoNeighbors['up']) != 0 else False
         self.currentDownID = True if len(self.infoNeighbors['down']) != 0 else False
-        #print(self.infoNeighbors)
 
         
     def setLastView(self) :
@@ -331,21 +295,17 @@ class stereoPhoto(object):
         scaleStore = currentTransform.m11() #self.currentScale
 
         cx, cy = self.leftPictureManager.pixelToCoord((centerPixel.x(), centerPixel.y()), self.cursorAltitude)
-        self.lastCurrentView = (cx,cy,self.cursorAltitude,scaleStore,scaleStore)
+        self.lastCurrentView = (cx,cy,self.cursorAltitude,scaleStore)
 
-        self.paramMenu.currentDictParam['LastX'] = str(self.lastCurrentView[0])
-        self.paramMenu.currentDictParam['LastY'] = str(self.lastCurrentView[1])
-        self.paramMenu.currentDictParam['LastZ'] = str(self.lastCurrentView[2])
-        self.paramMenu.currentDictParam['ScaleX'] = str(self.lastCurrentView[3])
-        self.paramMenu.currentDictParam['ScaleY'] = str(self.lastCurrentView[4])
+        self.optWindow.ParamDict['position']['longitude'] = cx
+        self.optWindow.ParamDict['position']['latitude'] = cy
+        self.optWindow.ParamDict['position']['altitude'] = self.cursorAltitude
+        self.optWindow.ParamDict['position']['scale'] = scaleStore
 
     
     def findNextPair(self, ori):
-        self.navigMapTool.deactivateMapTool() #canvas.unsetMapTool(self.navigMapTool)
+        self.navigMapTool.deactivateMapTool() 
         self.setLastView()
-        #self.navigMapTool.sendPosTimer.stop()
-        #self.navigMapTool.ignoringSyntheticMove = True
-        #self.isLoadingPair = True
         
         secondID = None
         if ori == 'L': newID = self.infoNeighbors['left'][0]
@@ -381,7 +341,6 @@ class stereoPhoto(object):
 
             else : newID = self.infoNeighbors['up'][0][0]
         
-        #if self.setPairID(newID) :  self.addNewPair()
         self.setPairWithPARId(newID,secondID)
         
         self.loadNewPair(ignoreMapTool=True)
@@ -397,12 +356,10 @@ class stereoPhoto(object):
         imageID = bestFit[0] 
         distance = bestFit[1]
 
-        #Zone de 3 km pour être proche de la photo le plus possible
+        #Zone de 7.5 km pour être proche de la photo le plus possible
         if max(width,height,distance) < 7500 : 
             self.buttonPosition = centerCoord
-            #self.buttonExtent = qgisExtent
             self.buttonMapUnit = self.canvas.mapUnitsPerPixel()
-            #if self.setPairID(imageID) :  self.addNewPair()
             self.setPairWithPARId(imageID)
             if self.enableShow and self.leftParID != '' : self.loadNewPair()
         else : self.buttonPosition = None
@@ -419,29 +376,27 @@ class stereoPhoto(object):
                 else : self.navigMapTool.activateDrawing = False
             return
 
-        self.intLeftScreen = self.paramMenu.ui.spinBoxScreenLeft.value()
-        self.intRightScreen = self.paramMenu.ui.spinBoxScreenRight.value()
+        intDownScreen = self.optWindow.ui.spinBoxDownScreen.value()
+        intUpSreen = self.optWindow.ui.spinBoxUpScreen.value()
         
-        screenLeft = QGuiApplication.screens()[self.intLeftScreen]
-        screenRight = QGuiApplication.screens()[self.intRightScreen]
+        screenLeft = QGuiApplication.screens()[intDownScreen]
+        screenRight = QGuiApplication.screens()[intUpSreen]
 
         screenLeft_geom = screenLeft.geometry()
         screenRight_geom = screenRight.geometry()
 
         self.graphWindowLeft = graphicsWindow()
         self.graphWindowLeft.setWindowFlags(Qt.Window | Qt.FramelessWindowHint)
-        #self.graphWindowLeft.setAttribute(Qt.WA_ShowWithoutActivating)
         self.graphWindowLeft.move(screenLeft_geom.topLeft())
         self.graphWindowLeft.keyPressed.connect(self.keyboardHandler)
 
         self.graphWindowRight = graphicsWindow()
         self.graphWindowRight.setWindowFlags(Qt.Window | Qt.FramelessWindowHint)
-        #self.graphWindowRight.setAttribute(Qt.WA_ShowWithoutActivating)
         self.graphWindowRight.move(screenRight_geom.topLeft())
         self.graphWindowRight.keyPressed.connect(self.keyboardHandler)
         
-        width = self.paramMenu.ui.spinBoxPenWidth.value()
-        color = QColor(self.paramMenu.ui.comboBoxColor.currentText())
+        width = 4
+        color = QColor('Cyan')
 
         self.my_pen = QPen(color, width, Qt.SolidLine, Qt.SquareCap, Qt.RoundJoin)
         self.my_pen.setCosmetic(True)
@@ -486,11 +441,11 @@ class stereoPhoto(object):
         self.graphWindowLeft.ui.graphicsView.resetTransform()
         self.graphWindowRight.ui.graphicsView.resetTransform()
        
-        self.tSeekLeft = threadShow(self.currentLeftTIF, self.listParam)
+        self.tSeekLeft = threadShow(self.currentLeftTIF, self.optWindow.rehaussementParam)
         self.tSeekLeft.newImage.connect(self.graphWindowLeft.addPixmap)
         self.tSeekLeft.finished.connect(self.seekLeftDone)
         
-        self.tSeekRight = threadShow(self.currentRightTIF, self.listParam)
+        self.tSeekRight = threadShow(self.currentRightTIF, self.optWindow.rehaussementParam)
         self.tSeekRight.newImage.connect(self.graphWindowRight.addPixmap)
         self.tSeekRight.finished.connect(self.seekRightDone)
         
@@ -535,13 +490,8 @@ class stereoPhoto(object):
         self.setStartingView()
         self.setExtent2Canvas()
         
-        #if not ignoreMapTool : 
         if ignoreMapTool : self.navigMapTool.activateMapTool() 
         else : self.windowHandler('picture')
-        #if self.lastCurrentView:
-        #    newCenter = QgsPointXY(self.lastCurrentView[0], self.lastCurrentView[1])
-        #    self.navigMapTool.currentMouseCoord = newCenter
-        #    self.navigMapTool.lastEmittedCoord = newCenter
         
         self.polygonL2Draw = {}
         self.polygonR2Draw = {}
@@ -711,7 +661,7 @@ class stereoPhoto(object):
                 color = arr[1]
                 polyLeft = arr[0]
                 polyRight = self.polygonR2Draw[name][0]
-                width = self.paramMenu.ui.spinBoxPenWidth.value()
+                width = 4
 
                 layerPen = QPen(color, width, Qt.SolidLine, Qt.SquareCap, Qt.RoundJoin)
                 layerPen.setCosmetic(True)
@@ -739,8 +689,9 @@ class stereoPhoto(object):
                     rightObj.setPen(layerPen)
                     self.graphWindowLeft.geometryItemGroup.addToGroup(leftObj)
                     self.graphWindowRight.geometryItemGroup.addToGroup(rightObj)
+        
         self.hideOffBoundDrawing()
-        #séparer ici dans une autre fonction , ajouter a leur propre groupe pour avoir un zvalue plus grand que poly
+
     def hideOffBoundDrawing(self) : 
 
         color = QColor(182, 182, 182)
@@ -753,16 +704,11 @@ class stereoPhoto(object):
             for item in self.graphWindowRight.offboundRectGroup.childItems():
                 self.graphWindowRight.scene.removeItem(item)
 
-        #self.graphWindowLeft.offboundRectGroup.addToGroup(rectObj)
-        #self.graphWindowRight.offboundRectGroup.addToGroup(rightObj)
-        
         # Offsets in the scene
         offLX, offLY = self.realCropValueLeft[0],  self.realCropValueLeft[1]     
         offRX, offRY = self.realCropValueRight[0], self.realCropValueRight[1]   
 
         dval = 15000
-        #sceneL = self.graphWindowLeft.ui.graphicsView.scene()
-        #sceneR = self.graphWindowRight.ui.graphicsView.scene()
 
         # For LEFT screen 
         x0 = offLX
@@ -839,24 +785,22 @@ class stereoPhoto(object):
     def seekLeftDone(self) : 
         if self.enableDraw and self.enableShow :
             self.drawPolygon()
-        #self.graphWindowLeft.centerCrosshair()
         if hasattr(self, "tSeekLeft"):  self.tSeekLeft.showThreadInProcess = False 
     
     def seekRightDone(self) : 
         if self.enableDraw and self.enableShow :
             self.drawPolygon()
-        #self.graphWindowRight.centerCrosshair()
         if hasattr(self, "tSeekRight"):  self.tSeekRight.showThreadInProcess = False
     
     #Ouverture de la fenêtre de rehaussement
     def enhanceClick(self):
-        self.enhanceManager = enhanceManager(self.currentLeftTIF, self.currentRightTIF, self.listParam, self.leftParID, self.rightParID)
+        self.enhanceManager = enhanceManager(self.currentLeftTIF, self.currentRightTIF, self.optWindow.rehaussementParam, self.leftParID, self.rightParID)
         self.enhanceManager.listParamSignal.connect(self.applyEnhance)
 
     #Permet le lancement du traitement de modification des images
     def applyEnhance(self, listParam):
         self.enhanceManager.listParamSignal.disconnect(self.applyEnhance)
-        self.listParam = listParam
+        self.optWindow.rehaussementParam = listParam
 
     
     def windowHandler(self,window) : 
@@ -891,7 +835,6 @@ class stereoPhoto(object):
                 val = event.key() - QtCore.Qt.Key_F5
                 self.keyboardZoom(val)
 
-            #elif event.key() == int(self.paramMenu.currentDictParam['BindDraw']) :     
             elif event.key() == QtCore.Qt.Key_1 : 
                 if self.optWindow.ui.radioButtonDraw.isChecked() : self.optWindow.ui.radioButtonCut.setChecked(True)
                 else : self.optWindow.ui.radioButtonDraw.setChecked(True)
@@ -983,19 +926,11 @@ class stereoPhoto(object):
             if pxL < 0 or pxL > self.fullLeftPicSize[0] or pyL < 0 or pyL > self.fullLeftPicSize[1] : self.setCenterView()
             elif pxR < 0 or pxR > self.fullRightPicSize[0] or pyR < 0 or pyR > self.fullRightPicSize[1] : self.setCenterView()
             else : 
-                scale = self.lastCurrentView[-2]  
+                scale = self.lastCurrentView[-1]  
                 self.currentScale = scale
 
-                print('scenePointL at restore:', scenePointL)
-                
                 self.graphWindowLeft.custom_centerOn(scenePointL,scale,forceGroupCall=True)
                 self.graphWindowRight.custom_centerOn(scenePointR,scale,forceGroupCall=True)
-
-                LGV = self.graphWindowLeft.ui.graphicsView
-                sceneRect = LGV.mapToScene(LGV.viewport().rect()).boundingRect()
-                sceneCenter = sceneRect.center()
-                checkPixel = self.graphWindowLeft.imageRoot.mapFromScene(sceneCenter)
-                print('pixel after centerOn:', checkPixel)
 
         else : self.setCenterView()
         
@@ -1042,21 +977,14 @@ class stereoPhoto(object):
         leftTransform = self.getQtransform(self.leftPictureManager)
         rightTransform = self.getQtransform(self.rightPictureManager)
 
-        if not self.paramMenu.ui.checkBoxFlip.isChecked() : 
+        if not self.optWindow.ui.checkBoxFlip.isChecked() : 
 
             mirror_transform = QTransform()
             mirror_transform.scale(-1, 1)
             mirror_transform.translate(-self.rightPicSize[0], 0)
             rightTransform =  rightTransform * mirror_transform
-            #rightTransform =  mirror_transform * rightTransform 
 
-        #leftTransform = QTransform()
-        #rightTransform = QTransform()
-       
-        #self.graphWindowLeft.scene.addItem(self.graphWindowLeft.imageRoot)
         self.graphWindowLeft.imageRoot.setTransform(leftTransform)
-
-        #self.graphWindowRight.scene.addItem(self.graphWindowRight.imageRoot)
         self.graphWindowRight.imageRoot.setTransform(rightTransform)
     
     def setExtent2Canvas(self) : 
@@ -1224,8 +1152,6 @@ class stereoPhoto(object):
         coordTuple = (mousePos[0],mousePos[1],altitude)
         if self.optWindow.currentMNTPath and self.enableDraw and self.vectorLayer.geometryType() == QgsWkbTypes.PolygonGeometry :
 
-            #if shape have 2d only2D = True
-            
             if mouseButton == Qt.LeftButton:
                 if self.firstDrawClick :
                     pxL, pyL = self.leftPictureManager.coordToPixel(mousePos,self.cursorAltitude)
@@ -1294,10 +1220,10 @@ class stereoPhoto(object):
                         featureGeo = item.geometry()
                         
                         if newGeo.intersects(featureGeo) :
-                            if self.paramMenu.ui.radioButtonMerge.isChecked() :
-                                mergePolygon(featureGeo, item.id(), newGeo, currentVectorLayer)
-                            else :
-                                automaticPolygon(featureGeo, item.id(), newGeo, currentVectorLayer)
+                            #if self.paramMenu.ui.radioButtonMerge.isChecked() :
+                            mergePolygon(featureGeo, item.id(), newGeo, currentVectorLayer)
+                            #else :
+                            #automaticPolygon(featureGeo, item.id(), newGeo, currentVectorLayer)
                             break
                             
                     else :
@@ -1321,7 +1247,6 @@ class stereoPhoto(object):
             self.windowHandler('qgis')
             feature = addPoint(self.vectorLayer, geo)
             
-            #self.vectorLayer.select(feature.id())
             self.vectorLayer.startEditing()
             resultForm = self.iface.openFeatureForm(self.vectorLayer, feature)
             if resultForm == False : 

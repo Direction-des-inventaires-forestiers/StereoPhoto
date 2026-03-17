@@ -154,7 +154,6 @@ class navigationMapTool(QgsMapTool):
             QTimer.singleShot(20, self.clearSyntheticGuard) 
             
         self.sendPosTimer.start()
-        #self.iface.mainWindow().installEventFilter(self.interceptor)
         qApp.installEventFilter(self.interceptor)
         self.canvas.setFocus()
 
@@ -166,7 +165,6 @@ class navigationMapTool(QgsMapTool):
         self.canvas.viewport().removeEventFilter(self)
         self.sendPosTimer.stop()
         self.rubberBand.reset(QgsWkbTypes.GeometryType.LineGeometry)
-        #self.iface.mainWindow().removeEventFilter(self.interceptor)
         qApp.removeEventFilter(self.interceptor)
         self.drawing = False
         

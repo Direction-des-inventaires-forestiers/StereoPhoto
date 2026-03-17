@@ -1,21 +1,20 @@
-{   
-    "Color": "Cyan", 
-    "BindDraw": "49", 
-    "BindLong": "16777248", 
-    "BindZoom": "16777249", 
-    "AddAltitude": "0", 
-    "PenWidth": "4", 
-    "ScreenLeft": "0", 
-    "ScreenRight": "0", 
-    "Flip" : "0",
-    "DistanceCurseur" : "0",
-    "PourcentageRetirer" : "60",
-    "LastPath" : "",
-    "LastName" : "",
-    "LastX" : "0",
-    "LastY" : "0",
-    "LastZ" : "0",
-    "ScaleX" : "0",
-    "ScaleY" : "0",
-    "MNTPath" : ""
+{
+    "position": {
+        "longitude": 0.0,
+        "latitude": 0.0,
+        "altitude": 0.0,
+        "scale" : 0.0
+    },
+    "stereoscope": {
+        "ecran_bas": 0, 
+        "ecran_haut": 0, 
+        "miroir_OFF" : false
+    },
+    "info_raster": {
+        "mnt_file": "",
+        "image_dir": "",
+        "user_image":""
+    },
+
+    "rehaussement": [0, 0, 0, 0, 0, 0, 0, false, false, []]
 }
