@@ -484,7 +484,10 @@ class stereoPhoto(object):
         self.realCropValueLeft = cropValueLeft
         self.realCropValueRight = cropValueRight
         
-        self.openMNT()
+        #self.openMNT()
+        coordRect = self.getShowRect()
+        self.optWindow.getMNTWithCoord(coordRect)
+
         self.setInitialCursorAltitude()
         self.setBaseTransform()
         self.setStartingView()
@@ -852,44 +855,44 @@ class stereoPhoto(object):
         self.cursorAltitude = Z
 
         if self.buttonPosition : 
-            altitude = self.readMNTWithCoordinate(self.buttonPosition)
+            altitude = self.optWindow.readMNTWithCoord(self.buttonPosition)
             if altitude is not None : self.cursorAltitude = altitude
 
         elif self.lastCurrentView : 
             self.cursorAltitude = self.lastCurrentView[2]
 
-        elif self.mntDS is not None :
+        elif self.optWindow.mntArr is not None :
             middleCoordLeft = self.leftPictureManager.pixelToCoord(midLPix,self.cursorAltitude)
-            altitude = self.readMNTWithCoordinate(middleCoordLeft)
+            altitude = self.optWindow.readMNTWithCoord(middleCoordLeft)
             if altitude is not None : self.cursorAltitude = altitude
 
         self.optWindow.ui.labelAltitude.setText(f"{self.cursorAltitude:.3f}")
 
     
-    def openMNT(self) : 
-        if not self.optWindow.currentMNTPath : 
-            self.mntDS = None
-            return
+    def openMNT(self) : pass
+        #if not self.optWindow.currentMNTPath : 
+        #    self.mntDS = None
+        #    return#
 
-        self.mntDS = gdal.Open(self.optWindow.currentMNTPath,gdal.GA_ReadOnly)
-        self.mntBand = self.mntDS.GetRasterBand(1)
-        self.mntGeo = self.mntDS.GetGeoTransform()
-        self.mntNoData = self.mntBand.GetNoDataValue()
-        self.mntXSize = self.mntDS.RasterXSize
-        self.mntYSize = self.mntDS.RasterYSize
+        #self.mntDS = gdal.Open(self.optWindow.currentMNTPath,gdal.GA_ReadOnly)
+        #self.mntBand = self.mntDS.GetRasterBand(1)
+        #self.mntGeo = self.mntDS.GetGeoTransform()
+        #self.mntNoData = self.mntBand.GetNoDataValue()
+        #self.mntXSize = self.mntDS.RasterXSize
+        #self.mntYSize = self.mntDS.RasterYSize
 
 
-    def readMNTWithCoordinate(self,coordinates) :
-        if self.mntDS is None : return None
+    def readMNTWithCoordinate(self,coordinates) : pass
+        #if self.mntDS is None : return None
         
-        px = math.floor((coordinates[0] - self.mntGeo[0]) / self.mntGeo[1]) 
-        py = math.floor((coordinates[1] - self.mntGeo[3]) / self.mntGeo[5])
-        if px < 0 or py < 0 or px >= self.mntXSize or py >= self.mntYSize: return None
+        #px = math.floor((coordinates[0] - self.mntGeo[0]) / self.mntGeo[1]) 
+        #py = math.floor((coordinates[1] - self.mntGeo[3]) / self.mntGeo[5])
+        #if px < 0 or py < 0 or px >= self.mntXSize or py >= self.mntYSize: return None
 
-        try : Z = self.mntBand.ReadAsArray(px,py,1,1)[0][0]
-        except : return None 
-        if Z == self.mntNoData : return None
-        return Z
+        #try : Z = self.mntBand.ReadAsArray(px,py,1,1)[0][0]
+        #except : return None 
+        #if Z == self.mntNoData : return None
+        #return Z
 
     def setStartingView(self) : 
 
@@ -1005,6 +1008,11 @@ class stereoPhoto(object):
 
     def mouseMoveEvent(self,coordinate) :
         if self.isLoadingPair : return
+
+        if True : 
+            mntAlt = self.optWindow.readMNTWithCoord(coordinate)
+            if mntAlt is not None and mntAlt != self.optWindow.mntNodata : self.cursorAltitude = mntAlt
+
         pxL, pyL = self.leftPictureManager.coordToPixel(coordinate,self.cursorAltitude)
         pxR, pyR = self.rightPictureManager.coordToPixel(coordinate,self.cursorAltitude)
 
@@ -1147,7 +1155,7 @@ class stereoPhoto(object):
 
     def mousePressEvent(self,mouseButton,mousePos) : 
 
-        altitude = self.readMNTWithCoordinate(mousePos)
+        altitude = self.optWindow.readMNTWithCoord(mousePos)
 
         coordTuple = (mousePos[0],mousePos[1],altitude)
         if self.optWindow.currentMNTPath and self.enableDraw and self.vectorLayer.geometryType() == QgsWkbTypes.PolygonGeometry :
