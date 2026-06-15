@@ -6,7 +6,7 @@ Pour toute question supplémentaire ou si vous désirez participer au développe
 
 # Première utilisation
 
-Afin de faciliter l'installation ainsi que la première utilisation, il est recommandé d'utiliser [le guide d'utilisation.](guideUtilisationStereoPhoto_v0_1_6.pdf) Le guide peut être utilisé pour envoyer des commentaires à notre adresse courriel. 
+Afin de faciliter l'installation ainsi que la première utilisation, il est recommandé d'utiliser [le guide d'utilisation.](guideUtilisationStereoPhoto_v0_2_0.pdf) Le guide peut être utilisé pour envoyer des commentaires à notre adresse courriel. 
 
 Sans avoir recours au guide d'utilisation voici les éléments importants à considérer lors de la première utilisation : 
 
@@ -56,7 +56,7 @@ For any additional questions or if you wish to participate in the development of
 
 # First Use
 
-To facilitate installation and first-time use, it is recommended to use the [user guide.](guideUtilisationStereoPhoto_v0_1_6.pdf) The guide is only available in french. The guide can be used to send comments to our email address. 
+To facilitate installation and first-time use, it is recommended to use the [user guide.](guideUtilisationStereoPhoto_v0_2_0.pdf) The guide is only available in french. The guide can be used to send comments to our email address. 
 
 Without using the user guide, here are the important elements to consider during first-time use: 
 
