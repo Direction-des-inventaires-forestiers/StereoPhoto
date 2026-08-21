@@ -146,12 +146,12 @@ class graphicsWindow(QtWidgets.QMainWindow):
             self.manageTileGroupViewing(newAction)
             self.tileGroupAction = newAction
 
-    def addPixmap(self, tile, scaleFactor, topX, topY, groupId):
+    def addPixmap(self, q_img, scaleFactor, topX, topY, groupId):
         if groupId == 0 : tileGroup = self.fullviewTileGroup 
         elif groupId == 1 : tileGroup = self.overviewTileGroup
         else : tileGroup = self.safetyTileGroup
 
-        q_img = QtGui.QImage(tile.data, tile.shape[1], tile.shape[0],tile.shape[1]*3, QtGui.QImage.Format_RGB888).copy()
+        #q_img = QtGui.QImage(tile.data, tile.shape[1], tile.shape[0],tile.shape[1]*3, QtGui.QImage.Format_RGB888).copy()
         pixmap = QtGui.QPixmap.fromImage(q_img)
 
         item = QtWidgets.QGraphicsPixmapItem(pixmap, self.imageRoot)
