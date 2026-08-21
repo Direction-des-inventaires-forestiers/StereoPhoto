@@ -67,26 +67,50 @@ class stereoPhoto(object):
 
     #Place le bouton de l'application dans QGIS
     def initGui(self):
-        urlPicture = ":/Anaglyph/Icons/icon.png"
-        self.action = QAction(QIcon(urlPicture), "StereoPhoto", self.iface.mainWindow())
+
+        self.toolbarST = self.iface.addToolBar("StereoPhoto Toolbar")
+        self.toolbarST.setObjectName("StereoPhotoToolbar")
+
+        iconOuvrirMenu = ":/Anaglyph/Icons/OuvrirMenu.png"
+        self.actionMainMenu = QAction(QIcon(iconOuvrirMenu), "Ouvrir le menu principal", self.iface.mainWindow())
         
-        self.action.setCheckable(True)
-        self.action.toggled.connect(self.run)
+        self.actionMainMenu.setCheckable(True)
+        self.actionMainMenu.toggled.connect(self.run)
+
+        iconSuivreMNT = ":/Anaglyph/Icons/SuivreMNT.png"
+        self.actionSuivreMNT = QAction(QIcon(iconSuivreMNT), "Suivre le MNT ; Appuyer sur 'M' ", self.iface.mainWindow())
+        
+        self.actionSuivreMNT.setCheckable(True)
          
-        self.iface.addToolBarIcon(self.action)
-        self.iface.addPluginToMenu("&StereoPhoto", self.action)
+
+        iconUnlockCursor = ":/Anaglyph/Icons/UnlockCursor.png"
+        self.actionUnlockCursor = QAction(QIcon(iconUnlockCursor), "Débarrer le curseur  ; Appuyer sur 'C' ", self.iface.mainWindow())
+        
+        self.actionUnlockCursor.setCheckable(True)
+
+
+        self.toolbarST.addAction(self.actionMainMenu)
+        self.toolbarST.addAction(self.actionSuivreMNT)
+        self.toolbarST.addAction(self.actionUnlockCursor)
+
+
+        self.iface.addPluginToMenu("&StereoPhoto", self.actionMainMenu)
 
     #Retire le bouton de l'application dans QGIS
     def unload(self):
-        self.iface.removePluginMenu("&StereoPhoto", self.action)
-        self.iface.removeToolBarIcon(self.action)
+        self.iface.removePluginMenu("&StereoPhoto", self.actionMainMenu)
+        #self.iface.removeToolBarIcon(self.actionMainMenu)
+
+        if hasattr(self, 'toolbarST'):
+            self.iface.mainWindow().removeToolBar(self.toolbarST)
+            self.toolbarST.deleteLater()
 
     #Initialisation de l'application et des variables
     #Connection entre les boutons du menu d'options (mOpt) et leurs fonctions attitrées
     #Ouverture du menu d'options
     def run(self):
 
-        if self.action.isChecked() :
+        if self.actionMainMenu.isChecked() :
 
             self.initGlobalParam()           
 
@@ -177,7 +201,7 @@ class stereoPhoto(object):
         self.closeAllSideWindows()
         self.optWindow.close()
         self.optWindow.vectorWindow.close()
-        if self.action.isChecked() : self.action.setChecked(False)
+        if self.actionMainMenu.isChecked() : self.actionMainMenu.setChecked(False)
 
     def newPictureFile(self):
         
@@ -841,6 +865,9 @@ class stereoPhoto(object):
             elif event.key() == QtCore.Qt.Key_1 : 
                 if self.optWindow.ui.radioButtonDraw.isChecked() : self.optWindow.ui.radioButtonCut.setChecked(True)
                 else : self.optWindow.ui.radioButtonDraw.setChecked(True)
+
+            elif event.key() == QtCore.Qt.Key_M : 
+                if self.optWindow.mntArr is not None : self.actionSuivreMNT.toggle() 
             
 
         event.accept()
@@ -1009,7 +1036,7 @@ class stereoPhoto(object):
     def mouseMoveEvent(self,coordinate) :
         if self.isLoadingPair : return
 
-        if True : 
+        if self.actionSuivreMNT.isChecked() : 
             mntAlt = self.optWindow.readMNTWithCoord(coordinate)
             if mntAlt is not None and mntAlt != self.optWindow.mntNodata : self.cursorAltitude = mntAlt
 
@@ -1023,8 +1050,18 @@ class stereoPhoto(object):
         scenePointR = self.graphWindowRight.imageRoot.mapToScene(self.endDrawPointRight)
 
         scale = self.currentScale
+        self.graphWindowLeft.ui.graphicsView.setUpdatesEnabled(False)
+        self.graphWindowRight.ui.graphicsView.setUpdatesEnabled(False)
+
         self.graphWindowLeft.custom_centerOn(scenePointL,scale)
         self.graphWindowRight.custom_centerOn(scenePointR,scale)
+
+        self.graphWindowLeft.ui.graphicsView.setUpdatesEnabled(True)
+        self.graphWindowRight.ui.graphicsView.setUpdatesEnabled(True)
+
+        # Single coordinated repaint
+        self.graphWindowLeft.ui.graphicsView.viewport().update()
+        self.graphWindowRight.ui.graphicsView.viewport().update()
 
         self.updateUserAltitude()
 
@@ -1058,6 +1095,10 @@ class stereoPhoto(object):
             newAltitude = self.cursorAltitude
 
         else : 
+
+            #Désactiver le suivi du MNT pour permettre l'action de la roulette
+            self.actionSuivreMNT.setChecked(False)
+
             zoom_level = math.log2(self.currentScale)
 
             if zoom_level > 2 : meter_changer = 0.1

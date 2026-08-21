@@ -329,12 +329,13 @@ class Ui_StereoDockWidget(object):
 
 class dropEventMNT(QtWidgets.QGroupBox): 
     validMNT = pyqtSignal()
+    
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setAcceptDrops(True)
         self.MNTPath = ""
         self.MNTName = ""
-        self.fileExtensions = ['tif','vrt']
+        self.fileExtensions = ['tif', 'vrt']
 
     def dragEnterEvent(self, event):
         if event.mimeData().hasUrls():
@@ -343,37 +344,54 @@ class dropEventMNT(QtWidgets.QGroupBox):
             event.ignore()
 
     def dropEvent(self, event):
-        urls = event.mimeData().urls()
-        if not urls:
-            event.ignore()
-            return
 
-        url = urls[0] 
-        local = url.toLocalFile()
-        if local:
-            return local
-        
-        parsed = urlparse(url.toString())
-        if parsed.scheme == "file" and parsed.path:
-            if os.name == "nt" : 
-                file_path = parsed.path.lstrip("/")  
+        try:
+            urls = event.mimeData().urls()
+            if not urls:
+                event.ignore()
+                return
+
+            url = urls[0] 
+            local = url.toLocalFile()
             
-            else : file_path = parsed.path
-        
-        else : 
-            event.ignore()
-            return
+            if local:
+                file_path = local
+            else:
+                # Fallback URL parsing engine
+                parsed = urlparse(url.toString())
+                if parsed.scheme == "file" and parsed.path:
+                    if os.name == "nt": 
+                        file_path = parsed.path.lstrip("/")  
+                    else: 
+                        file_path = parsed.path
+                else: 
+                    event.ignore()
+                    return
 
-        ext = os.path.splitext(file_path)[1].lstrip(".").lower()
-        if ext in self.fileExtensions:
-            self.MNTPath = file_path
-            self.MNTName = os.path.basename(file_path)
-            self.validMNT.emit()
-            event.acceptProposedAction()
-        else:
-            self.MNTPath = ""
-            self.MNTName = ""
+            # Normalize path slashes for Windows safety
+            file_path = os.path.normpath(file_path)
+
+            ext = os.path.splitext(file_path)[1].lstrip(".").lower()
+            if ext in self.fileExtensions:
+                self.MNTPath = file_path
+                self.MNTName = os.path.basename(file_path)
+                self.validMNT.emit()
+                event.acceptProposedAction()
+            else:
+                self.MNTPath = ""
+                self.MNTName = ""
+                event.ignore()
+                
+        except Exception as e:
+            # Prints any hidden scripting errors cleanly to your console terminal
+            print(f"Error inside dropEvent: {e}")
+            import traceback
+            traceback.print_exc()
             event.ignore()
+            
+        #Explicitly return None (or nothing) so the C++ engine doesn't crash
+        return
+
 
         
 
@@ -472,6 +490,7 @@ class optionWindow(QtWidgets.QDockWidget):
         self.vectorWindow.close()
     
     def showImportMNT(self):
+
         fname = QtWidgets.QFileDialog.getOpenFileName(self, 'Importer un modèle numérique de terrain', self.mntLocation, 'MNT (*.tif *.vrt)')[0]
         if fname:
             self.loadImportMNT(fname)
