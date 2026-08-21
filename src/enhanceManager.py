@@ -145,8 +145,8 @@ class enhanceManager(QObject):
 
 
     #Fonction appelée par le emit du thread pour ajouter une portion de l'image sur l'affichage
-    def addPixmap(self, tile, scaleFactor, topX, topY, groupId) :
-        q_img = QImage(tile.data, tile.shape[1], tile.shape[0],tile.shape[1]*3, QImage.Format_RGB888).copy()
+    def addPixmap(self, q_img, scaleFactor, topX, topY, groupId) :
+        #q_img = QImage(tile.data, tile.shape[1], tile.shape[0],tile.shape[1]*3, QImage.Format_RGB888).copy()
         pixmap = QPixmap.fromImage(q_img)
         d = self.colorWindow.ui.graphicsView.scene().addPixmap(pixmap)
         d.setPos(topX, topY)
@@ -399,7 +399,7 @@ class enhanceManager(QObject):
         return pixValue
     
 class threadShow(QThread):
-    newImage = pyqtSignal(object, float, float, float, int)
+    newImage = pyqtSignal(QImage, float, float, float, int)
     
     def __init__(self, picturePath, listParam,cropValue=None, sceneRect=None):
         super().__init__()
@@ -521,10 +521,14 @@ class threadShow(QThread):
                 if self.perform_Enhancing:
                     tile = self.applyEnhancements(tile, self.listParam)
                 tile = np.ascontiguousarray(tile)
-                #q_img = QImage(tile.data, tile_w, tile_h, tile_w * 3, QImage.Format_RGB888)
+                #tile_32 = np.empty((tile_h, tile_w, 4), dtype=np.uint8)
+
+                # 2. Copy your 3-channel RGB data into the first 3 channels (channel 4 is left empty as padding)
+                #tile_32[:, :, :3] = tile
+                q_img = QImage(tile.data, tile_w, tile_h, tile_w * 3, QImage.Format_RGB888).copy()
                 #pixmap = QPixmap.fromImage(q_img)
                 
-                self.newImage.emit(tile, scale, curr_lx * scale, curr_ly * scale, groupId)
+                self.newImage.emit(q_img, scale, curr_lx * scale, curr_ly * scale, groupId)
                 QThread.msleep(1)
         
     def fetch_tile(self, x, y, w, h, ovr_index):

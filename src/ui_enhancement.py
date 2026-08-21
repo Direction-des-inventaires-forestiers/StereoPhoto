@@ -199,42 +199,42 @@ class enhanceWindow(QtWidgets.QMainWindow):
     def __init__(self):
         super(enhanceWindow, self).__init__()
         self.ui = Ui_enhanceWindow()
-        self.initSize = self.size()
         self.ui.setupUi(self)
+
+        self.baseWidth = 1070
+        self.baseHeight = 750
     
     #Revoir cette méthode, semble inversé le state un fois lancé, jamais State maximized quand on le max seulement quand on réduit ---> à décalage!
-    def resizeEvent(self, event) :
-        QtWidgets.QMainWindow.resizeEvent(self, event)
-        if self.windowState() == QtCore.Qt.WindowMaximized:
-            if event.size().width() > 1070 :
+    def resizeEvent(self, event):
+        super(enhanceWindow, self).resizeEvent(event)
+        
+        currentW = event.size().width()
+        currentH = event.size().height()
 
-                #Taille original 1070,750
-                difX = event.size().width() - event.oldSize().width()
-                self.pixelX = difX
-                difY = event.size().height() - event.oldSize().height()
-                self.pixelY = difY
+        # Calculate absolute growth from baseline (1070x750)
+        difX = currentW - self.baseWidth
+        difY = currentH - self.baseHeight
+        
+        self.pixelX = difX
+        self.pixelY = difY
 
+        # 1. Update Zoom Buttons (Original Y was 620, Height 30, Width 30)
+        self.ui.zoomInButton.setGeometry(QtCore.QRect(160, 620 + difY, 30, 30))
+        self.ui.zoomOutButton.setGeometry(QtCore.QRect(200, 620 + difY, 30, 30))
+        self.ui.zoomPanButton.setGeometry(QtCore.QRect(240, 620 + difY, 30, 30))
 
-                #Augmenter 2e param pour déplacer vers le bas
-                geo = self.ui.zoomPanButton.geometry()
-                self.ui.zoomPanButton.setGeometry(QtCore.QRect(geo.x(), geo.y()+difY, geo.width(), geo.height()))
+        # 2. Update Action Buttons (Original coordinates from your UI setup)
+        # applyButton base: X=860, Y=630, W=71, H=23
+        self.ui.applyButton.setGeometry(QtCore.QRect(860 + difX, 630 + difY, 71, 23))
+        
+        # cancelButton base: X=940, Y=630, W=75, H=23
+        self.ui.cancelButton.setGeometry(QtCore.QRect(940 + difX, 630 + difY, 75, 23))
 
-                geo = self.ui.zoomInButton.geometry()
-                self.ui.zoomInButton.setGeometry(QtCore.QRect(geo.x(), geo.y()+difY, geo.width(), geo.height()))
+        # 3. Scale Graphics View (Original X=150, Y=40, W=881, H=561)
+        newWidth = max(10, 881 + difX)
+        newHeight = max(10, 561 + difY)
+        self.ui.graphicsView.setGeometry(QtCore.QRect(150, 40, newWidth, newHeight))
 
-                geo = self.ui.zoomOutButton.geometry()
-                self.ui.zoomOutButton.setGeometry(QtCore.QRect(geo.x(), geo.y()+difY, geo.width(), geo.height()))
-
-                #Augmenter 1er et 2e param pour déplacer vers droite et bas
-                geo = self.ui.cancelButton.geometry()
-                self.ui.cancelButton.setGeometry(QtCore.QRect(geo.x()+difX, geo.y()+difY, geo.width(), geo.height()))
-
-                geo = self.ui.applyButton.geometry()
-                self.ui.applyButton.setGeometry(QtCore.QRect(geo.x()+difX, geo.y()+difY, geo.width(), geo.height()))
-
-                #Augmenter 3e et 4e param pour augmenter la taille vers la droite et vers le bas
-                geo = self.ui.graphicsView.geometry()
-                self.ui.graphicsView.setGeometry(QtCore.QRect(geo.x(), geo.y(), geo.width()+difX, geo.height()+difY))
 
 
 

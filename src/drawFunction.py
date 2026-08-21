@@ -86,10 +86,17 @@ def reshapeLayer(lineString,listFeatures,vectorLayer) :
 #Découpe la couche en fonction d'une ligne tracer par l'utilisateur
 #Si les lignes tracées se croisent aucune coupe à lieu (IDEM à QGIS)
 def cutPolygon(vectorLayer, line):
+    if len(line) < 2: return
+
+    #splitLineGeometry = QgsGeometry.fromPolylineXY(line)
     vectorLayer.startEditing()
     vectorLayer.removeSelection()
-    vectorLayer.splitFeatures(line)
-    vectorLayer.commitChanges()
+    #vectorLayer.splitFeatures(line)
+    editUtils = QgsVectorLayerEditUtils(vectorLayer)
+    result_code = editUtils.splitFeatures(line)
+    
+    if result_code == 0:
+        vectorLayer.commitChanges()
 
 #Lorsqu'un nouveau polygon entre en contact avec un polygon existant
 #Le nouveau est conservé dans son entièreté et l'ancien est reformé pour laisser la place au nouveau
