@@ -54,6 +54,7 @@ from .navigationQgsMapTool import navigationMapTool
 from .ui_widgetStereoPhoto import optionWindow
 
 from .gestionDossier import getParDict, get_neighbors_and_pairs, findPairWithCoord, compute_overlap
+from .config import PAR_CAMERA_ORIENTATION_TOLERANCE_DEG, DRAW_LINE_PEN_WIDTH_PX, GEOMETRY_PEN_WIDTH_PX, GEOMETRY_POINT_RADIUS_PX
 import sys, os, time, math, gc
 from osgeo import gdal
 
@@ -399,7 +400,7 @@ class stereoPhoto(object):
         self.graphWindowRight.move(screenRight_geom.topLeft())
         self.graphWindowRight.keyPressed.connect(self.keyboardHandler)
         
-        width = 4
+        width = DRAW_LINE_PEN_WIDTH_PX
         color = QColor('Cyan')
 
         self.my_pen = QPen(color, width, Qt.SolidLine, Qt.SquareCap, Qt.RoundJoin)
@@ -665,7 +666,7 @@ class stereoPhoto(object):
                 color = arr[1]
                 polyLeft = arr[0]
                 polyRight = self.polygonR2Draw[name][0]
-                width = 4
+                width = GEOMETRY_PEN_WIDTH_PX
 
                 layerPen = QPen(color, width, Qt.SolidLine, Qt.SquareCap, Qt.RoundJoin)
                 layerPen.setCosmetic(True)
@@ -683,7 +684,7 @@ class stereoPhoto(object):
                         rightObj = QGraphicsPathItem(polyRight[i],self.graphWindowRight.imageRoot)
 
                     elif geoType == QgsWkbTypes.PointGeometry : 
-                        radius = 9  #rayon pour la taille des points 
+                        radius = GEOMETRY_POINT_RADIUS_PX  #rayon pour la taille des points 
                         
                         leftObj = QGraphicsEllipseItem(polyLeft[i][0] - radius, polyLeft[i][1] - radius, 2*radius, 2*radius,self.graphWindowLeft.imageRoot)
                         leftObj.setBrush(color)
@@ -1111,7 +1112,7 @@ class stereoPhoto(object):
 
 
     def calculNextPairWithPos(self,rangeX,rangeY,qpoint)   :
-        threshold_deg=10
+        threshold_deg = PAR_CAMERA_ORIENTATION_TOLERANCE_DEG
         kappa = math.degrees(self.leftPictureManager.kappa)
 
         #Faire une liste des combinaison plutot que de répter 4 fois

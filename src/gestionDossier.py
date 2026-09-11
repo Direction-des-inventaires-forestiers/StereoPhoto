@@ -2,6 +2,7 @@ import os, math
 from osgeo import gdal, ogr, osr
 import numpy as np
 from qgis.core import QgsApplication
+from .config import PAR_CAMERA_ORIENTATION_TOLERANCE_DEG, PAR_PAIR_PROXIMITY_BUFFER_M, PAR_DIRECTION_BUFFER_M, PAR_MIN_OVERLAP_RATIO
 
 def getParDict(dossierImages) :
     
@@ -72,7 +73,7 @@ def getParDict(dossierImages) :
         else : 
             fscale = Z0/Focal
         
-        threshold_deg=10
+        threshold_deg = PAR_CAMERA_ORIENTATION_TOLERANCE_DEG
         if (abs(kappa - 90) < threshold_deg) or (abs(kappa + 90) < threshold_deg):
             longSensor = abs(sizeImg[1] * pixelSize)
             hautSensor = abs(sizeImg[0] * pixelSize)
@@ -99,7 +100,7 @@ def findPairWithCoord(parDict,centerCoord) :
             minID = key
             minDist = dist
 
-    buffer = 500
+    buffer = PAR_PAIR_PROXIMITY_BUFFER_M
     nbPic = int(minID.split('_')[1])
     leftDist = 9999999
     leftName = ''
@@ -145,7 +146,7 @@ def compute_overlap(bbox1, bbox2):
     return overlap_ratio, overlap_bbox
 
 
-def get_neighbors_and_pairs(parID, parDict, direction_buffer=500):
+def get_neighbors_and_pairs(parID, parDict, direction_buffer=PAR_DIRECTION_BUFFER_M):
     
     bbox_ref = parDict[parID]
     x0 = bbox_ref[0] 
@@ -184,7 +185,7 @@ def get_neighbors_and_pairs(parID, parDict, direction_buffer=500):
                 elif overlap_ratio == 0 and dist < best_right[2] :  
                     best_right = (key, overlap_ratio, dist)
 
-        if overlap_ratio > 0.05:
+        if overlap_ratio > PAR_MIN_OVERLAP_RATIO:
             if dy > direction_buffer:  # up
                 up_candidates.append((key, overlap_ratio, dy))
             elif dy < -direction_buffer:  # down
