@@ -308,6 +308,7 @@ class stereoPhoto(object):
         self.setLastView()
         
         secondID = None
+        newID = None
         if ori == 'L': newID = self.infoNeighbors['left'][0]
         elif ori == 'R': newID = self.infoNeighbors['right'][0]
         
@@ -340,6 +341,9 @@ class stereoPhoto(object):
                     secondID = name_1
 
             else : newID = self.infoNeighbors['up'][0][0]
+
+        #Orientation inconnue ou voisin absent : aucune paire à charger
+        if newID is None : return
         
         self.setPairWithPARId(newID,secondID)
         
@@ -668,6 +672,8 @@ class stereoPhoto(object):
 
                 for i in range(len(polyLeft)) : 
 
+                    leftObj = None
+                    rightObj = None
                     if geoType == QgsWkbTypes.PolygonGeometry : 
                         leftObj = QGraphicsPolygonItem(polyLeft[i],self.graphWindowLeft.imageRoot)
                         rightObj = QGraphicsPolygonItem(polyRight[i],self.graphWindowRight.imageRoot)
@@ -685,6 +691,9 @@ class stereoPhoto(object):
                         rightObj = QGraphicsEllipseItem(polyRight[i][0] - radius, polyRight[i][1] - radius, 2*radius, 2*radius,self.graphWindowRight.imageRoot)
                         rightObj.setBrush(color)
                     
+                    #Type de géométrie non pris en charge : rien à dessiner
+                    if leftObj is None : continue
+
                     leftObj.setPen(layerPen)
                     rightObj.setPen(layerPen)
                     self.graphWindowLeft.geometryItemGroup.addToGroup(leftObj)

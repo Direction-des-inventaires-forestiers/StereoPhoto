@@ -571,6 +571,7 @@ class threadShow(QThread):
         contrast = params[0]
         saturation = params[2]
         need_grayscale = contrast != 0 or saturation != 0
+        grayscale = None
         
         # Convert to grayscale using PIL weights
         if need_grayscale : 
