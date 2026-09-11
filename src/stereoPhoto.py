@@ -872,7 +872,8 @@ class stereoPhoto(object):
             altitude = self.readMNTWithCoordinate(middleCoordLeft)
             if altitude is not None : self.cursorAltitude = altitude
 
-        self.optWindow.ui.labelAltitude.setText(f"{self.cursorAltitude:.3f}")
+        #Altitude indéterminée : affichage de repli
+        self.optWindow.ui.labelAltitude.setText(f"{self.cursorAltitude:.3f}" if self.cursorAltitude is not None else "N/D")
 
     
     def openMNT(self) : 
@@ -957,7 +958,8 @@ class stereoPhoto(object):
         cPixelR = self.graphWindowRight.imageRoot.mapFromScene(sceneCenterR)
 
         self.cursorAltitude = self.dualManager.calculateZ((cPixelL.x(), cPixelL.y()), (cPixelR.x(), cPixelR.y())) 
-        self.optWindow.ui.labelAltitude.setText(f"{self.cursorAltitude:.3f}")
+        #Altitude indéterminée : affichage de repli
+        self.optWindow.ui.labelAltitude.setText(f"{self.cursorAltitude:.3f}" if self.cursorAltitude is not None else "N/D")
         
 
 
