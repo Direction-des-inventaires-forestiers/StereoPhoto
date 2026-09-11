@@ -47,8 +47,9 @@ from math import ceil
 #Gestionnaire de la QMainWindow qui permet le rehaussement d'image
 class enhanceManager(QObject):
     listParamSignal = pyqtSignal(list)
-    def __init__(self, pathLeft, pathRight, listParam=[],nameLeft='',nameRight=''):
+    def __init__(self, pathLeft, pathRight, listParam=None,nameLeft='',nameRight=''):
         QObject.__init__(self)
+        if listParam is None : listParam = []
         self.pathLeft = pathLeft
         self.pathRight = pathRight
 
@@ -632,7 +633,8 @@ class threadShow(QThread):
 
         return arr.astype(np.uint8, copy=False)
 
-    def get_global_stats_from_overview(self,band_numbers=[1,2,3], lower=5, upper=95):
+    def get_global_stats_from_overview(self,band_numbers=None, lower=5, upper=95):
+        if band_numbers is None : band_numbers = [1, 2, 3]
         stats = []
         band_arrays = []
         for bandNumber in band_numbers:
