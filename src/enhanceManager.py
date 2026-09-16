@@ -380,24 +380,15 @@ class enhanceManager(QObject):
 
             
     #Calcul de l'histogramme sur une portion de la photo lorsque l'on veut conserver le min/max pour la vue courante
+    #ATTENTION (registre B-02, item P1-E) : la fonction retourne une plage fixe 0-255 par bande.
+    #Le calcul réel de l'histogramme se trouvait après ce return et n'a donc jamais été exécuté;
+    #il a été retiré le 2026-09-17 comme code mort (récupérable dans l'historique Git).
+    #Conséquence fonctionnelle : l'option « conserver le min/max de la vue courante » est sans effet,
+    #l'étirement min/max utilise toujours la plage complète. Comportement à valider avec la DIF
+    #avant de rétablir le calcul.
     def calculHistogram(self, top, low):
 
         return [0,255,0,255,0,255]
-        h = self.picture.crop((top.x(), top.y(), low.x(), low.y())).histogram()
-        a = sum(h)
-        cutValue = [round(a*0.05/3), round(a*0.95/3), round(a*1.05/3), round(a*1.95/3), round(a*2.05/3), round(a*2.95/3)]
-        pixValue = []
-        b = 0
-        c = 0
-        for i in range(len(h)):
-            b += h[i] 
-            if b > cutValue[c] : 
-                i = i % 256
-                pixValue.append(i)
-                c += 1
-                if c == 6 :
-                    break
-        return pixValue
     
 class threadShow(QThread):
     newImage = pyqtSignal(object, float, float, float, int)
