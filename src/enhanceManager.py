@@ -655,7 +655,9 @@ class threadShow(QThread):
                     self.overviewStartY = 0 
 
             else:
-                return None, None
+                #Retour None (et non None, None) : applyEnhancements() teste « if self.stats is None »,
+                #un tuple aurait franchi la garde et fait échouer l'étirement min/max (registre B-02, item P1-G).
+                return None
 
             arr_flat = arr[np.isfinite(arr)]
 
