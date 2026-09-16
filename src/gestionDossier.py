@@ -251,36 +251,8 @@ def save_bbox_to_gpkg(bbox, gpkg_path, layer_name="bbox", crs_epsg=2948):
     datasource = None
     print(f"BBox saved to {gpkg_path} as layer '{layer_name}'")
 
-#from qgis.gui import *
-#from qgis.core import *
-#from qgis.utils import iface
-#from qgis.PyQt.QtWidgets import *
-#from qgis.PyQt.QtCore import *
-#from qgis.PyQt.QtGui import *
-
-def createShapePoint(shapeName, epsg):
-    
-    #
-    fields = QgsFields()
-    fields.append(QgsField("id", QVariant.Int))
-    fields.append(QgsField("name", QVariant.String))
-    shapeName = 'E:\\point/pointFromPicture.shp'
-    epsg = 'EPSG:2950'
-    
-    vectorWriter = QgsVectorFileWriter(shapeName, "System", fields, QgsWkbTypes.MultiPoint, QgsCoordinateReferenceSystem(epsg), "ESRI Shapefile")
-    points = getParDict('E:\\mtm8')
-    for key, value in points.items() :
-        
-        feature = QgsFeature(fields)
-        feature.setAttribute(1,str(key))
-        geo = QgsGeometry.fromPointXY(QgsPointXY(value[0],value[1]))
-        feature.setGeometry(geo)
-        vectorWriter.addFeature(feature)
-    #return vectorWriter
-
 
 '''    
-#createShapePoint('a','A')   
 import time
 t = time.time()
 a= getParDict('E:/c24104/modeles_photos/rgb/Photo20rvb2023_20cm_Rvb/Mtm8/Tiff_Par')
