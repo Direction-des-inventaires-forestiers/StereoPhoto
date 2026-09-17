@@ -33,3 +33,20 @@ GEOMETRY_PEN_WIDTH_PX = 4
 
 # Rayon des points des couches vectorielles affichées (pixels de l'image)
 GEOMETRY_POINT_RADIUS_PX = 9
+
+# Journalisation (journal.py)
+
+# Niveau minimal des messages écrits au journal : DEBUG, INFO, WARNING ou ERROR
+JOURNAL_NIVEAU_DEFAUT = "INFO"
+
+# Nombre de jours de conservation des fichiers de journal archivés
+JOURNAL_RETENTION_JOURS = 90
+
+# Sous-dossier des journaux, sous le dossier de profil QGIS de l'utilisateur
+JOURNAL_SOUS_DOSSIER = "stereophoto/logs"
+
+# Sous-dossier où sont déplacés les fichiers des journées précédentes
+JOURNAL_SOUS_DOSSIER_ARCHIVE = "archive"
+
+# Préfixe du nom des fichiers de journal, suivi de la date (stereophoto-AAAA-MM-JJ.log)
+JOURNAL_PREFIXE_FICHIER = "stereophoto"
