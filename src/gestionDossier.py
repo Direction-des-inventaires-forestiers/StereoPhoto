@@ -3,19 +3,10 @@ from osgeo import gdal, ogr, osr
 import numpy as np
 from qgis.core import QgsApplication
 from .config import PAR_CAMERA_ORIENTATION_TOLERANCE_DEG, PAR_PAIR_PROXIMITY_BUFFER_M, PAR_DIRECTION_BUFFER_M, PAR_MIN_OVERLAP_RATIO
+from .parFile import parse_par_file, PAR_REQUIRED_KEYWORDS
 
 def getParDict(dossierImages) :
     
-    keywords = {
-        "$PARAFFINE00": "affine",
-        "$PARINVAFF00": "inverse_affine",
-        "$FOC00": "focal",
-        "$XYZ00": "camera position",
-        "$OPK00": "orientation",
-        "$PIXELSIZE": "pixel_size",
-        "$FSCALE00": "fscale"
-        }
-
     listpath = os.listdir(dossierImages)
     parDict = {}
     
@@ -38,22 +29,10 @@ def getParDict(dossierImages) :
         #with Image.open(pathImg) as img:
         #    sizeImg = img.size 
         #sizeImg = (info['size'][0], info['size'][1])
-        try:
-            with open(pathPAR, encoding='utf-8') as f:
-                lines = f.read().splitlines()
-        except:
-            with open(pathPAR, encoding='ansi') as f:
-                lines = f.read().splitlines()
-
-        values = {}
-        for line in lines:
-            for key in keywords:
-                if line.startswith(key):
-                    values[key] = line.split()
-                    break
+        values = parse_par_file(pathPAR)
         
         #Vérification des paramètres obligatoires, le fichier PAR sera ignoré si un paramètre est absent
-        if not all(key in values for key in ['$PARAFFINE00','$PARINVAFF00','$FOC00','$XYZ00','$OPK00']) : continue
+        if not all(key in values for key in PAR_REQUIRED_KEYWORDS) : continue
         
         affine = [float(val) for val in values["$PARAFFINE00"][-6:]]
         AffineA, AffineB, AffineC, AffineD, AffineE, AffineF = affine

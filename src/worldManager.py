@@ -18,6 +18,7 @@ from math import cos, sin, radians
 #from qgis.PyQt.QtCore import QRectF
 from PyQt5.QtCore import QRectF
 import numpy as np
+from .parFile import parse_par_file
 
 class pictureManager(): 
 
@@ -31,30 +32,7 @@ class pictureManager():
         
     def initPAR(self):
 
-        keywords = {
-            "$PARAFFINE00": "affine",
-            "$PARINVAFF00": "inverse_affine",
-            "$FOC00": "focal",
-            "$XYZ00": "camera position",
-            "$OPK00": "orientation",
-            "$PIXELSIZE": "pixel_size",
-            "$FSCALE00": "fscale",
-            "$PPA": "principal point of autocollimation"
-        }
-
-        try:
-            with open(self.pathPAR, encoding='utf-8') as f:
-                lines = f.read().splitlines()
-        except:
-            with open(self.pathPAR, encoding='ansi') as f:
-                lines = f.read().splitlines()
-
-        values = {}
-        for line in lines:
-            for key in keywords:
-                if line.startswith(key):
-                    values[key] = line.split()
-                    break
+        values = parse_par_file(self.pathPAR)
 
         affine = [float(val) for val in values["$PARAFFINE00"][-6:]]
         self.AffineA, self.AffineB, self.AffineC, self.AffineD, self.AffineE, self.AffineF = affine
