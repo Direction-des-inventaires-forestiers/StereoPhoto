@@ -55,6 +55,7 @@ from .ui_widgetStereoPhoto import optionWindow
 
 from .gestionDossier import getParDict, get_neighbors_and_pairs, findPairWithCoord, compute_overlap
 from .config import PAR_CAMERA_ORIENTATION_TOLERANCE_DEG, DRAW_LINE_PEN_WIDTH_PX, GEOMETRY_PEN_WIDTH_PX, GEOMETRY_POINT_RADIUS_PX
+from .journal import initialiser_journal, fermer_journal, obtenir_journal
 import sys, os, time, math, gc
 from osgeo import gdal
 
@@ -65,6 +66,12 @@ class stereoPhoto(object):
     def __init__(self, iface):
         self.iface = iface
         self.canvas = self.iface.mapCanvas()
+
+        #Journalisation : appelée à chaque construction du plugin, donc aussi à
+        #chaque rechargement. initialiser_journal() retire les handlers déjà
+        #posés, ce qui évite les lignes en double et les fichiers verrouillés.
+        initialiser_journal()
+        self.journal = obtenir_journal(__name__)
 
     #Place le bouton de l'application dans QGIS
     def initGui(self):
@@ -81,6 +88,8 @@ class stereoPhoto(object):
     def unload(self):
         self.iface.removePluginMenu("&StereoPhoto", self.action)
         self.iface.removeToolBarIcon(self.action)
+        self.journal.info("Extension déchargée")
+        fermer_journal()
 
     #Initialisation de l'application et des variables
     #Connection entre les boutons du menu d'options (mOpt) et leurs fonctions attitrées
@@ -98,6 +107,7 @@ class stereoPhoto(object):
             self.optWindow.loadParamFile()
             self.iface.addDockWidget(Qt.RightDockWidgetArea, self.optWindow)
             self.optWindow.raise_()
+            self.journal.info("Session ouverte")
 
         else :
             self.iface.removeDockWidget(self.optWindow)
@@ -105,6 +115,7 @@ class stereoPhoto(object):
             del self.optWindow
             try : del self.currentParDict
             except: pass
+            self.journal.info("Session fermée")
 
     def initGlobalParam(self):
         

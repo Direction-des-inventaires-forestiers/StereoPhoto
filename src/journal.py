@@ -49,9 +49,9 @@ NOM_JOURNAL_RACINE = "StereoPhoto"
 #Onglet du panneau Journal de QGIS
 ETIQUETTE_QGIS = "StereoPhoto"
 
-FORMAT_FICHIER = ("%(asctime)s | %(levelname)-8s | %(name)s"
+FORMAT_FICHIER = ("%(asctime)s | %(levelname)-8s | %(name)s:%(lineno)d"
                   " | %(threadName)s | %(message)s")
-FORMAT_QGIS = "%(levelname)s | %(name)s | %(threadName)s | %(message)s"
+FORMAT_QGIS = "%(levelname)s | %(name)s:%(lineno)d | %(threadName)s | %(message)s"
 
 FORMAT_JOUR = "%Y-%m-%d"
 
