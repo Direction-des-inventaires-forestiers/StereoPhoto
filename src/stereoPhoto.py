@@ -114,7 +114,9 @@ class stereoPhoto(object):
             self.optWindowClose()
             del self.optWindow
             try : del self.currentParDict
-            except: pass
+            except AttributeError :
+                #Aucun dossier de photos n'avait été ouvert : cas normal.
+                self.journal.debug("Aucun dictionnaire PAR à libérer à la fermeture")
             self.journal.info("Session fermée")
 
     def initGlobalParam(self):
@@ -619,7 +621,13 @@ class stereoPhoto(object):
             rectL = QgsRectangle(QgsPointXY(bboxOverlap[0]-700, bboxOverlap[1]-700), QgsPointXY(bboxOverlap[2]+700, bboxOverlap[3]+700))
 
             return rectL
-        except :
+        except Exception :
+            #Rectangle dégénéré retourné à l'appelant : sans trace, la région
+            #d'affichage vide est impossible à expliquer en support.
+            self.journal.warning(
+                "Région d'affichage indéterminable pour la paire %s / %s",
+                getattr(self, 'leftParID', None), getattr(self, 'rightParID', None),
+                exc_info=True)
             return QgsRectangle(QgsPointXY(0, 0), QgsPointXY(0, 0))
         
     def removePolygonOnScreen(self) :
@@ -889,6 +897,8 @@ class stereoPhoto(object):
 
     
     def openMNT(self) : 
+        #Garde de l'avertissement de lecture du MNT (voir readMNTWithCoordinate)
+        self.mntLectureEchouee = None
         if not self.optWindow.currentMNTPath : 
             self.mntDS = None
             return
@@ -909,7 +919,17 @@ class stereoPhoto(object):
         if px < 0 or py < 0 or px >= self.mntXSize or py >= self.mntYSize: return None
 
         try : Z = self.mntBand.ReadAsArray(px,py,1,1)[0][0]
-        except : return None 
+        except Exception :
+            #Appelé à chaque clic : un MNT défectueux produirait une ligne par
+            #clic. Le premier échec est signalé, les suivants restent en débogage.
+            if self.mntLectureEchouee != self.optWindow.currentMNTPath :
+                self.mntLectureEchouee = self.optWindow.currentMNTPath
+                self.journal.warning(
+                    "Lecture du MNT impossible, altitude indéterminée : %s",
+                    self.optWindow.currentMNTPath)
+            else :
+                self.journal.debug("Lecture du MNT impossible en (%s, %s)", px, py)
+            return None
         if Z == self.mntNoData : return None
         return Z
 

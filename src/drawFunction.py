@@ -153,6 +153,9 @@ class calculatePolygon(QThread):
         self.dictPolyR = {}
         self.running = True
         self.count = 0
+        #Nombre de sommets dont l'altitude n'a pu être lue dans la fenêtre de MNT
+        #chargée; résumé une seule fois à la fin du traitement (voir run()).
+        self.nbSommetsHorsMNT = 0
 
     def run(self):
         while self.running : 
@@ -289,6 +292,11 @@ class calculatePolygon(QThread):
                                 
                 except Exception:
                     _journal.exception("Erreur dans le thread de calcul des polygones")
+            if self.nbSommetsHorsMNT :
+                _journal.warning("%s sommets sans altitude dans la fenêtre de MNT"
+                                 " chargée; altitude calculée par stéréoscopie",
+                                 self.nbSommetsHorsMNT)
+                self.nbSommetsHorsMNT = 0
             self.running = False
                 
     def pointToPix(self,point,geotype) : 
@@ -328,7 +336,12 @@ class calculatePolygon(QThread):
             #        if mntAlt != self.mntNodata : 
             #            return mntAlt
 
-            except : pass
+            except Exception :
+                #Sommet hors de la fenêtre de MNT chargée, ou lecture impossible.
+                #Appelé une fois par sommet : jamais de trace par sommet au-delà
+                #du niveau débogage, un seul résumé à la fin du traitement.
+                self.nbSommetsHorsMNT += 1
+                _journal.debug("Altitude du MNT indisponible en (%s, %s)", x, y)
         
         if z is None  :
             pl = self.leftManager.coordToPixel((x,y), self.initAltitude)
