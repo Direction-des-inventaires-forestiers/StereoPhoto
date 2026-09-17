@@ -407,11 +407,14 @@ class threadShow(QThread):
         # Open GDAL dataset ONCE here
         #gdal.SetCacheMax(256 * 1024 * 1024)
         self.ds = gdal.Open(self.picturePath, gdal.GA_ReadOnly)
+        #Vérification avant tout accès : elle suivait les trois lignes ci-dessous et
+        #ne pouvait donc jamais se déclencher (AttributeError levée avant).
+        if self.ds is None:
+            raise ValueError(f"Image illisible : {self.picturePath}")
+
         self.height = self.ds.RasterYSize
         self.width = self.ds.RasterXSize
         self.rect = QRectF(0,0,self.width,self.height)
-        if self.ds is None:
-            raise ValueError("Cannot open image")
         
         self.stats = self.get_global_stats_from_overview()
         

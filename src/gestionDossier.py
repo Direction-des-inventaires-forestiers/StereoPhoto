@@ -22,6 +22,10 @@ def getParDict(dossierImages) :
         if not os.path.exists(pathImg) : continue
         else : 
             imgDS = gdal.Open(pathImg,gdal.GA_ReadOnly)
+            #gdal.Open() retourne None sur une image illisible ou corrompue. On rejète
+            #le PAR comme lorsque l'image est absente, plutôt que de laisser un
+            #AttributeError interrompre la lecture de tout le dossier.
+            if imgDS is None : continue
             sizeImg = (imgDS.RasterXSize, imgDS.RasterYSize)
             imgDS = None
         #info = gdal.Info(pathImg, format='json')
