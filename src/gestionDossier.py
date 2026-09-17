@@ -4,6 +4,9 @@ import numpy as np
 from qgis.core import QgsApplication
 from .config import PAR_CAMERA_ORIENTATION_TOLERANCE_DEG, PAR_PAIR_PROXIMITY_BUFFER_M, PAR_DIRECTION_BUFFER_M, PAR_MIN_OVERLAP_RATIO
 from .parFile import parse_par_file, PAR_REQUIRED_KEYWORDS
+from .journal import obtenir_journal
+
+_journal = obtenir_journal(__name__)
 
 def getParDict(dossierImages) :
     
@@ -232,7 +235,7 @@ def save_bbox_to_gpkg(bbox, gpkg_path, layer_name="bbox", crs_epsg=2948):
 
     feature = None
     datasource = None
-    print(f"BBox saved to {gpkg_path} as layer '{layer_name}'")
+    _journal.info("Emprise enregistrée dans %s, couche « %s »", gpkg_path, layer_name)
 
 
 '''    

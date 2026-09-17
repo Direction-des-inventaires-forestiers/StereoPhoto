@@ -42,6 +42,9 @@ import sys, os, time, threading, traceback, gc
 from scipy.ndimage import uniform_filter
 from osgeo import gdal
 from math import ceil
+from .journal import obtenir_journal
+
+_journal = obtenir_journal(__name__)
 
 
 #Gestionnaire de la QMainWindow qui permet le rehaussement d'image
@@ -441,8 +444,8 @@ class threadShow(QThread):
                 if not self.keepRunning: return
                 self.load_tiled_rect(rects_L0[i], ovr_index=-1, groupId=0)
 
-        except Exception as e:
-            print(f"Erreur lors du chargements des images: {e}")
+        except Exception:
+            _journal.exception("Erreur lors du chargement des images")
         
         finally : 
             gc.enable()
