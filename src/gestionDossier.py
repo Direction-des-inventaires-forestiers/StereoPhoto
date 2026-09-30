@@ -75,9 +75,27 @@ def getParDict(dossierImages) :
         parDict[i[:-4]] = bbox
     return parDict
 
+def numeroPhoto(identifiant) :
+    """Retourne le numéro de l'identifiant <ligne>_<numero>, ou None s'il n'en a pas.
+
+    C'est le seul endroit du plugin qui dépend de la convention de nommage des
+    fichiers PAR de la DIF. Un identifiant qui n'y répond pas ne doit pas
+    interrompre la recherche : il est écarté du calcul des voisins.
+    """
+
+    champs = identifiant.split('_')
+    if len(champs) < 2 or not champs[1].isdigit() :
+        _journal.debug("Identifiant hors convention <ligne>_<numero>, "
+                       "voisins non calculés : %s", identifiant)
+        return None
+    return int(champs[1])
+
 def findPairWithCoord(parDict,centerCoord) : 
     distDict = {}
-    minDist = 9999999
+    #math.inf plutôt qu'une sentinelle numérique : 9999999 agissait en seuil de
+    #recherche, et laissait minID vide dès que la vue s'éloignait de plus de
+    #10 000 km des photos. L'appelant écarte déjà le cas trop éloigné.
+    minDist = math.inf
     minID = ''
     for key, val in parDict.items() :
         dist = math.sqrt((centerCoord[0]-val[0])**2 + (centerCoord[1]-val[1])**2)
@@ -86,15 +104,24 @@ def findPairWithCoord(parDict,centerCoord) :
             minID = key
             minDist = dist
 
+    #Aucune photo retenue : dictionnaire vide, ou distances toutes indéfinies
+    #(toute comparaison avec NaN étant fausse). L'appelant traite la distance
+    #infinie comme un échec de recherche.
+    if not minID : return ('', math.inf)
+
     buffer = PAR_PAIR_PROXIMITY_BUFFER_M
-    nbPic = int(minID.split('_')[1])
+    nbPic = numeroPhoto(minID)
+    #Photo la plus proche hors convention : elle reste le meilleur candidat,
+    #mais ses voisins ne peuvent pas être départagés par numéro.
+    if nbPic is None : return (minID,minDist)
     leftDist = 9999999
     leftName = ''
     rightDist = 9999998
     
     for key in distDict.keys() : 
         if key != minID and abs(parDict[minID][1] - parDict[key][1]) < buffer :  
-            idNb = int(key.split('_')[1])
+            idNb = numeroPhoto(key)
+            if idNb is None : continue
             if idNb + 1 == nbPic or idNb - 1 == nbPic :  
                 if parDict[key][0] < parDict[minID][0] :
                     leftDist = distDict[key]

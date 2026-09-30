@@ -55,7 +55,7 @@ from .ui_widgetStereoPhoto import optionWindow
 
 from .gestionDossier import getParDict, get_neighbors_and_pairs, findPairWithCoord, compute_overlap
 from .config import PAR_CAMERA_ORIENTATION_TOLERANCE_DEG, DRAW_LINE_PEN_WIDTH_PX, GEOMETRY_PEN_WIDTH_PX, GEOMETRY_POINT_RADIUS_PX
-from .journal import initialiser_journal, fermer_journal, obtenir_journal
+from .journal import initialiser_journal, fermer_journal, obtenir_journal, avertir_utilisateur
 import sys, os, time, math, gc
 from osgeo import gdal
 
@@ -380,7 +380,13 @@ class stereoPhoto(object):
             self.buttonMapUnit = self.canvas.mapUnitsPerPixel()
             self.setPairWithPARId(imageID)
             if self.enableShow and self.leftParID != '' : self.loadNewPair()
-        else : self.buttonPosition = None
+        else :
+            self.buttonPosition = None
+            #Sans message, le bouton restait sans effet visible : l'utilisateur
+            #ne pouvait pas distinguer une vue mal placée d'une panne.
+            avertir_utilisateur(
+                "Aucune paire trouvée à cet endroit. Rapprochez la vue de la "
+                "zone des photos et zoomez sous 7,5 km avant de réessayer.")
 
     
     def createGraphicsWindows(self) : 
