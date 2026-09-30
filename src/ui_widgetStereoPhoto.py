@@ -18,6 +18,10 @@ from qgis.core import QgsMapLayerType, QgsWkbTypes
 from . import resources
 from .ui_getVectorLayer import getVectorLayerCustomList
 from .ui_graphicsWindow import Ui_graphicsWindow 
+from .journal import obtenir_journal
+
+#Journal du module; le préfixe « _ » l'exclut des imports étoile
+_journal = obtenir_journal(__name__)
 
 
 class Ui_StereoDockWidget(object):
@@ -382,11 +386,10 @@ class dropEventMNT(QtWidgets.QGroupBox):
                 self.MNTName = ""
                 event.ignore()
                 
-        except Exception as e:
-            # Prints any hidden scripting errors cleanly to your console terminal
-            print(f"Error inside dropEvent: {e}")
-            import traceback
-            traceback.print_exc()
+        except Exception:
+            #La trace part dans le journal de l'extension plutôt que sur la
+            #sortie d'erreur, qui remontait dans la console Python de QGIS.
+            _journal.exception("Erreur pendant le dépôt d'un fichier de MNT")
             event.ignore()
             
         #Explicitly return None (or nothing) so the C++ engine doesn't crash
@@ -562,9 +565,13 @@ class optionWindow(QtWidgets.QDockWidget):
                     mntArr[arr_yoff:arr_yoff + read_ysize,
                         arr_xoff:arr_xoff + read_xsize] = sub
 
-                except Exception as e:
+                except Exception:
                     # Reading failed → keep nodata-filled array
-                    print("ReadAsArray failed:", e)
+                    _journal.warning(
+                        "Lecture du MNT impossible, fenêtre laissée à nodata : "
+                        "%s, lecture (%s, %s) de %sx%s",
+                        self.currentMNTPath, read_xoff, read_yoff,
+                        read_xsize, read_ysize, exc_info=True)
 
             # Store final result
             self.mntArr = mntArr 
