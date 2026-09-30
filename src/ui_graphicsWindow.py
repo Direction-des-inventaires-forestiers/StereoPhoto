@@ -128,17 +128,20 @@ class graphicsWindow(QtWidgets.QMainWindow):
     
     def custom_centerOn(self, target_scene_pos, scale, forceGroupCall=False):
         view = self.ui.graphicsView
-        view_center = QtCore.QPointF(view.viewport().rect().center())
 
-        #tx = view_center.x() - (target_scene_pos.x() * scale)
-        #ty = view_center.y() - (target_scene_pos.y() * scale)
-
+        #Le centrage passe par centerOn() et non par une translation intégrée à
+        #la transformation de la vue. Cette translation n'amène la cible au centre
+        #que si le décalage de défilement est nul, ce qui n'est jamais garanti :
+        #la scène fait 200 000 px, les barres de défilement sont masquées mais
+        #conservent leur valeur, et NoAnchor fait que setTransform() ne réancre
+        #rien. Le décalage résiduel persistait d'un chargement de paire au
+        #suivant et faisait dériver la vue de plusieurs dizaines de milliers de
+        #pixels hors de l'image (affichage gris, aucune tuile chargée).
         transform = QtGui.QTransform()
-        transform.translate(view_center.x(), view_center.y())
         transform.scale(scale, scale)
-        transform.translate(-target_scene_pos.x(), -target_scene_pos.y())
-
         view.setTransform(transform)
+        view.centerOn(target_scene_pos)
+
         self.centerCrosshair()
 
         newAction = self.findScaleAction(scale)
@@ -146,7 +149,7 @@ class graphicsWindow(QtWidgets.QMainWindow):
             self.manageTileGroupViewing(newAction)
             self.tileGroupAction = newAction
 
-    def addPixmap(self, tile, scaleFactor, topX, topY, groupId):
+    def addPixmap(self, tile, scaleX, scaleY, topX, topY, groupId):
         if groupId == 0 : tileGroup = self.fullviewTileGroup 
         elif groupId == 1 : tileGroup = self.overviewTileGroup
         else : tileGroup = self.safetyTileGroup
@@ -157,7 +160,9 @@ class graphicsWindow(QtWidgets.QMainWindow):
         item = QtWidgets.QGraphicsPixmapItem(pixmap, self.imageRoot)
         item.setTransformationMode(Qt.FastTransformation)
         item.setPos(topX, topY)
-        item.setScale(scaleFactor)
+        #setScale() est isotrope : on passe par une transformation pour appliquer
+        #une échelle distincte sur chaque axe.
+        item.setTransform(QtGui.QTransform().scale(scaleX, scaleY))
         tileGroup.addToGroup(item)
         
 

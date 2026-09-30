@@ -149,12 +149,14 @@ class enhanceManager(QObject):
 
 
     #Fonction appelée par le emit du thread pour ajouter une portion de l'image sur l'affichage
-    def addPixmap(self, tile, scaleFactor, topX, topY, groupId) :
+    def addPixmap(self, tile, scaleX, scaleY, topX, topY, groupId) :
         q_img = QImage(tile.data, tile.shape[1], tile.shape[0],tile.shape[1]*3, QImage.Format_RGB888).copy()
         pixmap = QPixmap.fromImage(q_img)
         d = self.colorWindow.ui.graphicsView.scene().addPixmap(pixmap)
         d.setPos(topX, topY)
-        d.setScale(scaleFactor)
+        #setScale() est isotrope : on passe par une transformation pour appliquer
+        #une échelle distincte sur chaque axe.
+        d.setTransform(QTransform().scale(scaleX, scaleY))
     
     #Fonction exécutée lorsque le thread d'affichage se termine
     #Elle relance le thread avec la même résolution si une requête a été faite sinon
@@ -394,7 +396,10 @@ class enhanceManager(QObject):
         return [0,255,0,255,0,255]
     
 class threadShow(QThread):
-    newImage = pyqtSignal(object, float, float, float, int)
+    #Le signal transporte une échelle par axe : les ratios X et Y d'un aperçu
+    #diffèrent dès que les dimensions de l'image ne sont pas des multiples
+    #exacts du niveau d'aperçu.
+    newImage = pyqtSignal(object, float, float, float, float, int)
     
     def __init__(self, picturePath, listParam,cropValue=None, sceneRect=None):
         super().__init__()
@@ -468,10 +473,15 @@ class threadShow(QThread):
             x1 = self.width
             y1 = self.height
 
-        topX = max(x0, int(self.sceneRect.left() - 1024))
-        topY = max(y0, int(self.sceneRect.top() - 1024))
-        lowX = min(x1, int(self.sceneRect.right() + 1024))
-        lowY = min(y1, int(self.sceneRect.bottom() + 1024))
+        #Bornage des deux côtés. La vue peut se retrouver entièrement hors de
+        #l'image pendant la navigation; sans la borne opposée, topX/topY
+        #dépassaient x1/y1 et lowX/lowY devenaient négatifs, ce qui produisait
+        #un rectangle central inversé (donc vide) et des bandes périphériques
+        #hors raster.
+        topX = min(max(x0, int(self.sceneRect.left() - 1024)), x1)
+        topY = min(max(y0, int(self.sceneRect.top() - 1024)), y1)
+        lowX = max(min(x1, int(self.sceneRect.right() + 1024)), x0)
+        lowY = max(min(y1, int(self.sceneRect.bottom() + 1024)), y0)
 
 
         middleRect = [topX, topY, lowX, lowY]
@@ -481,22 +491,63 @@ class threadShow(QThread):
         fourthRect = [topX, lowY, lowX, y1]
         
         rects = [middleRect, firstRect, secondRect, thridRect, fourthRect]
+
+        #Anomalie recherchée : la vue ne recoupe pas du tout la zone utile de
+        #la photo, donc aucune tuile n'est chargée et l'affichage reste vide.
+        #Signalée en avertissement pour rester visible au niveau INFO.
+        if (self.sceneRect.right() < x0 or self.sceneRect.left() > x1
+                or self.sceneRect.bottom() < y0 or self.sceneRect.top() > y1):
+            _journal.warning(
+                "Vue hors de la zone utile — image %sx%s, rognage %s, "
+                "vue [%.1f, %.1f, %.1f, %.1f]; aucune tuile à charger",
+                self.width, self.height, (x0, y0, x1, y1),
+                self.sceneRect.left(), self.sceneRect.top(),
+                self.sceneRect.right(), self.sceneRect.bottom(),
+            )
+
+        #Trace de diagnostic temporaire : la vue s'est déjà retrouvée à des
+        #dizaines de milliers de pixels de l'image sans que la cause amont soit
+        #identifiée. À retirer une fois le positionnement de la vue validé.
+        _journal.debug(
+            "Rectangles de chargement — image %sx%s, rognage %s, "
+            "vue [%.1f, %.1f, %.1f, %.1f], rectangles %s",
+            self.width, self.height, (x0, y0, x1, y1),
+            self.sceneRect.left(), self.sceneRect.top(),
+            self.sceneRect.right(), self.sceneRect.bottom(), rects,
+        )
+
         return rects
     
     def load_tiled_rect(self, rect_full_res, ovr_index, groupId):
         
         if ovr_index == -1:
-            scale = 1.0
+            maxX, maxY = self.width, self.height
+            scaleX = scaleY = 1.0
         else:
             ovr_band = self.ds.GetRasterBand(1).GetOverview(ovr_index)
-            scale = min(self.width/ovr_band.XSize , self.height/ovr_band.YSize) 
+            maxX, maxY = ovr_band.XSize, ovr_band.YSize
+            #Un facteur par axe : les deux ratios diffèrent dès que les
+            #dimensions ne sont pas des multiples exacts du niveau d'aperçu
+            #(11310/2828 = 3,99929 contre 17310/4328 = 3,99954). Un facteur
+            #unique appliqué aux deux axes décale la conversion et peut faire
+            #sortir la fenêtre de lecture du raster.
+            scaleX = self.width / maxX
+            scaleY = self.height / maxY
 
-            
-        # We divide the coordinates by the scale factor
-        lx0 = int(rect_full_res[0] / scale)
-        ly0 = int(rect_full_res[1] / scale)
-        lx1 = int(rect_full_res[2] / scale)
-        ly1 = int(rect_full_res[3] / scale)
+        #Bornage sur les dimensions réelles du raster lu : un rectangle issu de
+        #la vue peut sortir de l'image, et GDAL lève alors « Access window out
+        #of range in RasterIO() », ce qui avorte tout le chargement.
+        lx0 = max(0, min(int(rect_full_res[0] / scaleX), maxX))
+        ly0 = max(0, min(int(rect_full_res[1] / scaleY), maxY))
+        lx1 = max(0, min(int(rect_full_res[2] / scaleX), maxX))
+        ly1 = max(0, min(int(rect_full_res[3] / scaleY), maxY))
+
+        if lx1 <= lx0 or ly1 <= ly0:
+            _journal.debug(
+                "Rectangle vide ou hors image ignoré : %s (aperçu %s)",
+                rect_full_res, ovr_index,
+            )
+            return
 
         # 3. Tile and Load
         nbDivX = ceil((lx1 - lx0) / self.target_tile_size)
@@ -522,7 +573,8 @@ class threadShow(QThread):
                 #q_img = QImage(tile.data, tile_w, tile_h, tile_w * 3, QImage.Format_RGB888)
                 #pixmap = QPixmap.fromImage(q_img)
                 
-                self.newImage.emit(tile, scale, curr_lx * scale, curr_ly * scale, groupId)
+                self.newImage.emit(tile, scaleX, scaleY,
+                                   curr_lx * scaleX, curr_ly * scaleY, groupId)
                 QThread.msleep(1)
         
     def fetch_tile(self, x, y, w, h, ovr_index):
