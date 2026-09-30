@@ -43,10 +43,10 @@ class navigationMapTool(QgsMapTool):
         self.centerGlobalPos = None
 
         # 125Hz Timer (8ms) 
-        self.sendPosTimer = QTimer()
-        self.sendPosTimer.setInterval(8)
-        self.sendPosTimer.setTimerType(Qt.PreciseTimer)
-        self.sendPosTimer.timeout.connect(self.sendMouseMovePos)
+        #self.sendPosTimer = QTimer()
+        #self.sendPosTimer.setInterval(16) #Diminuer à 60 hz
+        #self.sendPosTimer.setTimerType(Qt.PreciseTimer)
+        #self.sendPosTimer.timeout.connect(self.sendMouseMovePos)
 
         self.interceptor = keyboardInterceptor(self)
 
@@ -62,9 +62,10 @@ class navigationMapTool(QgsMapTool):
             self.currentMouseCoord = self.toMapCoordinates(new_pixel_pos)
             self.lastMousePos = new_pixel_pos
 
-            if self.safeRect and not self.safeRect.contains(new_pixel_pos):
-                self.recenterMouse()
-                return True 
+            if self.currentMouseCoord != self.lastEmittedCoord:
+                coordFormat = (float(self.currentMouseCoord.x()), float(self.currentMouseCoord.y()))
+                self.mouseMoved.emit(coordFormat)
+                self.lastEmittedCoord = self.currentMouseCoord    
             
             if self.drawing:
                 mapPoint = self.currentMouseCoord
@@ -72,7 +73,11 @@ class navigationMapTool(QgsMapTool):
                     self.rubberBand.movePoint(mapPoint)
                 else:
                     self.rubberBand.addPoint(mapPoint)
-
+            
+            if self.safeRect and not self.safeRect.contains(new_pixel_pos):
+                self.recenterMouse()
+                return True 
+        
         return False 
 
     def canvasPressEvent(self, event):
@@ -104,16 +109,23 @@ class navigationMapTool(QgsMapTool):
         if self.ignoringSyntheticMove:
             return
 
+        target_map_coord = self.currentMouseCoord
+
         # Lock the filter and warp
         self.ignoringSyntheticMove = True   
         # Snap map to current coord
         self.canvas.setCenter(self.currentMouseCoord)
         self.canvas.refresh()
         
-        QCursor.setPos(self.centerGlobalPos)        
+        QCursor.setPos(self.centerGlobalPos)    
+
+        self.currentMouseCoord = target_map_coord
+        self.lastEmittedCoord = target_map_coord    
         
         # Wait 20ms for OS to finish the jump before unlocking the filter
-        QTimer.singleShot(20, self.clearSyntheticGuard) 
+        #QTimer.singleShot(20, self.clearSyntheticGuard) 
+        QCoreApplication.processEvents(QEventLoop.ExcludeUserInputEvents)
+        QTimer.singleShot(0, self.clearSyntheticGuard) 
     
     def clearSyntheticGuard(self):
         self.ignoringSyntheticMove = False
@@ -129,6 +141,8 @@ class navigationMapTool(QgsMapTool):
         factor = event.angleDelta().y()
         direction = -1 if factor < 0 else 1
         if event.modifiers() & Qt.ControlModifier:
+
+            #Changer pour des fonctions plus flexible pour diminuer le zoom a plus petite échelle
             if direction == 1: self.canvas.zoomIn()
             else: self.canvas.zoomOut()
             self.canvas.refresh()
@@ -153,7 +167,7 @@ class navigationMapTool(QgsMapTool):
             QCursor.setPos(self.centerGlobalPos)        
             QTimer.singleShot(20, self.clearSyntheticGuard) 
             
-        self.sendPosTimer.start()
+        #self.sendPosTimer.start()
         qApp.installEventFilter(self.interceptor)
         self.canvas.setFocus()
 
@@ -163,7 +177,7 @@ class navigationMapTool(QgsMapTool):
 
     def deactivateMapTool(self) : 
         self.canvas.viewport().removeEventFilter(self)
-        self.sendPosTimer.stop()
+        #self.sendPosTimer.stop()
         self.rubberBand.reset(QgsWkbTypes.GeometryType.LineGeometry)
         qApp.removeEventFilter(self.interceptor)
         self.drawing = False

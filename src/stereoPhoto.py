@@ -75,19 +75,44 @@ class stereoPhoto(object):
 
     #Place le bouton de l'application dans QGIS
     def initGui(self):
-        urlPicture = ":/Anaglyph/Icons/icon.png"
-        self.action = QAction(QIcon(urlPicture), "StereoPhoto", self.iface.mainWindow())
+
+        self.toolbarST = self.iface.addToolBar("StereoPhoto Toolbar")
+        self.toolbarST.setObjectName("StereoPhotoToolbar")
+
+        iconOuvrirMenu = ":/Anaglyph/Icons/OuvrirMenu.png"
+        self.actionMainMenu = QAction(QIcon(iconOuvrirMenu), "Ouvrir le menu principal", self.iface.mainWindow())
         
-        self.action.setCheckable(True)
-        self.action.toggled.connect(self.run)
+        self.actionMainMenu.setCheckable(True)
+        self.actionMainMenu.toggled.connect(self.run)
+
+        iconSuivreMNT = ":/Anaglyph/Icons/SuivreMNT.png"
+        self.actionSuivreMNT = QAction(QIcon(iconSuivreMNT), "Suivre le MNT ; Appuyer sur 'M' ", self.iface.mainWindow())
+        
+        self.actionSuivreMNT.setCheckable(True)
          
-        self.iface.addToolBarIcon(self.action)
-        self.iface.addPluginToMenu("&StereoPhoto", self.action)
+
+        iconUnlockCursor = ":/Anaglyph/Icons/UnlockCursor.png"
+        self.actionUnlockCursor = QAction(QIcon(iconUnlockCursor), "Débarrer le curseur  ; Appuyer sur 'C' ", self.iface.mainWindow())
+        
+        self.actionUnlockCursor.setCheckable(True)
+
+
+        self.toolbarST.addAction(self.actionMainMenu)
+        self.toolbarST.addAction(self.actionSuivreMNT)
+        self.toolbarST.addAction(self.actionUnlockCursor)
+
+
+        self.iface.addPluginToMenu("&StereoPhoto", self.actionMainMenu)
 
     #Retire le bouton de l'application dans QGIS
     def unload(self):
-        self.iface.removePluginMenu("&StereoPhoto", self.action)
-        self.iface.removeToolBarIcon(self.action)
+        self.iface.removePluginMenu("&StereoPhoto", self.actionMainMenu)
+        #self.iface.removeToolBarIcon(self.actionMainMenu)
+
+        if hasattr(self, 'toolbarST'):
+            self.iface.mainWindow().removeToolBar(self.toolbarST)
+            self.toolbarST.deleteLater()
+
         self.journal.info("Extension déchargée")
         fermer_journal()
 
@@ -96,7 +121,7 @@ class stereoPhoto(object):
     #Ouverture du menu d'options
     def run(self):
 
-        if self.action.isChecked() :
+        if self.actionMainMenu.isChecked() :
 
             self.initGlobalParam()           
 
@@ -191,7 +216,7 @@ class stereoPhoto(object):
         self.closeAllSideWindows()
         self.optWindow.close()
         self.optWindow.vectorWindow.close()
-        if self.action.isChecked() : self.action.setChecked(False)
+        if self.actionMainMenu.isChecked() : self.actionMainMenu.setChecked(False)
 
     def newPictureFile(self):
         
@@ -508,7 +533,10 @@ class stereoPhoto(object):
         self.realCropValueLeft = cropValueLeft
         self.realCropValueRight = cropValueRight
         
-        self.openMNT()
+        #self.openMNT()
+        coordRect = self.getShowRect()
+        self.optWindow.getMNTWithCoord(coordRect)
+
         self.setInitialCursorAltitude()
         self.setBaseTransform()
         self.setStartingView()
@@ -873,6 +901,9 @@ class stereoPhoto(object):
             elif event.key() == QtCore.Qt.Key_1 : 
                 if self.optWindow.ui.radioButtonDraw.isChecked() : self.optWindow.ui.radioButtonCut.setChecked(True)
                 else : self.optWindow.ui.radioButtonDraw.setChecked(True)
+
+            elif event.key() == QtCore.Qt.Key_M : 
+                if self.optWindow.mntArr is not None : self.actionSuivreMNT.toggle() 
             
 
         event.accept()
@@ -887,57 +918,45 @@ class stereoPhoto(object):
         self.cursorAltitude = Z
 
         if self.buttonPosition : 
-            altitude = self.readMNTWithCoordinate(self.buttonPosition)
+            altitude = self.optWindow.readMNTWithCoord(self.buttonPosition)
             if altitude is not None : self.cursorAltitude = altitude
 
         elif self.lastCurrentView : 
             self.cursorAltitude = self.lastCurrentView[2]
 
-        elif self.mntDS is not None :
+        elif self.optWindow.mntArr is not None :
             middleCoordLeft = self.leftPictureManager.pixelToCoord(midLPix,self.cursorAltitude)
-            altitude = self.readMNTWithCoordinate(middleCoordLeft)
+            altitude = self.optWindow.readMNTWithCoord(middleCoordLeft)
             if altitude is not None : self.cursorAltitude = altitude
 
         #Altitude indéterminée : affichage de repli
         self.optWindow.ui.labelAltitude.setText(f"{self.cursorAltitude:.3f}" if self.cursorAltitude is not None else "N/D")
 
     
-    def openMNT(self) : 
-        #Garde de l'avertissement de lecture du MNT (voir readMNTWithCoordinate)
-        self.mntLectureEchouee = None
-        if not self.optWindow.currentMNTPath : 
-            self.mntDS = None
-            return
+    def openMNT(self) : pass
+        #if not self.optWindow.currentMNTPath : 
+        #    self.mntDS = None
+        #    return#
 
-        self.mntDS = gdal.Open(self.optWindow.currentMNTPath,gdal.GA_ReadOnly)
-        self.mntBand = self.mntDS.GetRasterBand(1)
-        self.mntGeo = self.mntDS.GetGeoTransform()
-        self.mntNoData = self.mntBand.GetNoDataValue()
-        self.mntXSize = self.mntDS.RasterXSize
-        self.mntYSize = self.mntDS.RasterYSize
+        #self.mntDS = gdal.Open(self.optWindow.currentMNTPath,gdal.GA_ReadOnly)
+        #self.mntBand = self.mntDS.GetRasterBand(1)
+        #self.mntGeo = self.mntDS.GetGeoTransform()
+        #self.mntNoData = self.mntBand.GetNoDataValue()
+        #self.mntXSize = self.mntDS.RasterXSize
+        #self.mntYSize = self.mntDS.RasterYSize
 
 
-    def readMNTWithCoordinate(self,coordinates) :
-        if self.mntDS is None : return None
+    def readMNTWithCoordinate(self,coordinates) : pass
+        #if self.mntDS is None : return None
         
-        px = math.floor((coordinates[0] - self.mntGeo[0]) / self.mntGeo[1]) 
-        py = math.floor((coordinates[1] - self.mntGeo[3]) / self.mntGeo[5])
-        if px < 0 or py < 0 or px >= self.mntXSize or py >= self.mntYSize: return None
+        #px = math.floor((coordinates[0] - self.mntGeo[0]) / self.mntGeo[1]) 
+        #py = math.floor((coordinates[1] - self.mntGeo[3]) / self.mntGeo[5])
+        #if px < 0 or py < 0 or px >= self.mntXSize or py >= self.mntYSize: return None
 
-        try : Z = self.mntBand.ReadAsArray(px,py,1,1)[0][0]
-        except Exception :
-            #Appelé à chaque clic : un MNT défectueux produirait une ligne par
-            #clic. Le premier échec est signalé, les suivants restent en débogage.
-            if self.mntLectureEchouee != self.optWindow.currentMNTPath :
-                self.mntLectureEchouee = self.optWindow.currentMNTPath
-                self.journal.warning(
-                    "Lecture du MNT impossible, altitude indéterminée : %s",
-                    self.optWindow.currentMNTPath)
-            else :
-                self.journal.debug("Lecture du MNT impossible en (%s, %s)", px, py)
-            return None
-        if Z == self.mntNoData : return None
-        return Z
+        #try : Z = self.mntBand.ReadAsArray(px,py,1,1)[0][0]
+        #except : return None 
+        #if Z == self.mntNoData : return None
+        #return Z
 
     def setStartingView(self) : 
 
@@ -1054,6 +1073,11 @@ class stereoPhoto(object):
 
     def mouseMoveEvent(self,coordinate) :
         if self.isLoadingPair : return
+
+        if self.actionSuivreMNT.isChecked() : 
+            mntAlt = self.optWindow.readMNTWithCoord(coordinate)
+            if mntAlt is not None and mntAlt != self.optWindow.mntNodata : self.cursorAltitude = mntAlt
+
         pxL, pyL = self.leftPictureManager.coordToPixel(coordinate,self.cursorAltitude)
         pxR, pyR = self.rightPictureManager.coordToPixel(coordinate,self.cursorAltitude)
 
@@ -1064,8 +1088,18 @@ class stereoPhoto(object):
         scenePointR = self.graphWindowRight.imageRoot.mapToScene(self.endDrawPointRight)
 
         scale = self.currentScale
+        self.graphWindowLeft.ui.graphicsView.setUpdatesEnabled(False)
+        self.graphWindowRight.ui.graphicsView.setUpdatesEnabled(False)
+
         self.graphWindowLeft.custom_centerOn(scenePointL,scale)
         self.graphWindowRight.custom_centerOn(scenePointR,scale)
+
+        self.graphWindowLeft.ui.graphicsView.setUpdatesEnabled(True)
+        self.graphWindowRight.ui.graphicsView.setUpdatesEnabled(True)
+
+        # Single coordinated repaint
+        self.graphWindowLeft.ui.graphicsView.viewport().update()
+        self.graphWindowRight.ui.graphicsView.viewport().update()
 
         self.updateUserAltitude()
 
@@ -1099,6 +1133,10 @@ class stereoPhoto(object):
             newAltitude = self.cursorAltitude
 
         else : 
+
+            #Désactiver le suivi du MNT pour permettre l'action de la roulette
+            self.actionSuivreMNT.setChecked(False)
+
             zoom_level = math.log2(self.currentScale)
 
             if zoom_level > 2 : meter_changer = 0.1
@@ -1196,7 +1234,7 @@ class stereoPhoto(object):
 
     def mousePressEvent(self,mouseButton,mousePos) : 
 
-        altitude = self.readMNTWithCoordinate(mousePos)
+        altitude = self.optWindow.readMNTWithCoord(mousePos)
 
         coordTuple = (mousePos[0],mousePos[1],altitude)
         if self.optWindow.currentMNTPath and self.enableDraw and self.vectorLayer.geometryType() == QgsWkbTypes.PolygonGeometry :

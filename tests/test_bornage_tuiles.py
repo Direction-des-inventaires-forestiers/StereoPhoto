@@ -54,9 +54,29 @@ def extraire_fonctions(chemin):
         "_journal": JournalBouchon(),
         "np": types.SimpleNamespace(ascontiguousarray=lambda a: a),
         "QThread": types.SimpleNamespace(msleep=lambda n: None),
+        "QImage": ImageBouchon,
     }
     exec(compile(ast.Module(body=corps, type_ignores=[]), "<extrait>", "exec"), espace)
     return espace
+
+
+class ImageBouchon:
+    """Remplace QImage : la tuile est convertie dans le fil de lecture depuis
+    la fusion de nextV. Seules la construction et copy() sont utilisées ici."""
+
+    Format_RGB888 = 13
+
+    def __init__(self, *args):
+        self.args = args
+
+    def copy(self):
+        return self
+
+
+class TuileBouchon:
+    """Tuile retournée par fetch_tile() : QImage n'en lit que le tampon."""
+
+    data = memoryview(b"")
 
 
 class JournalBouchon:
@@ -132,7 +152,7 @@ class ThreadBouchon:
         assert w > 0 and h > 0, "taille nulle ou négative : %r" % ((x, y, w, h),)
         assert x + w <= maxX and y + h <= maxY, (
             "hors raster : (%d,%d) de %dx%d sur %dx%d" % (x, y, w, h, maxX, maxY))
-        return None
+        return TuileBouchon()
 
     def applyEnhancements(self, tuile, params):
         return tuile

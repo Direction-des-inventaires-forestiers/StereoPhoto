@@ -149,8 +149,8 @@ class enhanceManager(QObject):
 
 
     #Fonction appelée par le emit du thread pour ajouter une portion de l'image sur l'affichage
-    def addPixmap(self, tile, scaleX, scaleY, topX, topY, groupId) :
-        q_img = QImage(tile.data, tile.shape[1], tile.shape[0],tile.shape[1]*3, QImage.Format_RGB888).copy()
+    def addPixmap(self, q_img, scaleX, scaleY, topX, topY, groupId) :
+        #q_img = QImage(tile.data, tile.shape[1], tile.shape[0],tile.shape[1]*3, QImage.Format_RGB888).copy()
         pixmap = QPixmap.fromImage(q_img)
         d = self.colorWindow.ui.graphicsView.scene().addPixmap(pixmap)
         d.setPos(topX, topY)
@@ -399,7 +399,7 @@ class threadShow(QThread):
     #Le signal transporte une échelle par axe : les ratios X et Y d'un aperçu
     #diffèrent dès que les dimensions de l'image ne sont pas des multiples
     #exacts du niveau d'aperçu.
-    newImage = pyqtSignal(object, float, float, float, float, int)
+    newImage = pyqtSignal(QImage, float, float, float, float, int)
     
     def __init__(self, picturePath, listParam,cropValue=None, sceneRect=None):
         super().__init__()
@@ -570,10 +570,14 @@ class threadShow(QThread):
                 if self.perform_Enhancing:
                     tile = self.applyEnhancements(tile, self.listParam)
                 tile = np.ascontiguousarray(tile)
-                #q_img = QImage(tile.data, tile_w, tile_h, tile_w * 3, QImage.Format_RGB888)
+                #tile_32 = np.empty((tile_h, tile_w, 4), dtype=np.uint8)
+
+                # 2. Copy your 3-channel RGB data into the first 3 channels (channel 4 is left empty as padding)
+                #tile_32[:, :, :3] = tile
+                q_img = QImage(tile.data, tile_w, tile_h, tile_w * 3, QImage.Format_RGB888).copy()
                 #pixmap = QPixmap.fromImage(q_img)
                 
-                self.newImage.emit(tile, scaleX, scaleY,
+                self.newImage.emit(q_img, scaleX, scaleY,
                                    curr_lx * scaleX, curr_ly * scaleY, groupId)
                 QThread.msleep(1)
         

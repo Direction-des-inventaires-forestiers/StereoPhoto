@@ -70,3 +70,7 @@ ehthumbs.db
 /Photo/*.tif
 /StereoPhoto/
 *.docx
+/Rehaussement/.vscode/
+/Rehaussement/__pycache__/
+/Rehaussement/build/
+/Rehaussement/dist/

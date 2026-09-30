@@ -9,7 +9,10 @@
 
 from qgis.PyQt import QtCore, QtGui, QtWidgets
 from qgis.PyQt.QtCore import pyqtSignal
-import os, json
+import os, json, math
+from urllib.parse import urlparse
+from osgeo import gdal
+import numpy as np
 from qgis.utils import iface
 from qgis.core import QgsMapLayerType, QgsWkbTypes
 from . import resources
@@ -326,28 +329,71 @@ class Ui_StereoDockWidget(object):
 
 class dropEventMNT(QtWidgets.QGroupBox): 
     validMNT = pyqtSignal()
+    
     def __init__(self, parent=None):
-        QtWidgets.QGroupBox.__init__(self, parent)
+        super().__init__(parent)
         self.setAcceptDrops(True)
+        self.MNTPath = ""
+        self.MNTName = ""
+        self.fileExtensions = ['tif', 'vrt']
 
     def dragEnterEvent(self, event):
-        event.accept()
-        
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()
+        else:
+            event.ignore()
+
     def dropEvent(self, event):
-        fileURL = event.mimeData().urls()[0].toString()
-        try :
-            fileName = fileURL.split('file:///')[1]
-        except :
-            fileName = fileURL.split('file:')[1]
+
+        try:
+            urls = event.mimeData().urls()
+            if not urls:
+                event.ignore()
+                return
+
+            url = urls[0] 
+            local = url.toLocalFile()
+            
+            if local:
+                file_path = local
+            else:
+                # Fallback URL parsing engine
+                parsed = urlparse(url.toString())
+                if parsed.scheme == "file" and parsed.path:
+                    if os.name == "nt": 
+                        file_path = parsed.path.lstrip("/")  
+                    else: 
+                        file_path = parsed.path
+                else: 
+                    event.ignore()
+                    return
+
+            # Normalize path slashes for Windows safety
+            file_path = os.path.normpath(file_path)
+
+            ext = os.path.splitext(file_path)[1].lstrip(".").lower()
+            if ext in self.fileExtensions:
+                self.MNTPath = file_path
+                self.MNTName = os.path.basename(file_path)
+                self.validMNT.emit()
+                event.acceptProposedAction()
+            else:
+                self.MNTPath = ""
+                self.MNTName = ""
+                event.ignore()
+                
+        except Exception as e:
+            # Prints any hidden scripting errors cleanly to your console terminal
+            print(f"Error inside dropEvent: {e}")
+            import traceback
+            traceback.print_exc()
+            event.ignore()
+            
+        #Explicitly return None (or nothing) so the C++ engine doesn't crash
+        return
+
+
         
-        
-        if fileName.split('.')[-1] in ['tif','vrt'] :
-            self.MNTPath = fileName
-            self.MNTName = os.path.basename(fileName)
-            self.validMNT.emit()
-        else : 
-            self.MNTPath = ''
-            self.MNTName = ''
 
 class dropedit(QtWidgets.QGroupBox):   
 
@@ -442,37 +488,115 @@ class optionWindow(QtWidgets.QDockWidget):
 
     def importVectorCancel(self):
         self.vectorWindow.close()
-
+    
     def showImportMNT(self):
+
         fname = QtWidgets.QFileDialog.getOpenFileName(self, 'Importer un modèle numérique de terrain', self.mntLocation, 'MNT (*.tif *.vrt)')[0]
         if fname:
-            self.currentMNTPath = fname
-            nameMNT = os.path.basename(fname)
-            self.mntLocation = os.path.dirname(fname)
-            self.ui.radioButtonCut.setEnabled(True)
-            self.ui.radioButtonDraw.setEnabled(True)
-            self.ui.pushButtonRemoveMNT.setEnabled(True)
-            self.ui.importLineMNT.setText(nameMNT)
+            self.loadImportMNT(fname)
         else : 
-            self.currentMNTPath = ''
-            self.ui.radioButtonCut.setEnabled(False)
-            self.ui.radioButtonDraw.setEnabled(False)
-            self.ui.pushButtonRemoveMNT.setEnabled(False)
+            self.removeImportMNT()
     
     def dropImportMNT(self):
-        self.currentMNTPath = self.ui.groupBoxMNT.MNTPath
-        self.mntLocation = os.path.dirname(self.currentMNTPath)
-        self.ui.importLineMNT.setText(self.ui.groupBoxMNT.MNTName)
-        self.ui.radioButtonCut.setEnabled(True)
-        self.ui.radioButtonDraw.setEnabled(True)
-        self.ui.pushButtonRemoveMNT.setEnabled(True)
+        self.loadImportMNT(self.ui.groupBoxMNT.MNTPath)
     
+    def loadImportMNT(self, file):
+        if not os.path.isfile(file):
+            self.removeImportMNT()
+            return
+        
+        self.currentMNTPath = file
+        self.mntLocation = os.path.dirname(file)
+        self.setStateMNT(True, os.path.basename(file))
+
+    def getMNTWithCoord(self,rectCoord) :
+
+        if self.currentMNTPath == "" : 
+            self.mntArr = None
+            return
+
+        mntDS = gdal.Open(self.currentMNTPath,gdal.GA_ReadOnly)
+        mntBand = mntDS.GetRasterBand(1)
+        self.mntGeo = mntDS.GetGeoTransform()
+        self.mntSize = (mntDS.RasterXSize, mntDS.RasterYSize)
+        self.mntNodata = mntBand.GetNoDataValue()
+
+        pxStart = math.floor((rectCoord.xMinimum() - self.mntGeo[0]) / self.mntGeo[1])
+        pyStart = math.floor((rectCoord.yMaximum() - self.mntGeo[3]) / self.mntGeo[5])
+
+        self.pxStart = pxStart
+        self.pyStart = pyStart
+
+        pxEnd = math.floor((rectCoord.xMaximum() - self.mntGeo[0]) / self.mntGeo[1])
+        pyEnd = math.floor((rectCoord.yMinimum() - self.mntGeo[3]) / self.mntGeo[5])
+
+        # Requested output size
+        sizeX = pxEnd - pxStart
+        sizeY = pyEnd - pyStart            
+        mntArr = np.full((sizeY, sizeX), self.mntNodata, dtype=np.float32)
+
+        if (pxStart >= self.mntSize[0] or pxStart + sizeX <= 0 or
+            pyStart >= self.mntSize[1] or pyStart + sizeY <= 0):
+
+            self.mntArr = mntArr
+
+
+        else : 
+            # Where the read starts *in the raster*
+            read_xoff = max(0, pxStart)
+            read_yoff = max(0, pyStart)
+
+            # Where the read starts *inside the output array*
+            arr_xoff = read_xoff-pxStart
+            arr_yoff = read_yoff-pyStart
+
+            # Compute read size inside raster bounds
+            read_xsize = min(pxStart + sizeX, self.mntSize[0]) - read_xoff
+            read_ysize = min(pyStart + sizeY, self.mntSize[1]) - read_yoff
+
+            if read_xsize > 0 and read_ysize > 0:
+                try:
+                    sub = mntBand.ReadAsArray(read_xoff, read_yoff,
+                                                read_xsize, read_ysize)
+                    # Place into output array
+                    mntArr[arr_yoff:arr_yoff + read_ysize,
+                        arr_xoff:arr_xoff + read_xsize] = sub
+
+                except Exception as e:
+                    # Reading failed → keep nodata-filled array
+                    print("ReadAsArray failed:", e)
+
+            # Store final result
+            self.mntArr = mntArr 
+        
+        mntDS = None
+
+    def readMNTWithCoord(self,coordinate) : 
+
+        if self.mntArr is None : return None
+
+        xPixel = math.floor((coordinate[0] - self.mntGeo[0]) / self.mntGeo[1])
+        yPixel = math.floor((coordinate[1] - self.mntGeo[3]) / self.mntGeo[5])
+        
+        pxRead = xPixel - self.pxStart 
+        pyRead = yPixel - self.pyStart 
+        
+        rows, cols = self.mntArr.shape
+        
+        if 0 <= pxRead < cols and 0 <= pyRead < rows : return self.mntArr[pyRead,pxRead]
+        
+        else : return None
+        
+
     def removeImportMNT(self) : 
-        self.currentMNTPath = ''
-        self.ui.radioButtonCut.setEnabled(False)
-        self.ui.radioButtonDraw.setEnabled(False)
-        self.ui.pushButtonRemoveMNT.setEnabled(False)
-        self.ui.importLineMNT.setText("")
+        self.currentMNTPath = ""
+        self.setStateMNT(False,self.currentMNTPath)
+
+    def setStateMNT(self, enabled, label) :
+        self.ui.radioButtonCut.setEnabled(enabled)
+        self.ui.radioButtonDraw.setEnabled(enabled)
+        self.ui.pushButtonRemoveMNT.setEnabled(enabled)
+        self.ui.importLineMNT.setText(label)
 
     def closeEvent(self,event):
         self.closeWindow.emit()
