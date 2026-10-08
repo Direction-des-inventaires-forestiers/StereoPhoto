@@ -54,6 +54,8 @@ from .navigationQgsMapTool import navigationMapTool
 from .ui_widgetStereoPhoto import optionWindow
 
 from .gestionDossier import getParDict, get_neighbors_and_pairs, findPairWithCoord, compute_overlap
+from .config import PAR_CAMERA_ORIENTATION_TOLERANCE_DEG, DRAW_LINE_PEN_WIDTH_PX, GEOMETRY_PEN_WIDTH_PX, GEOMETRY_POINT_RADIUS_PX
+from .journal import initialiser_journal, fermer_journal, obtenir_journal, avertir_utilisateur
 import sys, os, time, math, gc
 from osgeo import gdal
 
@@ -64,6 +66,12 @@ class stereoPhoto(object):
     def __init__(self, iface):
         self.iface = iface
         self.canvas = self.iface.mapCanvas()
+
+        #Journalisation : appelée à chaque construction du plugin, donc aussi à
+        #chaque rechargement. initialiser_journal() retire les handlers déjà
+        #posés, ce qui évite les lignes en double et les fichiers verrouillés.
+        initialiser_journal()
+        self.journal = obtenir_journal(__name__)
 
     #Place le bouton de l'application dans QGIS
     def initGui(self):
@@ -105,6 +113,9 @@ class stereoPhoto(object):
             self.iface.mainWindow().removeToolBar(self.toolbarST)
             self.toolbarST.deleteLater()
 
+        self.journal.info("Extension déchargée")
+        fermer_journal()
+
     #Initialisation de l'application et des variables
     #Connection entre les boutons du menu d'options (mOpt) et leurs fonctions attitrées
     #Ouverture du menu d'options
@@ -121,13 +132,17 @@ class stereoPhoto(object):
             self.optWindow.loadParamFile()
             self.iface.addDockWidget(Qt.RightDockWidgetArea, self.optWindow)
             self.optWindow.raise_()
+            self.journal.info("Session ouverte")
 
         else :
             self.iface.removeDockWidget(self.optWindow)
             self.optWindowClose()
             del self.optWindow
             try : del self.currentParDict
-            except: pass
+            except AttributeError :
+                #Aucun dossier de photos n'avait été ouvert : cas normal.
+                self.journal.debug("Aucun dictionnaire PAR à libérer à la fermeture")
+            self.journal.info("Session fermée")
 
     def initGlobalParam(self):
         
@@ -332,6 +347,7 @@ class stereoPhoto(object):
         self.setLastView()
         
         secondID = None
+        newID = None
         if ori == 'L': newID = self.infoNeighbors['left'][0]
         elif ori == 'R': newID = self.infoNeighbors['right'][0]
         
@@ -364,6 +380,9 @@ class stereoPhoto(object):
                     secondID = name_1
 
             else : newID = self.infoNeighbors['up'][0][0]
+
+        #Orientation inconnue ou voisin absent : aucune paire à charger
+        if newID is None : return
         
         self.setPairWithPARId(newID,secondID)
         
@@ -386,7 +405,13 @@ class stereoPhoto(object):
             self.buttonMapUnit = self.canvas.mapUnitsPerPixel()
             self.setPairWithPARId(imageID)
             if self.enableShow and self.leftParID != '' : self.loadNewPair()
-        else : self.buttonPosition = None
+        else :
+            self.buttonPosition = None
+            #Sans message, le bouton restait sans effet visible : l'utilisateur
+            #ne pouvait pas distinguer une vue mal placée d'une panne.
+            avertir_utilisateur(
+                "Aucune paire trouvée à cet endroit. Rapprochez la vue de la "
+                "zone des photos et zoomez sous 7,5 km avant de réessayer.")
 
     
     def createGraphicsWindows(self) : 
@@ -419,7 +444,7 @@ class stereoPhoto(object):
         self.graphWindowRight.move(screenRight_geom.topLeft())
         self.graphWindowRight.keyPressed.connect(self.keyboardHandler)
         
-        width = 4
+        width = DRAW_LINE_PEN_WIDTH_PX
         color = QColor('Cyan')
 
         self.my_pen = QPen(color, width, Qt.SolidLine, Qt.SquareCap, Qt.RoundJoin)
@@ -630,7 +655,13 @@ class stereoPhoto(object):
             rectL = QgsRectangle(QgsPointXY(bboxOverlap[0]-700, bboxOverlap[1]-700), QgsPointXY(bboxOverlap[2]+700, bboxOverlap[3]+700))
 
             return rectL
-        except :
+        except Exception :
+            #Rectangle dégénéré retourné à l'appelant : sans trace, la région
+            #d'affichage vide est impossible à expliquer en support.
+            self.journal.warning(
+                "Région d'affichage indéterminable pour la paire %s / %s",
+                getattr(self, 'leftParID', None), getattr(self, 'rightParID', None),
+                exc_info=True)
             return QgsRectangle(QgsPointXY(0, 0), QgsPointXY(0, 0))
         
     def removePolygonOnScreen(self) :
@@ -688,13 +719,15 @@ class stereoPhoto(object):
                 color = arr[1]
                 polyLeft = arr[0]
                 polyRight = self.polygonR2Draw[name][0]
-                width = 4
+                width = GEOMETRY_PEN_WIDTH_PX
 
                 layerPen = QPen(color, width, Qt.SolidLine, Qt.SquareCap, Qt.RoundJoin)
                 layerPen.setCosmetic(True)
 
                 for i in range(len(polyLeft)) : 
 
+                    leftObj = None
+                    rightObj = None
                     if geoType == QgsWkbTypes.PolygonGeometry : 
                         leftObj = QGraphicsPolygonItem(polyLeft[i],self.graphWindowLeft.imageRoot)
                         rightObj = QGraphicsPolygonItem(polyRight[i],self.graphWindowRight.imageRoot)
@@ -704,7 +737,7 @@ class stereoPhoto(object):
                         rightObj = QGraphicsPathItem(polyRight[i],self.graphWindowRight.imageRoot)
 
                     elif geoType == QgsWkbTypes.PointGeometry : 
-                        radius = 9  #rayon pour la taille des points 
+                        radius = GEOMETRY_POINT_RADIUS_PX  #rayon pour la taille des points 
                         
                         leftObj = QGraphicsEllipseItem(polyLeft[i][0] - radius, polyLeft[i][1] - radius, 2*radius, 2*radius,self.graphWindowLeft.imageRoot)
                         leftObj.setBrush(color)
@@ -712,6 +745,9 @@ class stereoPhoto(object):
                         rightObj = QGraphicsEllipseItem(polyRight[i][0] - radius, polyRight[i][1] - radius, 2*radius, 2*radius,self.graphWindowRight.imageRoot)
                         rightObj.setBrush(color)
                     
+                    #Type de géométrie non pris en charge : rien à dessiner
+                    if leftObj is None : continue
+
                     leftObj.setPen(layerPen)
                     rightObj.setPen(layerPen)
                     self.graphWindowLeft.geometryItemGroup.addToGroup(leftObj)
@@ -893,7 +929,8 @@ class stereoPhoto(object):
             altitude = self.optWindow.readMNTWithCoord(middleCoordLeft)
             if altitude is not None : self.cursorAltitude = altitude
 
-        self.optWindow.ui.labelAltitude.setText(f"{self.cursorAltitude:.3f}")
+        #Altitude indéterminée : affichage de repli
+        self.optWindow.ui.labelAltitude.setText(f"{self.cursorAltitude:.3f}" if self.cursorAltitude is not None else "N/D")
 
     
     def openMNT(self) : pass
@@ -978,7 +1015,8 @@ class stereoPhoto(object):
         cPixelR = self.graphWindowRight.imageRoot.mapFromScene(sceneCenterR)
 
         self.cursorAltitude = self.dualManager.calculateZ((cPixelL.x(), cPixelL.y()), (cPixelR.x(), cPixelR.y())) 
-        self.optWindow.ui.labelAltitude.setText(f"{self.cursorAltitude:.3f}")
+        #Altitude indéterminée : affichage de repli
+        self.optWindow.ui.labelAltitude.setText(f"{self.cursorAltitude:.3f}" if self.cursorAltitude is not None else "N/D")
         
 
 
@@ -1149,7 +1187,7 @@ class stereoPhoto(object):
 
 
     def calculNextPairWithPos(self,rangeX,rangeY,qpoint)   :
-        threshold_deg=10
+        threshold_deg = PAR_CAMERA_ORIENTATION_TOLERANCE_DEG
         kappa = math.degrees(self.leftPictureManager.kappa)
 
         #Faire une liste des combinaison plutot que de répter 4 fois

@@ -42,13 +42,17 @@ import sys, os, time, threading, traceback, gc
 from scipy.ndimage import uniform_filter
 from osgeo import gdal
 from math import ceil
+from .journal import obtenir_journal
+
+_journal = obtenir_journal(__name__)
 
 
 #Gestionnaire de la QMainWindow qui permet le rehaussement d'image
 class enhanceManager(QObject):
     listParamSignal = pyqtSignal(list)
-    def __init__(self, pathLeft, pathRight, listParam=[],nameLeft='',nameRight=''):
+    def __init__(self, pathLeft, pathRight, listParam=None,nameLeft='',nameRight=''):
         QObject.__init__(self)
+        if listParam is None : listParam = []
         self.pathLeft = pathLeft
         self.pathRight = pathRight
 
@@ -145,12 +149,14 @@ class enhanceManager(QObject):
 
 
     #Fonction appelée par le emit du thread pour ajouter une portion de l'image sur l'affichage
-    def addPixmap(self, q_img, scaleFactor, topX, topY, groupId) :
+    def addPixmap(self, q_img, scaleX, scaleY, topX, topY, groupId) :
         #q_img = QImage(tile.data, tile.shape[1], tile.shape[0],tile.shape[1]*3, QImage.Format_RGB888).copy()
         pixmap = QPixmap.fromImage(q_img)
         d = self.colorWindow.ui.graphicsView.scene().addPixmap(pixmap)
         d.setPos(topX, topY)
-        d.setScale(scaleFactor)
+        #setScale() est isotrope : on passe par une transformation pour appliquer
+        #une échelle distincte sur chaque axe.
+        d.setTransform(QTransform().scale(scaleX, scaleY))
     
     #Fonction exécutée lorsque le thread d'affichage se termine
     #Elle relance le thread avec la même résolution si une requête a été faite sinon
@@ -379,27 +385,21 @@ class enhanceManager(QObject):
 
             
     #Calcul de l'histogramme sur une portion de la photo lorsque l'on veut conserver le min/max pour la vue courante
+    #ATTENTION (registre B-02, item P1-E) : la fonction retourne une plage fixe 0-255 par bande.
+    #Le calcul réel de l'histogramme se trouvait après ce return et n'a donc jamais été exécuté;
+    #il a été retiré le 2026-09-17 comme code mort (récupérable dans l'historique Git).
+    #Conséquence fonctionnelle : l'option « conserver le min/max de la vue courante » est sans effet,
+    #l'étirement min/max utilise toujours la plage complète. Comportement à valider avec la DIF
+    #avant de rétablir le calcul.
     def calculHistogram(self, top, low):
 
         return [0,255,0,255,0,255]
-        h = self.picture.crop((top.x(), top.y(), low.x(), low.y())).histogram()
-        a = sum(h)
-        cutValue = [round(a*0.05/3), round(a*0.95/3), round(a*1.05/3), round(a*1.95/3), round(a*2.05/3), round(a*2.95/3)]
-        pixValue = []
-        b = 0
-        c = 0
-        for i in range(len(h)):
-            b += h[i] 
-            if b > cutValue[c] : 
-                i = i % 256
-                pixValue.append(i)
-                c += 1
-                if c == 6 :
-                    break
-        return pixValue
     
 class threadShow(QThread):
-    newImage = pyqtSignal(QImage, float, float, float, int)
+    #Le signal transporte une échelle par axe : les ratios X et Y d'un aperçu
+    #diffèrent dès que les dimensions de l'image ne sont pas des multiples
+    #exacts du niveau d'aperçu.
+    newImage = pyqtSignal(QImage, float, float, float, float, int)
     
     def __init__(self, picturePath, listParam,cropValue=None, sceneRect=None):
         super().__init__()
@@ -415,11 +415,14 @@ class threadShow(QThread):
         # Open GDAL dataset ONCE here
         #gdal.SetCacheMax(256 * 1024 * 1024)
         self.ds = gdal.Open(self.picturePath, gdal.GA_ReadOnly)
+        #Vérification avant tout accès : elle suivait les trois lignes ci-dessous et
+        #ne pouvait donc jamais se déclencher (AttributeError levée avant).
+        if self.ds is None:
+            raise ValueError(f"Image illisible : {self.picturePath}")
+
         self.height = self.ds.RasterYSize
         self.width = self.ds.RasterXSize
         self.rect = QRectF(0,0,self.width,self.height)
-        if self.ds is None:
-            raise ValueError("Cannot open image")
         
         self.stats = self.get_global_stats_from_overview()
         
@@ -446,8 +449,8 @@ class threadShow(QThread):
                 if not self.keepRunning: return
                 self.load_tiled_rect(rects_L0[i], ovr_index=-1, groupId=0)
 
-        except Exception as e:
-            print(f"Erreur lors du chargements des images: {e}")
+        except Exception:
+            _journal.exception("Erreur lors du chargement des images")
         
         finally : 
             gc.enable()
@@ -470,10 +473,15 @@ class threadShow(QThread):
             x1 = self.width
             y1 = self.height
 
-        topX = max(x0, int(self.sceneRect.left() - 1024))
-        topY = max(y0, int(self.sceneRect.top() - 1024))
-        lowX = min(x1, int(self.sceneRect.right() + 1024))
-        lowY = min(y1, int(self.sceneRect.bottom() + 1024))
+        #Bornage des deux côtés. La vue peut se retrouver entièrement hors de
+        #l'image pendant la navigation; sans la borne opposée, topX/topY
+        #dépassaient x1/y1 et lowX/lowY devenaient négatifs, ce qui produisait
+        #un rectangle central inversé (donc vide) et des bandes périphériques
+        #hors raster.
+        topX = min(max(x0, int(self.sceneRect.left() - 1024)), x1)
+        topY = min(max(y0, int(self.sceneRect.top() - 1024)), y1)
+        lowX = max(min(x1, int(self.sceneRect.right() + 1024)), x0)
+        lowY = max(min(y1, int(self.sceneRect.bottom() + 1024)), y0)
 
 
         middleRect = [topX, topY, lowX, lowY]
@@ -483,22 +491,63 @@ class threadShow(QThread):
         fourthRect = [topX, lowY, lowX, y1]
         
         rects = [middleRect, firstRect, secondRect, thridRect, fourthRect]
+
+        #Anomalie recherchée : la vue ne recoupe pas du tout la zone utile de
+        #la photo, donc aucune tuile n'est chargée et l'affichage reste vide.
+        #Signalée en avertissement pour rester visible au niveau INFO.
+        if (self.sceneRect.right() < x0 or self.sceneRect.left() > x1
+                or self.sceneRect.bottom() < y0 or self.sceneRect.top() > y1):
+            _journal.warning(
+                "Vue hors de la zone utile — image %sx%s, rognage %s, "
+                "vue [%.1f, %.1f, %.1f, %.1f]; aucune tuile à charger",
+                self.width, self.height, (x0, y0, x1, y1),
+                self.sceneRect.left(), self.sceneRect.top(),
+                self.sceneRect.right(), self.sceneRect.bottom(),
+            )
+
+        #Trace de diagnostic temporaire : la vue s'est déjà retrouvée à des
+        #dizaines de milliers de pixels de l'image sans que la cause amont soit
+        #identifiée. À retirer une fois le positionnement de la vue validé.
+        _journal.debug(
+            "Rectangles de chargement — image %sx%s, rognage %s, "
+            "vue [%.1f, %.1f, %.1f, %.1f], rectangles %s",
+            self.width, self.height, (x0, y0, x1, y1),
+            self.sceneRect.left(), self.sceneRect.top(),
+            self.sceneRect.right(), self.sceneRect.bottom(), rects,
+        )
+
         return rects
     
     def load_tiled_rect(self, rect_full_res, ovr_index, groupId):
         
         if ovr_index == -1:
-            scale = 1.0
+            maxX, maxY = self.width, self.height
+            scaleX = scaleY = 1.0
         else:
             ovr_band = self.ds.GetRasterBand(1).GetOverview(ovr_index)
-            scale = min(self.width/ovr_band.XSize , self.height/ovr_band.YSize) 
+            maxX, maxY = ovr_band.XSize, ovr_band.YSize
+            #Un facteur par axe : les deux ratios diffèrent dès que les
+            #dimensions ne sont pas des multiples exacts du niveau d'aperçu
+            #(11310/2828 = 3,99929 contre 17310/4328 = 3,99954). Un facteur
+            #unique appliqué aux deux axes décale la conversion et peut faire
+            #sortir la fenêtre de lecture du raster.
+            scaleX = self.width / maxX
+            scaleY = self.height / maxY
 
-            
-        # We divide the coordinates by the scale factor
-        lx0 = int(rect_full_res[0] / scale)
-        ly0 = int(rect_full_res[1] / scale)
-        lx1 = int(rect_full_res[2] / scale)
-        ly1 = int(rect_full_res[3] / scale)
+        #Bornage sur les dimensions réelles du raster lu : un rectangle issu de
+        #la vue peut sortir de l'image, et GDAL lève alors « Access window out
+        #of range in RasterIO() », ce qui avorte tout le chargement.
+        lx0 = max(0, min(int(rect_full_res[0] / scaleX), maxX))
+        ly0 = max(0, min(int(rect_full_res[1] / scaleY), maxY))
+        lx1 = max(0, min(int(rect_full_res[2] / scaleX), maxX))
+        ly1 = max(0, min(int(rect_full_res[3] / scaleY), maxY))
+
+        if lx1 <= lx0 or ly1 <= ly0:
+            _journal.debug(
+                "Rectangle vide ou hors image ignoré : %s (aperçu %s)",
+                rect_full_res, ovr_index,
+            )
+            return
 
         # 3. Tile and Load
         nbDivX = ceil((lx1 - lx0) / self.target_tile_size)
@@ -528,7 +577,8 @@ class threadShow(QThread):
                 q_img = QImage(tile.data, tile_w, tile_h, tile_w * 3, QImage.Format_RGB888).copy()
                 #pixmap = QPixmap.fromImage(q_img)
                 
-                self.newImage.emit(q_img, scale, curr_lx * scale, curr_ly * scale, groupId)
+                self.newImage.emit(q_img, scaleX, scaleY,
+                                   curr_lx * scaleX, curr_ly * scaleY, groupId)
                 QThread.msleep(1)
         
     def fetch_tile(self, x, y, w, h, ovr_index):
@@ -575,6 +625,7 @@ class threadShow(QThread):
         contrast = params[0]
         saturation = params[2]
         need_grayscale = contrast != 0 or saturation != 0
+        grayscale = None
         
         # Convert to grayscale using PIL weights
         if need_grayscale : 
@@ -635,7 +686,8 @@ class threadShow(QThread):
 
         return arr.astype(np.uint8, copy=False)
 
-    def get_global_stats_from_overview(self,band_numbers=[1,2,3], lower=5, upper=95):
+    def get_global_stats_from_overview(self,band_numbers=None, lower=5, upper=95):
+        if band_numbers is None : band_numbers = [1, 2, 3]
         stats = []
         band_arrays = []
         for bandNumber in band_numbers:
@@ -665,7 +717,9 @@ class threadShow(QThread):
                     self.overviewStartY = 0 
 
             else:
-                return None, None
+                #Retour None (et non None, None) : applyEnhancements() teste « if self.stats is None »,
+                #un tuple aurait franchi la garde et fait échouer l'étirement min/max (registre B-02, item P1-G).
+                return None
 
             arr_flat = arr[np.isfinite(arr)]
 

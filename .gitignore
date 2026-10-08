@@ -1,14 +1,76 @@
-*.db
-*.spec
+# === Python ===
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+parts/
+var/
+sdist/
+develop-eggs/
+.installed.cfg
+lib/
+lib64/
+
+# === Environnements virtuels ===
+.env
+.venv/
+venv/
+ENV/
+env/
+
+# === Distribution / packaging ===
+*.whl
+*.tar.gz
 *.zip
-/.vscode/
-/__pycache__/
-/build/
-/dist/
+
+# === Tests & couverture ===
+.coverage
+.tox/
+.nox/
+htmlcov/
+.pytest_cache/
+nosetests.xml
+coverage.xml
+*.cover
+
+# === Jupyter ===
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# === PyInstaller ===
+*.spec
+
+# === IDE — JetBrains (PyCharm, etc.) ===
+.idea/
+
+# === IDE — VS Code ===
+.vscode/
+
+# === Système d'exploitation ===
+.DS_Store
+Thumbs.db
+desktop.ini
+ehthumbs.db
+
+# === Bases de données ===
+*.db
+*.sqlite3
+
+# === Qodana ===
+.qodana/
+
+# === Projet — spécifique ===
 /Photo/*.tif
+/StereoPhoto/
+*.docx
 /Rehaussement/.vscode/
 /Rehaussement/__pycache__/
 /Rehaussement/build/
 /Rehaussement/dist/
-/StereoPhoto/
-/.env

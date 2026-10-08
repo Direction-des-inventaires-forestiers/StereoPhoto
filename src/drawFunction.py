@@ -26,10 +26,14 @@ from qgis.PyQt.QtWidgets import *
 from qgis.PyQt.QtCore import *
 from qgis.PyQt.QtGui import *
 
-import math, threading, traceback
+import math, threading
 from osgeo import gdal
+from .journal import obtenir_journal
 import numpy as np
 from .worldManager import pictureManager, dualManager
+
+#Journal du module; le préfixe « _ » l'exclut des imports étoile
+_journal = obtenir_journal(__name__)
 
 
 #Création d'un vector layer dans QGIS
@@ -74,12 +78,13 @@ def reshapeLayer(lineString,listFeatures,vectorLayer) :
     vectorLayer.startEditing()
     for feat in listFeatures :
         geo = feat.geometry()
-        print(geo)
+        _journal.debug("reshapeLayer : géométrie initiale %s", geo)
         retval = geo.reshapeGeometry(lineString)
         if retval == 0 : 
-            print(geo)
+            _journal.debug("reshapeLayer : géométrie remodelée %s", geo)
             vectorLayer.changeGeometry(feat.id(),geo)
-        else : print(retval)
+        else :
+            _journal.warning("reshapeLayer : reshapeGeometry a retourné %s", retval)
     vectorLayer.commitChanges()
         
 
@@ -155,6 +160,9 @@ class calculatePolygon(QThread):
         self.dictPolyR = {}
         self.running = True
         self.count = 0
+        #Nombre de sommets dont l'altitude n'a pu être lue dans la fenêtre de MNT
+        #chargée; résumé une seule fois à la fin du traitement (voir run()).
+        self.nbSommetsHorsMNT = 0
 
     def run(self):
         while self.running : 
@@ -208,7 +216,8 @@ class calculatePolygon(QThread):
 
                         except Exception as e:
                             # Reading failed → keep nodata-filled array
-                            print("ReadAsArray failed:", e)
+                            _journal.warning(
+                                "Lecture du MNT impossible, tuile laissée à nodata : %s", e)
 
                     # Store final result
                     self.mntArr = mntArr
@@ -288,9 +297,13 @@ class calculatePolygon(QThread):
                                     self.dictPolyL[name][0].append((pixL[0], pixL[1]))
                                     self.dictPolyR[name][0].append((pixR[0], pixR[1]))
                                 
-                except Exception as e:
-                    print(f"Error in thread: {e}")
-                    traceback.print_exc()
+                except Exception:
+                    _journal.exception("Erreur dans le thread de calcul des polygones")
+            if self.nbSommetsHorsMNT :
+                _journal.warning("%s sommets sans altitude dans la fenêtre de MNT"
+                                 " chargée; altitude calculée par stéréoscopie",
+                                 self.nbSommetsHorsMNT)
+                self.nbSommetsHorsMNT = 0
             self.running = False
                 
     def pointToPix(self,point,geotype) : 
@@ -330,7 +343,12 @@ class calculatePolygon(QThread):
             #        if mntAlt != self.mntNodata : 
             #            return mntAlt
 
-            except : pass
+            except Exception :
+                #Sommet hors de la fenêtre de MNT chargée, ou lecture impossible.
+                #Appelé une fois par sommet : jamais de trace par sommet au-delà
+                #du niveau débogage, un seul résumé à la fin du traitement.
+                self.nbSommetsHorsMNT += 1
+                _journal.debug("Altitude du MNT indisponible en (%s, %s)", x, y)
         
         if z is None  :
             pl = self.leftManager.coordToPixel((x,y), self.initAltitude)

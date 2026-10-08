@@ -23,8 +23,6 @@
 
 **enhanceManager.py** : Fichier pour l’interface graphique de rehaussement et pour les fonctions de rehaussement. La classe imageEnhancing fait le rehaussement. Le dossier Rehaussement contient l’application de rehaussement qui peut être utiliser de manière indépendante. Dans le passé, j’ai développé l’application de rehaussement qui permettait de rehausser des images et de les enregistrer. J’ai par la suite ajouté le module de rehaussement directement dans l’application. Ui_enhancement.py contient le code pour l’interface graphique
 
-**folderManager.py** : Quelques fonctions pour la gestion des images importées
-
 **paramStoring.json** : Fichier pour conserver de l’information entre les utilisations
 
 **resources.py, resources.qrc**: fichier pour permettre d’afficher des petites icônes pour l’interface graphique. Les icônes sont dans le dossier Icons. Lorsque que tu installes QT, le script pyrcc5 va s’installer. Il permet de transformer le fichier QRC en fichier PY
