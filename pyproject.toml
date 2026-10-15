@@ -1,0 +1,60 @@
+# Contrôle automatique du style (issue GOV-01, décision D-13 de la DIF).
+#
+# Norme de référence : PEP 8, complétée par PEP 257 pour la forme des docstrings.
+# Un seul outil l'applique, ruff, en deux rôles séparés :
+#   - `ruff format` : la mise en page (style de black, transcription déterministe
+#     de PEP 8). C'est lui qui tranche indentation, espaces, lignes vides,
+#     guillemets et longueur de ligne — rien à débattre en revue de code.
+#   - `ruff check` : ce que la mise en page ne décide pas. Les codes E viennent de
+#     pycodestyle (PEP 8), les codes F de Pyflakes (défauts réels, pas du style).
+#
+# Ce fichier n'est pas inclus dans l'extension distribuée, qui provient de src/.
+
+[tool.ruff]
+# 88 caractères au lieu des 79 de PEP 8 : seul écart assumé à la norme, et défaut
+# de ruff comme de black. À 79, un appel Qt imbriqué se replie sur trois lignes.
+line-length = 88
+# Environnement Python de QGIS visé : 3.7 et plus (hypothèse A-08).
+# `qgisMinimumVersion=3.0` de metadata.txt correspond à Python 3.6, que ruff ne
+# peut pas cibler ; la compatibilité avec les versions antérieures, si elle est
+# requise, se valide à la main.
+target-version = "py37"
+# Appliquer les exclusions même lorsque les fichiers sont passés explicitement,
+# par le hook pre-commit ou l'éditeur.
+force-exclude = true
+extend-exclude = [
+    # Fichiers générés : toute correction y serait écrasée à la régénération.
+    "src/resources.py",            # pyrcc5
+    "src/ui_enhancement.py",       # pyuic5
+    "src/ui_getVectorLayer.py",    # pyuic5
+    # Prototypes hors extension, conservés comme références.
+    "NavigationSansGeoRef",
+    "Rehaussement",
+]
+
+[tool.ruff.lint]
+# Sélection déclarée explicitement, et non laissée au défaut de ruff : ce défaut
+# change d'une version à l'autre et il est bien plus large (mesure du 2026-10-15
+# sur src/ et tests/ : 0 constat avec la sélection ci-dessous, 118 avec le défaut
+# de la version 0.16.8). Sans cette liste, une mise à jour de l'outil ferait
+# échouer les commits de toute l'équipe sur des règles que personne n'a choisies.
+#
+#   E4 (2 règles)  imports groupés, import hors de l'en-tête de module
+#   E7 (13 règles) comparaisons à None/True/False, except nu, comparaison de
+#                  type(), lambda assignée, noms ambigus, instructions multiples
+#   E9 (2 règles)  erreur de syntaxe, fichier illisible
+#   F  (43 règles) noms non définis, imports et variables jamais utilisés,
+#                  redéfinitions, f-strings sans champ, clés en double
+#
+# Volontairement absentes : E1, E2, E3, E5 et W, que le formateur tranche déjà
+# (les activer en plus met les deux outils en conflit sans rien détecter) ; et N
+# (nommage, issue P3-A), sans correctif automatique et dont l'application
+# briserait les méthodes imposées par Qt — PEP 8 prévoit lui-même cette dispense
+# pour le code qui doit rester compatible avec une interface existante.
+#
+# Élargissement prévu, une décision à la fois : I (tri des imports), puis B
+# (bogues courants), puis retrait de l'exception sur les imports étoile (A8).
+select = ["E4", "E7", "E9", "F"]
+# Imports étoile de QGIS et de Qt : convention de tout le code existant, que
+# PEP 8 interdit. Exception datée, à retirer au traitement de l'issue A8.
+ignore = ["F403", "F405"]

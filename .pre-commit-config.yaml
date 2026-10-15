@@ -1,0 +1,15 @@
+# Contrôle automatique du style à l'entrée du dépôt (issue GOV-01, décision D-13).
+# Installation, une fois par poste :
+#     pip install pre-commit
+#     pre-commit install
+# Les règles sont dans pyproject.toml ; la même configuration sert au hook local
+# et à la vérification en intégration continue (.github/workflows/style.yml).
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.8
+    hooks:
+      # Vérification, avec application des correctifs sûrs
+      - id: ruff-check
+        args: [--fix]
+      # Formatage (même style que black)
+      - id: ruff-format

@@ -1,0 +1,6 @@
+# Commits de reformatage à ignorer dans la vue « blame ».
+# Activation locale, une fois par poste :
+#     git config blame.ignoreRevsFile .git-blame-ignore-revs
+#
+# GOV-01 : formatage initial et correctifs ruff
+# (hash à inscrire après la création du commit de nettoyage)

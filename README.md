@@ -28,6 +28,30 @@ Advenant le cas ou vous rencontrez un problème ou vous avez un question concern
 - Question sur les fonctionnalités existantes
 - Signaler un problème
 
+# Contribuer au code
+
+Le style du code Python est vérifié automatiquement à chaque commit. Les règles sont définies dans `pyproject.toml` et appliquées par [ruff](https://docs.astral.sh/ruff/), en vérification et en formatage.
+
+Installation, une seule fois par poste :
+
+```bash
+pip install pre-commit
+pre-commit install
+git config blame.ignoreRevsFile .git-blame-ignore-revs
+```
+
+Au quotidien :
+
+| Situation | Ce qui se passe | Action |
+|---|---|---|
+| Le code respecte les règles | Le commit passe | Aucune |
+| ruff corrige lui-même le fichier | Le commit est interrompu avec *files were modified by this hook* | Relire la correction, `git add` le fichier, relancer le commit |
+| Constat non corrigible automatiquement | Le commit est refusé, avec le fichier, la ligne et la règle en cause | Corriger, puis relancer le commit |
+
+Pour vérifier tout le dépôt sans faire de commit : `pre-commit run --all-files`.
+
+Les mêmes vérifications sont rejouées sur chaque demande de tirage par le flux `Style` de GitHub Actions : un commit fait avec `--no-verify` sera signalé à ce moment.
+
 # Fichier de test
 
 Un fichier contenant une paire d'image ainsi que les fichiers «.par» associés est disponible sur [ce dépôt.](fichierTest/) Ce fichier démontre comment le dossier d'image devrait être assemblé pour être compatible avec l'application. 
@@ -77,6 +101,20 @@ In the event that you encounter a problem or have a question regarding the softw
 - General question - Question générale
 - Question about existing features - Question sur les fonctionnalités existantes
 - Report a problem - Signaler un problème
+
+# Contributing
+
+Python code style is checked automatically on every commit. The rules live in `pyproject.toml` and are enforced by [ruff](https://docs.astral.sh/ruff/), for both linting and formatting.
+
+One-time setup per workstation:
+
+```bash
+pip install pre-commit
+pre-commit install
+git config blame.ignoreRevsFile .git-blame-ignore-revs
+```
+
+To check the whole repository without committing: `pre-commit run --all-files`. The same checks run on every pull request through the `Style` GitHub Actions workflow.
 
 # Test Files
 

@@ -1,0 +1,20 @@
+# Vérification du style sur chaque demande de tirage (issue GOV-01, décision D-13).
+# Le hook local n'est pas installé par un simple clonage et peut être contourné
+# avec `git commit --no-verify` : seule cette vérification, combinée à la
+# protection de la branche principale, garantit le contrôle.
+name: Style
+
+on:
+  pull_request:
+
+jobs:
+  pre-commit:
+    name: ruff (vérification et formatage)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pre-commit
+      - run: pre-commit run --all-files --show-diff-on-failure
