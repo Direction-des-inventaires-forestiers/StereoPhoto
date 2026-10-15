@@ -32,10 +32,10 @@ MODULE_DEFAUT = os.path.join(RACINE, "src", "gestionDossier.py")
 
 FONCTIONS_TESTEES = ("numeroPhoto", "findPairWithCoord")
 
-#Valeur de config.PAR_PAIR_PROXIMITY_BUFFER_M au moment du test.
+# Valeur de config.PAR_PAIR_PROXIMITY_BUFFER_M au moment du test.
 BUFFER_M = 500
 
-#Seuil appliqué par stereoPhoto.findPairWithPosition() au résultat.
+# Seuil appliqué par stereoPhoto.findPairWithPosition() au résultat.
 SEUIL_APPELANT_M = 7500
 
 
@@ -53,11 +53,16 @@ class JournalBouchon:
 def extraire_fonctions(chemin):
     """Retourne les fonctions voulues du module, isolées de leurs imports."""
     arbre = ast.parse(io.open(chemin, encoding="utf-8").read())
-    corps = [n for n in arbre.body
-             if isinstance(n, ast.FunctionDef) and n.name in FONCTIONS_TESTEES]
+    corps = [
+        n
+        for n in arbre.body
+        if isinstance(n, ast.FunctionDef) and n.name in FONCTIONS_TESTEES
+    ]
     manquantes = set(FONCTIONS_TESTEES) - {n.name for n in corps}
     if manquantes:
-        raise AssertionError("fonctions introuvables : %s" % ", ".join(sorted(manquantes)))
+        raise AssertionError(
+            "fonctions introuvables : %s" % ", ".join(sorted(manquantes))
+        )
 
     espace = {
         "math": math,
@@ -70,14 +75,16 @@ def extraire_fonctions(chemin):
 
 def ligne_de_vol(prefixe, premier, nombre, x0, y0, pas=300.0):
     """Photos alignées en X, espacées de `pas` mètres, comme une ligne de vol."""
-    return {"%s_%03d_rgb" % (prefixe, premier + i):
-            (x0 + i * pas, y0, 0, 0, 0, 0) for i in range(nombre)}
+    return {
+        "%s_%03d_rgb" % (prefixe, premier + i): (x0 + i * pas, y0, 0, 0, 0, 0)
+        for i in range(nombre)
+    }
 
 
-#Zone réelle de la séance : 207 photos du dossier 2016, en EPSG:32198.
+# Zone réelle de la séance : 207 photos du dossier 2016, en EPSG:32198.
 PHOTOS = ligne_de_vol("q16033", 52, 207, 381008.901, 5391518.301)
 
-#Centre du canevas relevé au moment de l'erreur, dans le même CRS.
+# Centre du canevas relevé au moment de l'erreur, dans le même CRS.
 VUE_LOINTAINE = (9017716.330220249, -962310.8192603509)
 VUE_PROCHE = (381608.901, 5391518.301)
 
@@ -86,16 +93,20 @@ def cas_vue_lointaine(espace):
     """Le cas du journal : plus de 10 000 km, aucune exception attendue."""
     identifiant, distance = espace["findPairWithCoord"](PHOTOS, VUE_LOINTAINE)
     assert distance > SEUIL_APPELANT_M, (
-        "distance %r sous le seuil de l'appelant : la vue serait acceptée" % distance)
+        "distance %r sous le seuil de l'appelant : la vue serait acceptée" % distance
+    )
     assert identifiant == "" or distance > 1e7, (
-        "résultat inattendu pour une vue hors zone : %r" % ((identifiant, distance),))
+        "résultat inattendu pour une vue hors zone : %r" % ((identifiant, distance),)
+    )
     return "distance %.0f m, rejetée par l'appelant" % distance
 
 
 def cas_dictionnaire_vide(espace):
     """Aucune photo : la recherche doit répondre, pas planter."""
     identifiant, distance = espace["findPairWithCoord"]({}, VUE_PROCHE)
-    assert identifiant == "", "identifiant non vide sur un dossier vide : %r" % identifiant
+    assert identifiant == "", (
+        "identifiant non vide sur un dossier vide : %r" % identifiant
+    )
     assert distance == math.inf, "distance finie sur un dossier vide : %r" % distance
     return "('', inf)"
 
@@ -135,7 +146,9 @@ def cas_distance_indefinie(espace):
     """Une bbox portant NaN ne doit pas laisser minID vide puis planter."""
     photos = {"q16033_052_rgb": (float("nan"), float("nan"), 0, 0, 0, 0)}
     identifiant, distance = espace["findPairWithCoord"](photos, VUE_PROCHE)
-    assert identifiant == "", "photo retenue malgré une distance indéfinie : %r" % identifiant
+    assert identifiant == "", (
+        "photo retenue malgré une distance indéfinie : %r" % identifiant
+    )
     assert distance == math.inf, "distance %r au lieu de inf" % distance
     return "('', inf)"
 

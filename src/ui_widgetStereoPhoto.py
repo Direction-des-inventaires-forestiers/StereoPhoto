@@ -9,18 +9,20 @@
 
 from qgis.PyQt import QtCore, QtGui, QtWidgets
 from qgis.PyQt.QtCore import pyqtSignal
-import os, json, math
+import os
+import json
+import math
 from urllib.parse import urlparse
 from osgeo import gdal
 import numpy as np
 from qgis.utils import iface
 from qgis.core import QgsMapLayerType, QgsWkbTypes
-from . import resources
+from . import resources  # noqa: F401 — enregistre les icônes auprès de Qt
 from .ui_getVectorLayer import getVectorLayerCustomList
-from .ui_graphicsWindow import Ui_graphicsWindow 
+from .ui_graphicsWindow import Ui_graphicsWindow
 from .journal import obtenir_journal
 
-#Journal du module; le préfixe « _ » l'exclut des imports étoile
+# Journal du module; le préfixe « _ » l'exclut des imports étoile
 _journal = obtenir_journal(__name__)
 
 
@@ -65,7 +67,9 @@ class Ui_StereoDockWidget(object):
         self.gridLayout_3.addWidget(self.importToolProject, 0, 1, 1, 1)
         self.verticalLayout_2.addWidget(self.groupBoxMainPath)
         self.frame = QtWidgets.QFrame(self.dockWidgetContents)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
+        sizePolicy = QtWidgets.QSizePolicy(
+            QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed
+        )
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.frame.sizePolicy().hasHeightForWidth())
@@ -167,8 +171,7 @@ class Ui_StereoDockWidget(object):
         font = QtGui.QFont()
         font.setPointSize(10)
         self.enhanceButton.setFont(font)
-        self.enhanceButton.setStyleSheet("\n"
-"color: rgb(220, 147, 0);")
+        self.enhanceButton.setStyleSheet("\ncolor: rgb(220, 147, 0);")
         self.enhanceButton.setCheckable(False)
         self.enhanceButton.setObjectName("enhanceButton")
         self.verticalLayout_2.addWidget(self.enhanceButton)
@@ -200,7 +203,9 @@ class Ui_StereoDockWidget(object):
         self.pushButtonAffVecteur.setObjectName("pushButtonAffVecteur")
         self.verticalLayout_2.addWidget(self.pushButtonAffVecteur)
         self.label_11 = QtWidgets.QLabel(self.dockWidgetContents)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Fixed)
+        sizePolicy = QtWidgets.QSizePolicy(
+            QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Fixed
+        )
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.label_11.sizePolicy().hasHeightForWidth())
@@ -296,7 +301,9 @@ class Ui_StereoDockWidget(object):
         self.labelAltitude.setAlignment(QtCore.Qt.AlignCenter)
         self.labelAltitude.setObjectName("labelAltitude")
         self.verticalLayout_2.addWidget(self.labelAltitude)
-        spacerItem = QtWidgets.QSpacerItem(20, 1, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
+        spacerItem = QtWidgets.QSpacerItem(
+            20, 1, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding
+        )
         self.verticalLayout_2.addItem(spacerItem)
         StereoDockWidget.setWidget(self.dockWidgetContents)
 
@@ -306,40 +313,53 @@ class Ui_StereoDockWidget(object):
     def retranslateUi(self, StereoDockWidget):
         _translate = QtCore.QCoreApplication.translate
         StereoDockWidget.setWindowTitle(_translate("StereoDockWidget", "StereoPhoto"))
-        self.groupBoxMainPath.setTitle(_translate("StereoDockWidget", "Chemin vers les photos"))
+        self.groupBoxMainPath.setTitle(
+            _translate("StereoDockWidget", "Chemin vers les photos")
+        )
         self.importToolProject.setText(_translate("StereoDockWidget", "..."))
         self.label_2.setText(_translate("StereoDockWidget", "Image du haut"))
         self.label.setText(_translate("StereoDockWidget", "Image du bas"))
-        self.checkBoxFlip.setText(_translate("StereoDockWidget", "Retirer l\'effet miroir"))
-        self.pushButtonFindBestPair.setText(_translate("StereoDockWidget", "Trouver la paire avec QGIS"))
+        self.checkBoxFlip.setText(
+            _translate("StereoDockWidget", "Retirer l'effet miroir")
+        )
+        self.pushButtonFindBestPair.setText(
+            _translate("StereoDockWidget", "Trouver la paire avec QGIS")
+        )
         self.pushButtonShowIDList.setText(_translate("StereoDockWidget", "Liste Photo"))
         self.label_3.setText(_translate("StereoDockWidget", "Écran du haut"))
         self.label_4.setText(_translate("StereoDockWidget", "Écran du bas"))
-        self.pushButtonShowScreenNumber.setText(_translate("StereoDockWidget", "Voir Numéro"))
+        self.pushButtonShowScreenNumber.setText(
+            _translate("StereoDockWidget", "Voir Numéro")
+        )
         self.enhanceButton.setText(_translate("StereoDockWidget", "Rehausser"))
         self.pushButtonShowPicture.setText(_translate("StereoDockWidget", "Naviguer"))
         self.pushButtonCloseWindow.setText(_translate("StereoDockWidget", "Fermer"))
-        self.pushButtonAffVecteur.setText(_translate("StereoDockWidget", "Gestion des couches vectorielles"))
+        self.pushButtonAffVecteur.setText(
+            _translate("StereoDockWidget", "Gestion des couches vectorielles")
+        )
         self.label_11.setText(_translate("StereoDockWidget", "Couche en édition"))
-        self.groupBoxMNT.setTitle(_translate("StereoDockWidget", "Modèle numérique de terrrain"))
+        self.groupBoxMNT.setTitle(
+            _translate("StereoDockWidget", "Modèle numérique de terrrain")
+        )
         self.importToolMNT.setText(_translate("StereoDockWidget", "..."))
         self.radioButtonDraw.setText(_translate("StereoDockWidget", "Dessiner"))
-        self.pushButtonRemoveMNT.setText(_translate("StereoDockWidget", "Retirer le modèle"))
+        self.pushButtonRemoveMNT.setText(
+            _translate("StereoDockWidget", "Retirer le modèle")
+        )
         self.radioButtonCut.setText(_translate("StereoDockWidget", "Découper"))
         self.label_5.setText(_translate("StereoDockWidget", "Altitude du curseur"))
         self.labelAltitude.setText(_translate("StereoDockWidget", "100.000000000"))
 
 
-
-class dropEventMNT(QtWidgets.QGroupBox): 
+class dropEventMNT(QtWidgets.QGroupBox):
     validMNT = pyqtSignal()
-    
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setAcceptDrops(True)
         self.MNTPath = ""
         self.MNTName = ""
-        self.fileExtensions = ['tif', 'vrt']
+        self.fileExtensions = ["tif", "vrt"]
 
     def dragEnterEvent(self, event):
         if event.mimeData().hasUrls():
@@ -355,20 +375,20 @@ class dropEventMNT(QtWidgets.QGroupBox):
                 event.ignore()
                 return
 
-            url = urls[0] 
+            url = urls[0]
             local = url.toLocalFile()
-            
+
             if local:
                 file_path = local
             else:
                 # Fallback URL parsing engine
                 parsed = urlparse(url.toString())
                 if parsed.scheme == "file" and parsed.path:
-                    if os.name == "nt": 
-                        file_path = parsed.path.lstrip("/")  
-                    else: 
+                    if os.name == "nt":
+                        file_path = parsed.path.lstrip("/")
+                    else:
                         file_path = parsed.path
-                else: 
+                else:
                     event.ignore()
                     return
 
@@ -385,41 +405,40 @@ class dropEventMNT(QtWidgets.QGroupBox):
                 self.MNTPath = ""
                 self.MNTName = ""
                 event.ignore()
-                
+
         except Exception:
-            #La trace part dans le journal de l'extension plutôt que sur la
-            #sortie d'erreur, qui remontait dans la console Python de QGIS.
+            # La trace part dans le journal de l'extension plutôt que sur la
+            # sortie d'erreur, qui remontait dans la console Python de QGIS.
             _journal.exception("Erreur pendant le dépôt d'un fichier de MNT")
             event.ignore()
-            
-        #Explicitly return None (or nothing) so the C++ engine doesn't crash
+
+        # Explicitly return None (or nothing) so the C++ engine doesn't crash
         return
 
 
-        
-
-class dropedit(QtWidgets.QGroupBox):   
-
+class dropedit(QtWidgets.QGroupBox):
     def __init__(self, parent=None):
         super(dropedit, self).__init__(parent)
         self.setAcceptDrops(True)
 
     def dragEnterEvent(self, event):
         event.accept()
-        
+
     def dropEvent(self, event):
         fileURL = event.mimeData().urls()[0].toString()
-        try :
-            fileName = fileURL.split('file:///')[1]
-        except :
-            fileName = fileURL.split('file:')[1]
+        try:
+            fileName = fileURL.split("file:///")[1]
+        except IndexError:
+            fileName = fileURL.split("file:")[1]
         if os.path.isdir(fileName):
-            for child in self.children(): 
+            for child in self.children():
                 if child.metaObject().className() == "QLineEdit":
                     child.setText(fileName)
 
-class optionWindow(QtWidgets.QDockWidget): 
+
+class optionWindow(QtWidgets.QDockWidget):
     closeWindow = pyqtSignal()
+
     def __init__(self, iface):
         QtWidgets.QMainWindow.__init__(self, iface.mainWindow())
         self.ui = Ui_StereoDockWidget()
@@ -435,90 +454,109 @@ class optionWindow(QtWidgets.QDockWidget):
         self.projectPath = os.path.expanduser("~")
         self.mntLocation = os.path.expanduser("~")
 
-        self.JSONPath = os.path.join(os.path.dirname(os.path.realpath(__file__)),'paramStoring.json')
+        self.JSONPath = os.path.join(
+            os.path.dirname(os.path.realpath(__file__)), "paramStoring.json"
+        )
 
         self.listGraphWinObj = []
         self.screenNumberTimer = QtCore.QTimer(self)
         self.screenNumberTimer.setSingleShot(True)
         self.screenNumberTimer.timeout.connect(self.closeScreenWindow)
 
-        
-        #self.currentMNTPath = ''
+        # self.currentMNTPath = ''
 
-    def showImportDirectory(self) :
-        fname = QtWidgets.QFileDialog.getExistingDirectory(self, 'Importer un dossier de photos aériennes',self.projectPath)
-        if fname: self.ui.importLineProject.setText(fname)
+    def showImportDirectory(self):
+        fname = QtWidgets.QFileDialog.getExistingDirectory(
+            self, "Importer un dossier de photos aériennes", self.projectPath
+        )
+        if fname:
+            self.ui.importLineProject.setText(fname)
 
-            
-    #Ouvre une fenêtre de Qt pour choisir la couche de polygones
+    # Ouvre une fenêtre de Qt pour choisir la couche de polygones
     def showImportVector(self):
         self.dictLayerName = {}
         for item in iface.mapCanvas().layers():
-            if item.type() == QgsMapLayerType.VectorLayer and item.geometryType() in [QgsWkbTypes.PolygonGeometry, QgsWkbTypes.PointGeometry,QgsWkbTypes.LineGeometry]: 
+            if item.type() == QgsMapLayerType.VectorLayer and item.geometryType() in [
+                QgsWkbTypes.PolygonGeometry,
+                QgsWkbTypes.PointGeometry,
+                QgsWkbTypes.LineGeometry,
+            ]:
                 self.dictLayerName[item.name()] = item
-        
-        if self.dictLayerName : 
+
+        if self.dictLayerName:
             self.vectorWindow.setItem(self.dictLayerName)
             self.vectorWindow.show()
             self.vectorWindow.raise_()
             self.vectorWindow.ui.buttonBox.accepted.connect(self.importVectorAccept)
             self.vectorWindow.ui.buttonBox.rejected.connect(self.importVectorCancel)
 
-        else :
-            #No Current VectorLayer
+        else:
+            # No Current VectorLayer
             return
 
-    #Création de l'objet qui réprésente la couche vectorielle
+    # Création de l'objet qui réprésente la couche vectorielle
     def importVectorAccept(self):
         self.vectorToShow = {}
-        for i in range(self.vectorWindow.ui.tableWidget.rowCount()) : 
-            afficher = self.vectorWindow.ui.tableWidget.cellWidget(i,0)
-            nomCouche = self.vectorWindow.ui.tableWidget.item(i,1).text()
-            couleur = self.vectorWindow.ui.tableWidget.cellWidget(i,2).property("color")
-            utiliser3D = self.vectorWindow.ui.tableWidget.cellWidget(i,3).isChecked()
-            if afficher.isChecked() : self.vectorToShow[nomCouche] = [couleur,utiliser3D]
+        for i in range(self.vectorWindow.ui.tableWidget.rowCount()):
+            afficher = self.vectorWindow.ui.tableWidget.cellWidget(i, 0)
+            nomCouche = self.vectorWindow.ui.tableWidget.item(i, 1).text()
+            couleur = self.vectorWindow.ui.tableWidget.cellWidget(i, 2).property(
+                "color"
+            )
+            utiliser3D = self.vectorWindow.ui.tableWidget.cellWidget(i, 3).isChecked()
+            if afficher.isChecked():
+                self.vectorToShow[nomCouche] = [couleur, utiliser3D]
 
         currentRow = self.vectorWindow.ui.tableWidget.currentRow()
         currentVectors = list(self.vectorToShow.keys())
-        if len(currentVectors) > 0 : 
-            if currentRow == -1  : editLayer = ''
-            else : editLayer = self.vectorWindow.ui.tableWidget.item(currentRow,1).text()
-            self.vLayerName = editLayer if editLayer in currentVectors else currentVectors[0]  
-            #self.vLayerName = self.vectorWindow.ui.tableWidget.itemWidget(self.vectorWindow.ui.listWidget.selectedItems()[0]).label.text()
+        if len(currentVectors) > 0:
+            if currentRow == -1:
+                editLayer = ""
+            else:
+                editLayer = self.vectorWindow.ui.tableWidget.item(currentRow, 1).text()
+            self.vLayerName = (
+                editLayer if editLayer in currentVectors else currentVectors[0]
+            )
+            # self.vLayerName = self.vectorWindow.ui.tableWidget.itemWidget(self.vectorWindow.ui.listWidget.selectedItems()[0]).label.text()
             self.vLayer = self.dictLayerName[self.vLayerName]
             self.ui.importLineVectorLayer.setText(self.vLayerName)
         self.vectorWindow.close()
 
     def importVectorCancel(self):
         self.vectorWindow.close()
-    
+
     def showImportMNT(self):
 
-        fname = QtWidgets.QFileDialog.getOpenFileName(self, 'Importer un modèle numérique de terrain', self.mntLocation, 'MNT (*.tif *.vrt)')[0]
+        fname = QtWidgets.QFileDialog.getOpenFileName(
+            self,
+            "Importer un modèle numérique de terrain",
+            self.mntLocation,
+            "MNT (*.tif *.vrt)",
+        )[0]
         if fname:
             self.loadImportMNT(fname)
-        else : 
+        else:
             self.removeImportMNT()
-    
+
     def dropImportMNT(self):
         self.loadImportMNT(self.ui.groupBoxMNT.MNTPath)
-    
+
     def loadImportMNT(self, file):
         if not os.path.isfile(file):
             self.removeImportMNT()
             return
-        
+
         self.currentMNTPath = file
         self.mntLocation = os.path.dirname(file)
         self.setStateMNT(True, os.path.basename(file))
 
-    def getMNTWithCoord(self,rectCoord) :
+    def getMNTWithCoord(self, rectCoord):
 
-        if self.currentMNTPath == "" : 
+        if self.currentMNTPath == "":
             self.mntArr = None
             return
 
-        mntDS = gdal.Open(self.currentMNTPath,gdal.GA_ReadOnly)
+        mntDS = gdal.Open(self.currentMNTPath, gdal.GA_ReadOnly)
         mntBand = mntDS.GetRasterBand(1)
         self.mntGeo = mntDS.GetGeoTransform()
         self.mntSize = (mntDS.RasterXSize, mntDS.RasterYSize)
@@ -535,23 +573,25 @@ class optionWindow(QtWidgets.QDockWidget):
 
         # Requested output size
         sizeX = pxEnd - pxStart
-        sizeY = pyEnd - pyStart            
+        sizeY = pyEnd - pyStart
         mntArr = np.full((sizeY, sizeX), self.mntNodata, dtype=np.float32)
 
-        if (pxStart >= self.mntSize[0] or pxStart + sizeX <= 0 or
-            pyStart >= self.mntSize[1] or pyStart + sizeY <= 0):
-
+        if (
+            pxStart >= self.mntSize[0]
+            or pxStart + sizeX <= 0
+            or pyStart >= self.mntSize[1]
+            or pyStart + sizeY <= 0
+        ):
             self.mntArr = mntArr
 
-
-        else : 
+        else:
             # Where the read starts *in the raster*
             read_xoff = max(0, pxStart)
             read_yoff = max(0, pyStart)
 
             # Where the read starts *inside the output array*
-            arr_xoff = read_xoff-pxStart
-            arr_yoff = read_yoff-pyStart
+            arr_xoff = read_xoff - pxStart
+            arr_yoff = read_yoff - pyStart
 
             # Compute read size inside raster bounds
             read_xsize = min(pxStart + sizeX, self.mntSize[0]) - read_xoff
@@ -559,141 +599,156 @@ class optionWindow(QtWidgets.QDockWidget):
 
             if read_xsize > 0 and read_ysize > 0:
                 try:
-                    sub = mntBand.ReadAsArray(read_xoff, read_yoff,
-                                                read_xsize, read_ysize)
+                    sub = mntBand.ReadAsArray(
+                        read_xoff, read_yoff, read_xsize, read_ysize
+                    )
                     # Place into output array
-                    mntArr[arr_yoff:arr_yoff + read_ysize,
-                        arr_xoff:arr_xoff + read_xsize] = sub
+                    mntArr[
+                        arr_yoff : arr_yoff + read_ysize,
+                        arr_xoff : arr_xoff + read_xsize,
+                    ] = sub
 
                 except Exception:
                     # Reading failed → keep nodata-filled array
                     _journal.warning(
                         "Lecture du MNT impossible, fenêtre laissée à nodata : "
                         "%s, lecture (%s, %s) de %sx%s",
-                        self.currentMNTPath, read_xoff, read_yoff,
-                        read_xsize, read_ysize, exc_info=True)
+                        self.currentMNTPath,
+                        read_xoff,
+                        read_yoff,
+                        read_xsize,
+                        read_ysize,
+                        exc_info=True,
+                    )
 
             # Store final result
-            self.mntArr = mntArr 
-        
+            self.mntArr = mntArr
+
         mntDS = None
 
-    def readMNTWithCoord(self,coordinate) : 
+    def readMNTWithCoord(self, coordinate):
 
-        if self.mntArr is None : return None
+        if self.mntArr is None:
+            return None
 
         xPixel = math.floor((coordinate[0] - self.mntGeo[0]) / self.mntGeo[1])
         yPixel = math.floor((coordinate[1] - self.mntGeo[3]) / self.mntGeo[5])
-        
-        pxRead = xPixel - self.pxStart 
-        pyRead = yPixel - self.pyStart 
-        
+
+        pxRead = xPixel - self.pxStart
+        pyRead = yPixel - self.pyStart
+
         rows, cols = self.mntArr.shape
-        
-        if 0 <= pxRead < cols and 0 <= pyRead < rows : return self.mntArr[pyRead,pxRead]
-        
-        else : return None
-        
 
-    def removeImportMNT(self) : 
+        if 0 <= pxRead < cols and 0 <= pyRead < rows:
+            return self.mntArr[pyRead, pxRead]
+
+        else:
+            return None
+
+    def removeImportMNT(self):
         self.currentMNTPath = ""
-        self.setStateMNT(False,self.currentMNTPath)
+        self.setStateMNT(False, self.currentMNTPath)
 
-    def setStateMNT(self, enabled, label) :
+    def setStateMNT(self, enabled, label):
         self.ui.radioButtonCut.setEnabled(enabled)
         self.ui.radioButtonDraw.setEnabled(enabled)
         self.ui.pushButtonRemoveMNT.setEnabled(enabled)
         self.ui.importLineMNT.setText(label)
 
-    def closeEvent(self,event):
+    def closeEvent(self, event):
         self.closeWindow.emit()
 
     def loadParamFile(self):
 
         self.ParamDict = {}
-        
-        self.currentNoValidKey = []
-        with open(self.JSONPath) as f : 
-            self.ParamDict = json.load(f)
-        
-        info_raster = self.ParamDict['info_raster']
-        stereoscope = self.ParamDict['stereoscope'] 
 
-        if info_raster['image_dir'] : self.ui.importLineProject.setText(info_raster['image_dir'])
-            
-        if info_raster['mnt_file'] : 
-            self.currentMNTPath = info_raster['mnt_file']
+        self.currentNoValidKey = []
+        with open(self.JSONPath) as f:
+            self.ParamDict = json.load(f)
+
+        info_raster = self.ParamDict["info_raster"]
+        stereoscope = self.ParamDict["stereoscope"]
+
+        if info_raster["image_dir"]:
+            self.ui.importLineProject.setText(info_raster["image_dir"])
+
+        if info_raster["mnt_file"]:
+            self.currentMNTPath = info_raster["mnt_file"]
             self.ui.importLineMNT.setText(os.path.basename(self.currentMNTPath))
             self.ui.radioButtonCut.setEnabled(True)
             self.ui.radioButtonDraw.setEnabled(True)
             self.ui.pushButtonRemoveMNT.setEnabled(True)
-        else : self.currentMNTPath = ''
+        else:
+            self.currentMNTPath = ""
 
         desktop = QtWidgets.QApplication.desktop()
-        screenCount = desktop.screenCount()-1
+        screenCount = desktop.screenCount() - 1
         self.ui.spinBoxUpScreen.setMaximum(screenCount)
         self.ui.spinBoxDownScreen.setMaximum(screenCount)
 
-        self.ui.spinBoxUpScreen.setValue(stereoscope['ecran_haut'])
-        self.ui.spinBoxDownScreen.setValue(stereoscope['ecran_bas'])
+        self.ui.spinBoxUpScreen.setValue(stereoscope["ecran_haut"])
+        self.ui.spinBoxDownScreen.setValue(stereoscope["ecran_bas"])
 
-        self.ui.checkBoxFlip.setChecked(stereoscope['miroir_OFF'])
+        self.ui.checkBoxFlip.setChecked(stereoscope["miroir_OFF"])
 
-        self.rehaussementParam = self.ParamDict['rehaussement']
+        self.rehaussementParam = self.ParamDict["rehaussement"]
 
-    def saveParamFile(self) :
+    def saveParamFile(self):
 
-        self.ParamDict['stereoscope']['ecran_haut'] = self.ui.spinBoxUpScreen.value()
-        self.ParamDict['stereoscope']['ecran_bas'] = self.ui.spinBoxDownScreen.value()
-        self.ParamDict['stereoscope']['miroir_OFF'] = self.ui.checkBoxFlip.isChecked()
+        self.ParamDict["stereoscope"]["ecran_haut"] = self.ui.spinBoxUpScreen.value()
+        self.ParamDict["stereoscope"]["ecran_bas"] = self.ui.spinBoxDownScreen.value()
+        self.ParamDict["stereoscope"]["miroir_OFF"] = self.ui.checkBoxFlip.isChecked()
 
-        self.ParamDict['info_raster']['image_dir'] = self.ui.importLineProject.text()
-        self.ParamDict['info_raster']['mnt_file'] = self.currentMNTPath 
-        self.ParamDict['info_raster']['user_image'] = self.ui.labelLeftName.text()
+        self.ParamDict["info_raster"]["image_dir"] = self.ui.importLineProject.text()
+        self.ParamDict["info_raster"]["mnt_file"] = self.currentMNTPath
+        self.ParamDict["info_raster"]["user_image"] = self.ui.labelLeftName.text()
 
-        self.ParamDict['rehaussement'] = self.rehaussementParam 
+        self.ParamDict["rehaussement"] = self.rehaussementParam
 
-        with open(self.JSONPath,'w',encoding="utf-8") as f : 
-            json.dump(self.ParamDict,f,indent=2,ensure_ascii=False)
-        
-    def actionShowScreenNumber(self) :
+        with open(self.JSONPath, "w", encoding="utf-8") as f:
+            json.dump(self.ParamDict, f, indent=2, ensure_ascii=False)
 
-        if self.listGraphWinObj : self.closeScreenWindow()
-        
+    def actionShowScreenNumber(self):
+
+        if self.listGraphWinObj:
+            self.closeScreenWindow()
+
         desktop = QtWidgets.QApplication.desktop()
         screenCount = desktop.screenCount()
-        self.ui.spinBoxUpScreen.setMaximum(screenCount-1)
-        self.ui.spinBoxDownScreen.setMaximum(screenCount-1)
-        for i in range(screenCount) :
-
+        self.ui.spinBoxUpScreen.setMaximum(screenCount - 1)
+        self.ui.spinBoxDownScreen.setMaximum(screenCount - 1)
+        for i in range(screenCount):
             screenGeo = desktop.screenGeometry(i)
-            center = (int(screenGeo.width()/2), int(screenGeo.height()/2))
-            #rect = QtCore.QRect(0,0,125,175)
+            center = (int(screenGeo.width() / 2), int(screenGeo.height() / 2))
+            # rect = QtCore.QRect(0,0,125,175)
             graphWin = graphicsWindow()
-            graphWin.resize(125,175)
-            #graphWin.ui.graphicsView.setGeometry(rect)
-            graphWin.move(QtCore.QPoint(screenGeo.x()+center[0]-50,screenGeo.y()+center[1]-50))                
-            
-            
+            graphWin.resize(125, 175)
+            # graphWin.ui.graphicsView.setGeometry(rect)
+            graphWin.move(
+                QtCore.QPoint(
+                    screenGeo.x() + center[0] - 50, screenGeo.y() + center[1] - 50
+                )
+            )
+
             scene = QtWidgets.QGraphicsScene()
-            scene.setSceneRect(QtCore.QRectF(0,0,125,175))
-            scene.addText(str(i),QtGui.QFont('Times',80)) 
+            scene.setSceneRect(QtCore.QRectF(0, 0, 125, 175))
+            scene.addText(str(i), QtGui.QFont("Times", 80))
             graphWin.ui.graphicsView.setScene(scene)
-            
+
             graphWin.show()
-            
+
             self.listGraphWinObj.append(graphWin)
-        
+
         self.screenNumberTimer.start(6000)
 
-
-    def closeScreenWindow(self) :
+    def closeScreenWindow(self):
         self.screenNumberTimer.stop()
         for win in self.listGraphWinObj:
             win.close()
         self.listGraphWinObj.clear()
 
-class graphicsWindow(QtWidgets.QMainWindow): 
+
+class graphicsWindow(QtWidgets.QMainWindow):
     def __init__(self):
         QtWidgets.QMainWindow.__init__(self)
         self.ui = Ui_graphicsWindow()

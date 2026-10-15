@@ -2,7 +2,8 @@ from qgis.PyQt.QtCore import *
 from qgis.PyQt.QtGui import *
 from qgis.PyQt.QtWidgets import *
 from qgis.gui import QgsMapTool, QgsRubberBand
-from qgis.core import Qgis, QgsPointXY, QgsWkbTypes
+from qgis.core import QgsWkbTypes
+
 
 class keyboardInterceptor(QObject):
     def __init__(self, tool):
@@ -16,124 +17,130 @@ class keyboardInterceptor(QObject):
             return True
         return False
 
+
 class navigationMapTool(QgsMapTool):
-    mouseClicked = pyqtSignal(Qt.MouseButton,tuple)
+    mouseClicked = pyqtSignal(Qt.MouseButton, tuple)
     mouseMoved = pyqtSignal(tuple)
     wheelActivate = pyqtSignal(int, Qt.KeyboardModifier, tuple)
     keybordSignal = pyqtSignal(QKeyEvent)
 
-    def __init__(self, canvas, iface): 
+    def __init__(self, canvas, iface):
         super().__init__(canvas)
         self.canvas = canvas
         self.iface = iface
         self.lastMousePos = None
         self.currentMouseCoord = None
         self.lastEmittedCoord = None
-        
+
         self.ignoringSyntheticMove = False
 
-        self.rubberBand = QgsRubberBand(self.canvas, QgsWkbTypes.GeometryType.LineGeometry)
+        self.rubberBand = QgsRubberBand(
+            self.canvas, QgsWkbTypes.GeometryType.LineGeometry
+        )
         self.rubberBand.setColor(Qt.red)
         self.rubberBand.setWidth(2)
         self.drawing = False
         self.activateDrawing = False
-        
+
         self.borderRange = 150
         self.safeRect = None
         self.centerGlobalPos = None
 
-        # 125Hz Timer (8ms) 
-        #self.sendPosTimer = QTimer()
-        #self.sendPosTimer.setInterval(16) #Diminuer à 60 hz
-        #self.sendPosTimer.setTimerType(Qt.PreciseTimer)
-        #self.sendPosTimer.timeout.connect(self.sendMouseMovePos)
+        # 125Hz Timer (8ms)
+        # self.sendPosTimer = QTimer()
+        # self.sendPosTimer.setInterval(16) #Diminuer à 60 hz
+        # self.sendPosTimer.setTimerType(Qt.PreciseTimer)
+        # self.sendPosTimer.timeout.connect(self.sendMouseMovePos)
 
         self.interceptor = keyboardInterceptor(self)
 
     def eventFilter(self, obj, event):
 
         if event.type() == QEvent.MouseMove:
-
             if self.ignoringSyntheticMove:
-                return True 
+                return True
 
             new_pixel_pos = event.pos()
-            
+
             self.currentMouseCoord = self.toMapCoordinates(new_pixel_pos)
             self.lastMousePos = new_pixel_pos
 
             if self.currentMouseCoord != self.lastEmittedCoord:
-                coordFormat = (float(self.currentMouseCoord.x()), float(self.currentMouseCoord.y()))
+                coordFormat = (
+                    float(self.currentMouseCoord.x()),
+                    float(self.currentMouseCoord.y()),
+                )
                 self.mouseMoved.emit(coordFormat)
-                self.lastEmittedCoord = self.currentMouseCoord    
-            
+                self.lastEmittedCoord = self.currentMouseCoord
+
             if self.drawing:
                 mapPoint = self.currentMouseCoord
                 if self.rubberBand.numberOfVertices() > 1:
                     self.rubberBand.movePoint(mapPoint)
                 else:
                     self.rubberBand.addPoint(mapPoint)
-            
+
             if self.safeRect and not self.safeRect.contains(new_pixel_pos):
                 self.recenterMouse()
-                return True 
-        
-        return False 
+                return True
+
+        return False
 
     def canvasPressEvent(self, event):
-            
-        mapPoint = self.toMapCoordinates(event.pos())   
-        coordFormat = (float(mapPoint.x()), float(mapPoint.y())) 
-        self.mouseClicked.emit(event.button(),coordFormat)
-        
-        if self.activateDrawing: 
+
+        mapPoint = self.toMapCoordinates(event.pos())
+        coordFormat = (float(mapPoint.x()), float(mapPoint.y()))
+        self.mouseClicked.emit(event.button(), coordFormat)
+
+        if self.activateDrawing:
             if event.button() == Qt.LeftButton:
-                
                 if not self.drawing:
                     self.rubberBand.reset(QgsWkbTypes.GeometryType.LineGeometry)
                     self.rubberBand.addPoint(mapPoint)
                     self.drawing = True
                 else:
                     self.rubberBand.addPoint(mapPoint)
-            
+
             elif event.button() == Qt.RightButton and self.drawing:
                 self.drawing = False
                 self.rubberBand.reset(QgsWkbTypes.GeometryType.LineGeometry)
-        
+
         event.accept()
 
     def recenterMouse(self):
         if not self.centerGlobalPos or not self.currentMouseCoord:
             return
-        
+
         if self.ignoringSyntheticMove:
             return
 
         target_map_coord = self.currentMouseCoord
 
         # Lock the filter and warp
-        self.ignoringSyntheticMove = True   
+        self.ignoringSyntheticMove = True
         # Snap map to current coord
         self.canvas.setCenter(self.currentMouseCoord)
         self.canvas.refresh()
-        
-        QCursor.setPos(self.centerGlobalPos)    
+
+        QCursor.setPos(self.centerGlobalPos)
 
         self.currentMouseCoord = target_map_coord
-        self.lastEmittedCoord = target_map_coord    
-        
+        self.lastEmittedCoord = target_map_coord
+
         # Wait 20ms for OS to finish the jump before unlocking the filter
-        #QTimer.singleShot(20, self.clearSyntheticGuard) 
+        # QTimer.singleShot(20, self.clearSyntheticGuard)
         QCoreApplication.processEvents(QEventLoop.ExcludeUserInputEvents)
-        QTimer.singleShot(0, self.clearSyntheticGuard) 
-    
+        QTimer.singleShot(0, self.clearSyntheticGuard)
+
     def clearSyntheticGuard(self):
         self.ignoringSyntheticMove = False
 
-    def sendMouseMovePos(self): 
+    def sendMouseMovePos(self):
         if self.currentMouseCoord != self.lastEmittedCoord:
-
-            coordFormat = (float(self.currentMouseCoord.x()), float(self.currentMouseCoord.y()))
+            coordFormat = (
+                float(self.currentMouseCoord.x()),
+                float(self.currentMouseCoord.y()),
+            )
             self.mouseMoved.emit(coordFormat)
             self.lastEmittedCoord = self.currentMouseCoord
 
@@ -141,13 +148,17 @@ class navigationMapTool(QgsMapTool):
         factor = event.angleDelta().y()
         direction = -1 if factor < 0 else 1
         if event.modifiers() & Qt.ControlModifier:
-
-            #Changer pour des fonctions plus flexible pour diminuer le zoom a plus petite échelle
-            if direction == 1: self.canvas.zoomIn()
-            else: self.canvas.zoomOut()
+            # Changer pour des fonctions plus flexible pour diminuer le zoom a plus petite échelle
+            if direction == 1:
+                self.canvas.zoomIn()
+            else:
+                self.canvas.zoomOut()
             self.canvas.refresh()
 
-        coordFormat = (float(self.currentMouseCoord.x()), float(self.currentMouseCoord.y()))
+        coordFormat = (
+            float(self.currentMouseCoord.x()),
+            float(self.currentMouseCoord.y()),
+        )
         self.wheelActivate.emit(direction, event.modifiers(), coordFormat)
         event.accept()
 
@@ -155,19 +166,19 @@ class navigationMapTool(QgsMapTool):
         super().activate()
         self.activateMapTool()
 
-    def activateMapTool(self) : 
+    def activateMapTool(self):
         self.updateSafeZone()
-        
+
         # Install trap on the viewport
         self.canvas.viewport().installEventFilter(self)
         self.canvas.setMouseTracking(True)
-        
-        if self.centerGlobalPos: 
-            self.ignoringSyntheticMove = True        
-            QCursor.setPos(self.centerGlobalPos)        
-            QTimer.singleShot(20, self.clearSyntheticGuard) 
-            
-        #self.sendPosTimer.start()
+
+        if self.centerGlobalPos:
+            self.ignoringSyntheticMove = True
+            QCursor.setPos(self.centerGlobalPos)
+            QTimer.singleShot(20, self.clearSyntheticGuard)
+
+        # self.sendPosTimer.start()
         qApp.installEventFilter(self.interceptor)
         self.canvas.setFocus()
 
@@ -175,20 +186,18 @@ class navigationMapTool(QgsMapTool):
         self.deactivateMapTool()
         super().deactivate()
 
-    def deactivateMapTool(self) : 
+    def deactivateMapTool(self):
         self.canvas.viewport().removeEventFilter(self)
-        #self.sendPosTimer.stop()
+        # self.sendPosTimer.stop()
         self.rubberBand.reset(QgsWkbTypes.GeometryType.LineGeometry)
         qApp.removeEventFilter(self.interceptor)
         self.drawing = False
-        
 
     def updateSafeZone(self):
-        
+
         rect = self.canvas.viewport().rect()
         self.safeRect = rect.adjusted(
-            self.borderRange, self.borderRange,
-            -self.borderRange, -self.borderRange
+            self.borderRange, self.borderRange, -self.borderRange, -self.borderRange
         )
         self.centerGlobalPos = self.canvas.viewport().mapToGlobal(rect.center())
 
@@ -199,9 +208,9 @@ class navigationMapTool(QgsMapTool):
         self.keybordSignal.emit(event)
 
 
-#Autre méthode pour le mouse trap Windows seulement
+# Autre méthode pour le mouse trap Windows seulement
 
-'''
+"""
     # Windows cursor clip
     def _clip_windows(self):
         rect = self.canvas.rect()
@@ -218,4 +227,4 @@ class navigationMapTool(QgsMapTool):
     def _release_windows(self):
         ctypes.windll.user32.ClipCursor(None)
 
-    '''
+    """

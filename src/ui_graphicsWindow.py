@@ -1,6 +1,5 @@
 from qgis.PyQt import QtCore, QtGui, QtWidgets
 from qgis.PyQt.QtCore import Qt
-import os
 
 
 class ImageRoot(QtWidgets.QGraphicsObject):
@@ -12,6 +11,7 @@ class ImageRoot(QtWidgets.QGraphicsObject):
 
     def paint(self, painter, option, widget=None):
         pass
+
 
 class CursorItem(QtWidgets.QGraphicsItem):
     def __init__(self, radius=20):
@@ -25,7 +25,7 @@ class CursorItem(QtWidgets.QGraphicsItem):
     def boundingRect(self):
         pad = 3
         r = self.r + pad
-        return QtCore.QRectF(-r, -r, 2*r, 2*r)
+        return QtCore.QRectF(-r, -r, 2 * r, 2 * r)
 
     def paint(self, painter, option, widget=None):
         pen = QtGui.QPen(QtGui.QColor(0, 255, 255), 3)
@@ -34,6 +34,7 @@ class CursorItem(QtWidgets.QGraphicsItem):
         painter.drawLine(-self.r, 0, self.r, 0)
         painter.drawLine(0, -self.r, 0, self.r)
 
+
 class Ui_graphicsWindow(object):
     def setupUi(self, graphicsWindow):
         graphicsWindow.setObjectName("graphicsWindow")
@@ -41,24 +42,25 @@ class Ui_graphicsWindow(object):
         self.centralwidget = QtWidgets.QWidget(graphicsWindow)
         layout = QtWidgets.QVBoxLayout(self.centralwidget)
         layout.setContentsMargins(0, 0, 0, 0)
-        
+
         self.graphicsView = QtWidgets.QGraphicsView(self.centralwidget)
 
         fmt = QtGui.QSurfaceFormat()
         fmt.setSamples(4)  # Anti-aliasing for the tiles
-        
+
         self.gl_viewport = QtWidgets.QOpenGLWidget()
         self.gl_viewport.setFormat(fmt)
         self.graphicsView.setViewport(self.gl_viewport)
 
-        
         self.graphicsView.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.graphicsView.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.graphicsView.setRenderHint(QtGui.QPainter.SmoothPixmapTransform)
         self.graphicsView.setRenderHint(QtGui.QPainter.Antialiasing)
         self.graphicsView.setBackgroundBrush(QtGui.QColor(182, 182, 182))
 
-        self.graphicsView.setViewportUpdateMode(QtWidgets.QGraphicsView.FullViewportUpdate)
+        self.graphicsView.setViewportUpdateMode(
+            QtWidgets.QGraphicsView.FullViewportUpdate
+        )
         self.graphicsView.setTransformationAnchor(QtWidgets.QGraphicsView.NoAnchor)
         self.graphicsView.setResizeAnchor(QtWidgets.QGraphicsView.NoAnchor)
         self.graphicsView.setAlignment(Qt.AlignLeft | Qt.AlignTop)
@@ -101,7 +103,7 @@ class graphicsWindow(QtWidgets.QMainWindow):
         self.cursor = CursorItem(radius=20)
         self.scene.addItem(self.cursor)
 
-        self.tileGroupAction = 'safety'
+        self.tileGroupAction = "safety"
 
     def keyPressEvent(self, event):
         self.keyPressed.emit(event)
@@ -121,22 +123,24 @@ class graphicsWindow(QtWidgets.QMainWindow):
         self.cursor.setPos(scene_center)
 
     def findScaleAction(self, scale):
-        if scale < 0.1:   return 'safety'
-        elif scale < 0.5: return 'overview'
-        else:             return 'full'
+        if scale < 0.1:
+            return "safety"
+        elif scale < 0.5:
+            return "overview"
+        else:
+            return "full"
 
-    
     def custom_centerOn(self, target_scene_pos, scale, forceGroupCall=False):
         view = self.ui.graphicsView
 
-        #Le centrage passe par centerOn() et non par une translation intégrée à
-        #la transformation de la vue. Cette translation n'amène la cible au centre
-        #que si le décalage de défilement est nul, ce qui n'est jamais garanti :
-        #la scène fait 200 000 px, les barres de défilement sont masquées mais
-        #conservent leur valeur, et NoAnchor fait que setTransform() ne réancre
-        #rien. Le décalage résiduel persistait d'un chargement de paire au
-        #suivant et faisait dériver la vue de plusieurs dizaines de milliers de
-        #pixels hors de l'image (affichage gris, aucune tuile chargée).
+        # Le centrage passe par centerOn() et non par une translation intégrée à
+        # la transformation de la vue. Cette translation n'amène la cible au centre
+        # que si le décalage de défilement est nul, ce qui n'est jamais garanti :
+        # la scène fait 200 000 px, les barres de défilement sont masquées mais
+        # conservent leur valeur, et NoAnchor fait que setTransform() ne réancre
+        # rien. Le décalage résiduel persistait d'un chargement de paire au
+        # suivant et faisait dériver la vue de plusieurs dizaines de milliers de
+        # pixels hors de l'image (affichage gris, aucune tuile chargée).
         transform = QtGui.QTransform()
         transform.scale(scale, scale)
         view.setTransform(transform)
@@ -150,29 +154,30 @@ class graphicsWindow(QtWidgets.QMainWindow):
             self.tileGroupAction = newAction
 
     def addPixmap(self, q_img, scaleX, scaleY, topX, topY, groupId):
-        if groupId == 0 : tileGroup = self.fullviewTileGroup 
-        elif groupId == 1 : tileGroup = self.overviewTileGroup
-        else : tileGroup = self.safetyTileGroup
+        if groupId == 0:
+            tileGroup = self.fullviewTileGroup
+        elif groupId == 1:
+            tileGroup = self.overviewTileGroup
+        else:
+            tileGroup = self.safetyTileGroup
 
-        #q_img = QtGui.QImage(tile.data, tile.shape[1], tile.shape[0],tile.shape[1]*3, QtGui.QImage.Format_RGB888).copy()
+        # q_img = QtGui.QImage(tile.data, tile.shape[1], tile.shape[0],tile.shape[1]*3, QtGui.QImage.Format_RGB888).copy()
         pixmap = QtGui.QPixmap.fromImage(q_img)
 
         item = QtWidgets.QGraphicsPixmapItem(pixmap, self.imageRoot)
         item.setTransformationMode(Qt.FastTransformation)
         item.setPos(topX, topY)
-        #setScale() est isotrope : on passe par une transformation pour appliquer
-        #une échelle distincte sur chaque axe.
+        # setScale() est isotrope : on passe par une transformation pour appliquer
+        # une échelle distincte sur chaque axe.
         item.setTransform(QtGui.QTransform().scale(scaleX, scaleY))
         tileGroup.addToGroup(item)
-        
 
-    def resetTileGroup(self,remove=True) :
+    def resetTileGroup(self, remove=True):
 
-        if remove : 
+        if remove:
             self.scene.removeItem(self.fullviewTileGroup)
             self.scene.removeItem(self.overviewTileGroup)
             self.scene.removeItem(self.safetyTileGroup)
-
 
         self.fullviewTileGroup = QtWidgets.QGraphicsItemGroup()
         self.fullviewTileGroup.setZValue(0)
@@ -188,20 +193,18 @@ class graphicsWindow(QtWidgets.QMainWindow):
 
         self.imageRoot.setTransform(QtGui.QTransform())
 
-    def manageTileGroupViewing(self, action='full'):
-        if action == 'full':
+    def manageTileGroupViewing(self, action="full"):
+        if action == "full":
             self.fullviewTileGroup.show()
             self.overviewTileGroup.hide()
-            self.safetyTileGroup.show() 
+            self.safetyTileGroup.show()
 
-        elif action == 'overview':
+        elif action == "overview":
             self.fullviewTileGroup.hide()
             self.overviewTileGroup.show()
             self.safetyTileGroup.show()
 
-        elif action == 'safety':
+        elif action == "safety":
             self.fullviewTileGroup.hide()
             self.overviewTileGroup.hide()
             self.safetyTileGroup.show()
-
-

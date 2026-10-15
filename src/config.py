@@ -1,10 +1,10 @@
-'''
+"""
 Paramètres de configuration du plugin StereoPhoto
 
 Toute valeur qui influence le comportement de l'application est déclarée ici,
 nommée avec son rôle et son unité. Une valeur modifiée ici s'applique à tous
 les modules qui l'utilisent.
-'''
+"""
 
 # Découverte des paires de photos (gestionDossier.py) et navigation (stereoPhoto.py)
 

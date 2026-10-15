@@ -1,11 +1,11 @@
-'''
+"""
 Lecture des fichiers PAR
 
 Un fichier PAR accompagne chaque photo et décrit la caméra qui l'a prise :
 transformation affine, focale, position, orientation, taille du pixel. Ce
 module contient l'unique lecture de ce format; les modules appelants
 interprètent ensuite les champs dont ils ont besoin.
-'''
+"""
 
 # Champs PAR lus par le plugin. La valeur décrit le champ, seules les clés sont
 # utilisées à la lecture. Tous les modules lisent le même ensemble, chacun
@@ -27,19 +27,19 @@ PAR_REQUIRED_KEYWORDS = ("$PARAFFINE00", "$PARINVAFF00", "$FOC00", "$XYZ00", "$O
 
 
 def parse_par_file(path, keywords=None):
-    '''Lit un fichier PAR et retourne ses champs sous la forme
+    """Lit un fichier PAR et retourne ses champs sous la forme
     {clé: jetons de la ligne}, le premier jeton étant la clé elle-même.
 
     Les champs absents du fichier sont absents du dictionnaire : c'est à
     l'appelant de vérifier leur présence (voir PAR_REQUIRED_KEYWORDS).
     Seule la première occurrence d'un champ est retenue.
-    '''
+    """
 
     if keywords is None:
         keywords = PAR_KEYWORDS
 
     try:
-        with open(path, encoding='utf-8') as f:
+        with open(path, encoding="utf-8") as f:
             lines = f.read().splitlines()
     except UnicodeDecodeError:
         # Les fichiers PAR de la DIF sont produits sous Windows en français et
@@ -51,7 +51,7 @@ def parse_par_file(path, keywords=None):
         # les champs descriptifs ($FCAM00, $DESCR), jamais lus par le plugin :
         # errors='replace' garantit la lecture des paramètres de caméra même
         # si un octet n'est pas défini dans Windows-1252.
-        with open(path, encoding='cp1252', errors='replace') as f:
+        with open(path, encoding="cp1252", errors="replace") as f:
             lines = f.read().splitlines()
 
     values = {}
