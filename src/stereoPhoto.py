@@ -1168,6 +1168,7 @@ class stereoPhoto(object):
 
     def updateUserAltitude(self):
         gwL = self.graphWindowLeft.ui.graphicsView
+        gwR = self.graphWindowRight.ui.graphicsView
 
         sceneCenterL = gwL.mapToScene(gwL.viewport().rect().center())
         cPixelL = self.graphWindowLeft.imageRoot.mapFromScene(sceneCenterL)
@@ -1569,6 +1570,7 @@ class stereoPhoto(object):
         scaleY = self.leftPicSize[1] / scaleFactor
 
         gwL = self.graphWindowLeft.ui.graphicsView
+        gwR = self.graphWindowRight.ui.graphicsView
 
         scaleW = gwL.viewport().width() / scaleX
         scaleH = gwL.viewport().height() / scaleY
