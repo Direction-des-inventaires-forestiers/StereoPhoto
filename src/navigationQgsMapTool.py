@@ -34,6 +34,12 @@ class navigationMapTool(QgsMapTool):
 
         self.ignoringSyntheticMove = False
 
+        # Comportement de navigation (exigence EF-03). False : les photos
+        # défilent sous un curseur ramené au centre par recenterMouse().
+        # True : le piège à souris est levé, le curseur parcourt les photos.
+        # L'état est posé par stereoPhoto, qui porte le bouton de bascule.
+        self.curseurLibre = False
+
         self.rubberBand = QgsRubberBand(
             self.canvas, QgsWkbTypes.GeometryType.LineGeometry
         )
@@ -80,7 +86,13 @@ class navigationMapTool(QgsMapTool):
                 else:
                     self.rubberBand.addPoint(mapPoint)
 
-            if self.safeRect and not self.safeRect.contains(new_pixel_pos):
+            # Piège à souris, propre au mode synchronisé : sorti de la zone
+            # sûre, le curseur est ramené au centre et la carte suit.
+            if (
+                not self.curseurLibre
+                and self.safeRect
+                and not self.safeRect.contains(new_pixel_pos)
+            ):
                 self.recenterMouse()
                 return True
 
@@ -108,6 +120,10 @@ class navigationMapTool(QgsMapTool):
         event.accept()
 
     def recenterMouse(self):
+        if self.curseurLibre:
+            # Le curseur parcourt les photos : rien à recentrer.
+            return
+
         if not self.centerGlobalPos or not self.currentMouseCoord:
             return
 
@@ -173,7 +189,9 @@ class navigationMapTool(QgsMapTool):
         self.canvas.viewport().installEventFilter(self)
         self.canvas.setMouseTracking(True)
 
-        if self.centerGlobalPos:
+        # Curseur amené au centre à l'activation, en mode synchronisé seulement :
+        # en mode curseur libre, il doit rester là où le photo-interprète l'a mis.
+        if self.centerGlobalPos and not self.curseurLibre:
             self.ignoringSyntheticMove = True
             QCursor.setPos(self.centerGlobalPos)
             QTimer.singleShot(20, self.clearSyntheticGuard)

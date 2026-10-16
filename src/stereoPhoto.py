@@ -60,6 +60,7 @@ from .gestionDossier import (
     compute_overlap,
 )
 from .config import (
+    NAVIGATION_CURSEUR_LIBRE_PAR_DEFAUT,
     PAR_CAMERA_ORIENTATION_TOLERANCE_DEG,
     DRAW_LINE_PEN_WIDTH_PX,
     GEOMETRY_PEN_WIDTH_PX,
@@ -118,6 +119,11 @@ class stereoPhoto(object):
         )
 
         self.actionUnlockCursor.setCheckable(True)
+        self.actionUnlockCursor.setChecked(NAVIGATION_CURSEUR_LIBRE_PAR_DEFAUT)
+        # Connexion posée ici, et non dans setConnection() : l'action survit à
+        # la fermeture de la session, alors que setConnection() est rejouée à
+        # chaque ouverture et empilerait les connexions.
+        self.actionUnlockCursor.toggled.connect(self.basculerCurseurLibre)
 
         self.toolbarST.addAction(self.actionMainMenu)
         self.toolbarST.addAction(self.actionSuivreMNT)
@@ -147,6 +153,9 @@ class stereoPhoto(object):
 
             self.optWindow = optionWindow(self.iface)
             self.navigMapTool = navigationMapTool(self.canvas, self.iface)
+            # L'outil est neuf à chaque ouverture : il reprend le comportement
+            # de navigation que porte le bouton de la barre d'outils.
+            self.navigMapTool.curseurLibre = self.actionUnlockCursor.isChecked()
 
             self.setConnection()
             self.optWindow.loadParamFile()
@@ -1000,6 +1009,24 @@ class stereoPhoto(object):
             self.canvas.setMapTool(self.navigMapTool)
             self.canvas.setFocus()
 
+    # Bascule entre les deux comportements de navigation de l'exigence EF-03 :
+    #   décoché — les photos se déplacent sous un curseur immobile au centre
+    #   coché   — le curseur se déplace sur les photos, qui restent fixes
+    # Le changement prend effet au mouvement de souris suivant : mouseMoveEvent()
+    # et wheelActionEvent() lisent l'état de l'outil à chaque appel.
+    def basculerCurseurLibre(self, actif):
+        if not hasattr(self, "navigMapTool"):
+            # Aucune session ouverte. L'état est relu par run() à l'ouverture.
+            return
+
+        self.navigMapTool.curseurLibre = actif
+        self.journal.info(
+            "Comportement de navigation : %s",
+            "le curseur se déplace sur les photos"
+            if actif
+            else "les photos se déplacent sous le curseur",
+        )
+
     # Fonction appelée lorsque les touches respectives du clavier sont appuyées
     # Les touches sont utiles lorsque le mode pan est en cours d'utilisation
     # Possibilité d'ajouter d'autres fonctions plus tard
@@ -1021,6 +1048,10 @@ class stereoPhoto(object):
             elif event.key() == QtCore.Qt.Key_M:
                 if self.optWindow.mntArr is not None:
                     self.actionSuivreMNT.toggle()
+
+            elif event.key() == QtCore.Qt.Key_C:
+                # Raccourci annoncé par l'infobulle du bouton de la barre d'outils.
+                self.actionUnlockCursor.toggle()
 
         event.accept()
 
@@ -1166,15 +1197,26 @@ class stereoPhoto(object):
         self.updateUserAltitude()
         self.buttonPosition = None
 
-    def updateUserAltitude(self):
-        gwL = self.graphWindowLeft.ui.graphicsView
-        gwR = self.graphWindowRight.ui.graphicsView
+    def updateUserAltitude(self, cPixelL=None, cPixelR=None):
+        """Met à jour l'altitude du curseur d'après ses deux positions image.
 
-        sceneCenterL = gwL.mapToScene(gwL.viewport().rect().center())
-        cPixelL = self.graphWindowLeft.imageRoot.mapFromScene(sceneCenterL)
+        L'altitude vient de l'écart entre la position de la croix sur la photo
+        de gauche et sur celle de droite, c'est-à-dire de la parallaxe.
 
-        sceneCenterR = gwR.mapToScene(gwR.viewport().rect().center())
-        cPixelR = self.graphWindowRight.imageRoot.mapFromScene(sceneCenterR)
+        Sans argument, les positions prises sont les centres des deux vues :
+        c'est le cas du mode synchronisé, où la croix y est immobile. En mode
+        curseur libre (EF-03), les photos ne bougent pas et la croix n'est plus
+        au centre : les appelants passent alors sa position sur chaque image.
+        """
+        if cPixelL is None or cPixelR is None:
+            gwL = self.graphWindowLeft.ui.graphicsView
+            gwR = self.graphWindowRight.ui.graphicsView
+
+            sceneCenterL = gwL.mapToScene(gwL.viewport().rect().center())
+            cPixelL = self.graphWindowLeft.imageRoot.mapFromScene(sceneCenterL)
+
+            sceneCenterR = gwR.mapToScene(gwR.viewport().rect().center())
+            cPixelR = self.graphWindowRight.imageRoot.mapFromScene(sceneCenterR)
 
         self.cursorAltitude = self.dualManager.calculateZ(
             (cPixelL.x(), cPixelL.y()), (cPixelR.x(), cPixelR.y())
@@ -1255,12 +1297,20 @@ class stereoPhoto(object):
         scenePointL = self.graphWindowLeft.imageRoot.mapToScene(self.endDrawPointLeft)
         scenePointR = self.graphWindowRight.imageRoot.mapToScene(self.endDrawPointRight)
 
-        scale = self.currentScale
+        curseurLibre = self.navigMapTool.curseurLibre
+
         self.graphWindowLeft.ui.graphicsView.setUpdatesEnabled(False)
         self.graphWindowRight.ui.graphicsView.setUpdatesEnabled(False)
 
-        self.graphWindowLeft.custom_centerOn(scenePointL, scale)
-        self.graphWindowRight.custom_centerOn(scenePointR, scale)
+        if curseurLibre:
+            # Les photos restent fixes, seule la croix parcourt l'image.
+            self.graphWindowLeft.placerCroix(scenePointL)
+            self.graphWindowRight.placerCroix(scenePointR)
+        else:
+            # Les photos défilent sous la croix, immobile au centre des vues.
+            scale = self.currentScale
+            self.graphWindowLeft.custom_centerOn(scenePointL, scale)
+            self.graphWindowRight.custom_centerOn(scenePointR, scale)
 
         self.graphWindowLeft.ui.graphicsView.setUpdatesEnabled(True)
         self.graphWindowRight.ui.graphicsView.setUpdatesEnabled(True)
@@ -1269,7 +1319,10 @@ class stereoPhoto(object):
         self.graphWindowLeft.ui.graphicsView.viewport().update()
         self.graphWindowRight.ui.graphicsView.viewport().update()
 
-        self.updateUserAltitude()
+        if curseurLibre:
+            self.updateUserAltitude(self.endDrawPointLeft, self.endDrawPointRight)
+        else:
+            self.updateUserAltitude()
 
         pourcent = 2 / 100
         deltaX = self.leftPicSize[0] * pourcent
@@ -1349,10 +1402,18 @@ class stereoPhoto(object):
         scenePointL = self.graphWindowLeft.imageRoot.mapToScene(QPointF(pxL, pyL))
         scenePointR = self.graphWindowRight.imageRoot.mapToScene(QPointF(pxR, pyR))
 
-        self.graphWindowLeft.custom_centerOn(scenePointL, self.currentScale)
-        self.graphWindowRight.custom_centerOn(scenePointR, self.currentScale)
-
-        self.updateUserAltitude()
+        # En mode curseur libre, la roulette seule règle la parallaxe sans
+        # bouger les photos : la croix se décale sur chaque image. Le zoom
+        # (CTRL + roulette) recadre les vues dans les deux modes, puisqu'il
+        # change l'échelle d'affichage et non la position du curseur.
+        if self.navigMapTool.curseurLibre and not modifier & Qt.ControlModifier:
+            self.graphWindowLeft.placerCroix(scenePointL)
+            self.graphWindowRight.placerCroix(scenePointR)
+            self.updateUserAltitude(self.endDrawPointLeft, self.endDrawPointRight)
+        else:
+            self.graphWindowLeft.custom_centerOn(scenePointL, self.currentScale)
+            self.graphWindowRight.custom_centerOn(scenePointR, self.currentScale)
+            self.updateUserAltitude()
 
         if (
             not self.firstDrawClick

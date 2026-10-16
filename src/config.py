@@ -23,6 +23,15 @@ PAR_DIRECTION_BUFFER_M = 500
 # Chevauchement minimal (ratio de la plus petite emprise) pour retenir un voisin haut/bas
 PAR_MIN_OVERLAP_RATIO = 0.05
 
+# Navigation (navigationQgsMapTool.py, stereoPhoto.py)
+
+# Comportement de navigation à l'ouverture d'une session (exigence EF-03) :
+#   False — les photos se déplacent sous un curseur immobile au centre de la vue
+#   True  — le curseur se déplace sur les photos, qui restent fixes
+# Le photo-interprète bascule d'un comportement à l'autre en cours de session,
+# par le bouton « Débarrer le curseur » de la barre d'outils ou par la touche C.
+NAVIGATION_CURSEUR_LIBRE_PAR_DEFAUT = False
+
 # Interface graphique (stereoPhoto.py)
 
 # Épaisseur du trait de la ligne en cours de tracé (pixels écran)

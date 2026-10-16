@@ -119,8 +119,18 @@ class graphicsWindow(QtWidgets.QMainWindow):
     def centerCrosshair(self):
         view = self.ui.graphicsView
         scene_center = view.mapToScene(view.viewport().rect().center())
+        self.placerCroix(scene_center)
+
+    def placerCroix(self, scene_pos):
+        """Place la croix à une position de la scène.
+
+        En mode synchronisé, cette position est toujours le centre de la vue,
+        et centerCrosshair() l'appelle. En mode curseur libre (exigence EF-03),
+        l'image reste fixe et c'est la croix qui se déplace : stereoPhoto passe
+        alors la position du curseur sur l'image.
+        """
         self.cursor.prepareGeometryChange()
-        self.cursor.setPos(scene_center)
+        self.cursor.setPos(scene_pos)
 
     def findScaleAction(self, scale):
         if scale < 0.1:
