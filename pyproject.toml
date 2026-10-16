@@ -1,4 +1,4 @@
-# Contrôle automatique du style (issue GOV-01, décision D-13 de la DIF).
+# Contrôle automatique du style.
 #
 # Norme de référence : PEP 8, complétée par PEP 257 pour la forme des docstrings.
 # Un seul outil l'applique, ruff, en deux rôles séparés :

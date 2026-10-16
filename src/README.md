@@ -31,9 +31,15 @@
 
 **ui_getVectorLayer.py** : Petite fenêtre pour la sélection de la couche vectoriel
 
-**ui_optionWindow.py** : Gestion de l’interface graphique pour le menu principale, quelques fonctions sur dans le ficher comme le drag and drop pour le fichier d’images ou le modèle numérique de terrain.
+**ui_widgetStereoPhoto.py** : Gestion de l’interface graphique pour le menu principal et pour le menu des paramètres, avec les fonctions qui les font fonctionner. On y trouve aussi quelques fonctions comme le drag and drop pour le fichier d’images ou le modèle numérique de terrain. La classe optionWindow est celle que stereoPhoto.py utilise. Ce fichier portait auparavant les noms ui_optionWindow.py et ui_paramWindow.py.
 
-**ui_paramWindow.py** : Interface graphique pour le menu des paramètres ainsi que les fonctions pour le faire fonctionner.  
+**gestionDossier.py** : Fichier pour le parcours d’un dossier de photos : lecture des fichiers PAR, recherche des paires possibles, des quatre voisins de chaque image et de la paire la plus proche d’une coordonnée. Le calcul du chevauchement entre deux photos s’y trouve également.
+
+**parFile.py** : Lecture des fichiers PAR, au même endroit pour tous les modules. Le fichier PAR accompagne chaque photo et décrit la caméra qui l’a prise : transformation affine, focale, position, orientation, taille du pixel. Le module ne dépend ni de QGIS ni de Qt, ce qui le rend directement testable.
+
+**config.py** : Les valeurs qui influencent l’affichage et la navigation, regroupées en un seul endroit et nommées avec leur rôle et leur unité : tolérance d’orientation de la caméra, tampons de recherche des paires, chevauchement minimal, épaisseurs de trait, rayon des points, réglages du journal.
+
+**journal.py** : Journalisation de l’extension dans des fichiers, sous le profil QGIS de l’utilisateur (`stereophoto/logs`). Un fichier par jour, archivé au changement de journée et conservé 90 jours. Les messages vont aussi dans l’onglet StereoPhoto du panneau des journaux de QGIS. À utiliser à la place de print(), dont la sortie est perdue hors de la console Python.
 
 **worldManager.py** : Fichier qui contient les fonctions liées à la stéréoscopie/photogrammétrie. Il permet de transformer un point en coordonnée et vice-versa. Il permet aussi de calculer l’altitude Z à partir des deux images. 
 
