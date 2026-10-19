@@ -721,7 +721,7 @@ class optionWindow(QtWidgets.QDockWidget):
             screenGeo = desktop.screenGeometry(i)
             center = (int(screenGeo.width() / 2), int(screenGeo.height() / 2))
             # rect = QtCore.QRect(0,0,125,175)
-            graphWin = graphicsWindow()
+            graphWin = fenetreNumeroEcran()
             graphWin.resize(125, 175)
             # graphWin.ui.graphicsView.setGeometry(rect)
             graphWin.move(
@@ -748,7 +748,16 @@ class optionWindow(QtWidgets.QDockWidget):
         self.listGraphWinObj.clear()
 
 
-class graphicsWindow(QtWidgets.QMainWindow):
+class fenetreNumeroEcran(QtWidgets.QMainWindow):
+    """Vignette qui affiche le numéro d'un écran, pour « Voir Écran ».
+
+    Elle réemploie la disposition de ui_graphicsWindow.py mais n'est pas la
+    fenêtre de photo : celle-ci est la classe graphicsWindow du même fichier,
+    qui porte la scène, imageRoot et la croix. Les deux ont longtemps porté le
+    même nom, ce qui rendait indécelable une correction de navigation posée sur
+    la mauvaise (relevé au traitement de l'issue A8).
+    """
+
     def __init__(self):
         QtWidgets.QMainWindow.__init__(self)
         self.ui = Ui_graphicsWindow()

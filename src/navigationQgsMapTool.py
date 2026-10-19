@@ -1,8 +1,16 @@
-from qgis.PyQt.QtCore import *
-from qgis.PyQt.QtGui import *
-from qgis.PyQt.QtWidgets import *
-from qgis.gui import QgsMapTool, QgsRubberBand
 from qgis.core import QgsWkbTypes
+from qgis.gui import QgsMapTool, QgsRubberBand
+from qgis.PyQt.QtCore import (
+    QCoreApplication,
+    QEvent,
+    QEventLoop,
+    QObject,
+    Qt,
+    QTimer,
+    pyqtSignal,
+)
+from qgis.PyQt.QtGui import QCursor, QKeyEvent
+from qgis.PyQt.QtWidgets import qApp
 
 
 class keyboardInterceptor(QObject):

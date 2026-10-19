@@ -30,11 +30,22 @@ Optimisation futur
 
 import numpy as np
 
-from qgis.gui import *
-from qgis.core import *
-from qgis.PyQt.QtWidgets import *
-from qgis.PyQt.QtCore import *
-from qgis.PyQt.QtGui import *
+from qgis.PyQt.QtCore import (
+    QObject,
+    QPoint,
+    QRectF,
+    Qt,
+    QThread,
+    QTimer,
+    pyqtSignal,
+)
+from qgis.PyQt.QtGui import QImage, QPixmap, QTransform
+from qgis.PyQt.QtWidgets import (
+    QApplication,
+    QGraphicsPixmapItem,
+    QGraphicsScene,
+    QGraphicsView,
+)
 
 
 from .ui_enhancement import enhanceWindow

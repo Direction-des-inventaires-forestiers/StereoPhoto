@@ -37,11 +37,33 @@ Dans EFOTO, il semble avoir un décalage de 16 pixels en x et en y pour la photo
 
 """
 
-from qgis.gui import *
-from qgis.core import *
-from qgis.PyQt.QtWidgets import *
-from qgis.PyQt.QtCore import *
-from qgis.PyQt.QtGui import *
+from qgis.core import (
+    QgsGeometry,
+    QgsLineString,
+    QgsPoint,
+    QgsPointXY,
+    QgsProject,
+    QgsRectangle,
+    QgsWkbTypes,
+)
+from qgis.PyQt.QtCore import QEvent, QLineF, QPointF, QRectF, Qt, QThread
+from qgis.PyQt.QtGui import (
+    QBrush,
+    QColor,
+    QGuiApplication,
+    QIcon,
+    QPen,
+    QTransform,
+)
+from qgis.PyQt.QtWidgets import (
+    QAction,
+    QApplication,
+    QGraphicsEllipseItem,
+    QGraphicsLineItem,
+    QGraphicsPathItem,
+    QGraphicsPolygonItem,
+    QGraphicsRectItem,
+)
 
 from . import resources  # noqa: F401 — enregistre les icônes auprès de Qt
 
@@ -49,7 +71,13 @@ from .ui_graphicsWindow import graphicsWindow
 from .ui_getVectorLayer import getImageListDialog
 from .worldManager import pictureManager, dualManager, createWKTString
 from .enhanceManager import enhanceManager, threadShow
-from .drawFunction import *
+from .drawFunction import (
+    addPoint,
+    addPolygon,
+    calculatePolygon,
+    cutPolygon,
+    mergePolygon,
+)
 from .navigationQgsMapTool import navigationMapTool
 from .ui_widgetStereoPhoto import optionWindow
 
@@ -902,28 +930,28 @@ class stereoPhoto(object):
         y1 = offLY + self.leftPicSize[1]
 
         # Left side
-        gr1L = QtCore.QRectF(x0 - dval, y0 - dval, dval, (y1 - y0) + 2 * dval)
+        gr1L = QRectF(x0 - dval, y0 - dval, dval, (y1 - y0) + 2 * dval)
         rectObj = QGraphicsRectItem(gr1L, self.graphWindowLeft.imageRoot)
         rectObj.setBrush(QBrush(color))
         rectObj.setPen(QPen(color))
         self.graphWindowLeft.offboundRectGroup.addToGroup(rectObj)
 
         # Right side
-        gr2L = QtCore.QRectF(x1, y0 - dval, dval, (y1 - y0) + 2 * dval)
+        gr2L = QRectF(x1, y0 - dval, dval, (y1 - y0) + 2 * dval)
         rectObj = QGraphicsRectItem(gr2L, self.graphWindowLeft.imageRoot)
         rectObj.setBrush(QBrush(color))
         rectObj.setPen(QPen(color))
         self.graphWindowLeft.offboundRectGroup.addToGroup(rectObj)
 
         # Top
-        gr3L = QtCore.QRectF(x0, y0 - dval, (x1 - x0), dval)
+        gr3L = QRectF(x0, y0 - dval, (x1 - x0), dval)
         rectObj = QGraphicsRectItem(gr3L, self.graphWindowLeft.imageRoot)
         rectObj.setBrush(QBrush(color))
         rectObj.setPen(QPen(color))
         self.graphWindowLeft.offboundRectGroup.addToGroup(rectObj)
 
         # Bottom
-        gr4L = QtCore.QRectF(x0, y1, (x1 - x0), dval)
+        gr4L = QRectF(x0, y1, (x1 - x0), dval)
         rectObj = QGraphicsRectItem(gr4L, self.graphWindowLeft.imageRoot)
         rectObj.setBrush(QBrush(color))
         rectObj.setPen(QPen(color))
@@ -936,28 +964,28 @@ class stereoPhoto(object):
         y1 = offRY + self.rightPicSize[1]
 
         # Left side
-        gr1R = QtCore.QRectF(x0 - dval, y0 - dval, dval, (y1 - y0) + 2 * dval)
+        gr1R = QRectF(x0 - dval, y0 - dval, dval, (y1 - y0) + 2 * dval)
         rectObj = QGraphicsRectItem(gr1R, self.graphWindowRight.imageRoot)
         rectObj.setBrush(QBrush(color))
         rectObj.setPen(QPen(color))
         self.graphWindowRight.offboundRectGroup.addToGroup(rectObj)
 
         # Right side
-        gr2R = QtCore.QRectF(x1, y0 - dval, dval, (y1 - y0) + 2 * dval)
+        gr2R = QRectF(x1, y0 - dval, dval, (y1 - y0) + 2 * dval)
         rectObj = QGraphicsRectItem(gr2R, self.graphWindowRight.imageRoot)
         rectObj.setBrush(QBrush(color))
         rectObj.setPen(QPen(color))
         self.graphWindowRight.offboundRectGroup.addToGroup(rectObj)
 
         # Top
-        gr3R = QtCore.QRectF(x0, y0 - dval, (x1 - x0), dval)
+        gr3R = QRectF(x0, y0 - dval, (x1 - x0), dval)
         rectObj = QGraphicsRectItem(gr3R, self.graphWindowRight.imageRoot)
         rectObj.setBrush(QBrush(color))
         rectObj.setPen(QPen(color))
         self.graphWindowRight.offboundRectGroup.addToGroup(rectObj)
 
         # Bottom
-        gr4R = QtCore.QRectF(x0, y1, (x1 - x0), dval)
+        gr4R = QRectF(x0, y1, (x1 - x0), dval)
         rectObj = QGraphicsRectItem(gr4R, self.graphWindowRight.imageRoot)
         rectObj.setBrush(QBrush(color))
         rectObj.setPen(QPen(color))
@@ -1031,25 +1059,25 @@ class stereoPhoto(object):
     # Les touches sont utiles lorsque le mode pan est en cours d'utilisation
     # Possibilité d'ajouter d'autres fonctions plus tard
     def keyboardHandler(self, event):
-        if event.type() == QtCore.QEvent.KeyPress:
-            if event.key() == QtCore.Qt.Key_Escape:
+        if event.type() == QEvent.KeyPress:
+            if event.key() == Qt.Key_Escape:
                 self.windowHandler("qgis")
 
-            elif event.key() in range(QtCore.Qt.Key_F5, QtCore.Qt.Key_F13):
-                val = event.key() - QtCore.Qt.Key_F5
+            elif event.key() in range(Qt.Key_F5, Qt.Key_F13):
+                val = event.key() - Qt.Key_F5
                 self.keyboardZoom(val)
 
-            elif event.key() == QtCore.Qt.Key_1:
+            elif event.key() == Qt.Key_1:
                 if self.optWindow.ui.radioButtonDraw.isChecked():
                     self.optWindow.ui.radioButtonCut.setChecked(True)
                 else:
                     self.optWindow.ui.radioButtonDraw.setChecked(True)
 
-            elif event.key() == QtCore.Qt.Key_M:
+            elif event.key() == Qt.Key_M:
                 if self.optWindow.mntArr is not None:
                     self.actionSuivreMNT.toggle()
 
-            elif event.key() == QtCore.Qt.Key_C:
+            elif event.key() == Qt.Key_C:
                 # Raccourci annoncé par l'infobulle du bouton de la barre d'outils.
                 self.actionUnlockCursor.toggle()
 

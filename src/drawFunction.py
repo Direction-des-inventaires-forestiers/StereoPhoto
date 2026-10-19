@@ -19,12 +19,19 @@ Des fonctionnalités supplémentaires seront ajouter dans le futur pour agrémen
     et bien d'autre
 """
 
-from qgis.gui import *
-from qgis.core import *
+from qgis.core import (
+    QgsCoordinateReferenceSystem,
+    QgsFeature,
+    QgsField,
+    QgsFields,
+    QgsMapLayerType,
+    QgsVectorFileWriter,
+    QgsVectorLayerEditUtils,
+    QgsWkbTypes,
+)
 from qgis.utils import iface
-from qgis.PyQt.QtWidgets import *
-from qgis.PyQt.QtCore import *
-from qgis.PyQt.QtGui import *
+from qgis.PyQt.QtCore import QPointF, QThread, QVariant
+from qgis.PyQt.QtGui import QPainterPath, QPolygonF
 
 import math
 from osgeo import gdal
@@ -32,7 +39,7 @@ from .journal import obtenir_journal
 import numpy as np
 from .worldManager import pictureManager, dualManager
 
-# Journal du module; le préfixe « _ » l'exclut des imports étoile
+# Journal du module; le préfixe « _ » le réserve à l'usage interne
 _journal = obtenir_journal(__name__)
 
 

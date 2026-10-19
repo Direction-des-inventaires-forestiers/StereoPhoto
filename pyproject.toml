@@ -53,8 +53,11 @@ extend-exclude = [
 # pour le code qui doit rester compatible avec une interface existante.
 #
 # Élargissement prévu, une décision à la fois : I (tri des imports), puis B
-# (bogues courants), puis retrait de l'exception sur les imports étoile (A8).
+# (bogues courants).
+#
+# Aucune règle n'est ignorée depuis le traitement de l'issue A8 : les imports
+# étoile de QGIS et de Qt ont été remplacés par des imports nommés, et F403 et
+# F405 sont sortis de la liste d'exceptions. C'est ce qui rend F821 (nom non
+# défini) de nouveau opérant — l'inférence des noms est abandonnée pour tout un
+# fichier dès qu'il porte un seul import étoile.
 select = ["E4", "E7", "E9", "F"]
-# Imports étoile de QGIS et de Qt : convention de tout le code existant, que
-# PEP 8 interdit. Exception datée, à retirer au traitement de l'issue A8.
-ignore = ["F403", "F405"]
