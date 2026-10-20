@@ -140,7 +140,16 @@ class graphicsWindow(QtWidgets.QMainWindow):
         else:
             return "full"
 
-    def custom_centerOn(self, target_scene_pos, scale, forceGroupCall=False):
+    def custom_centerOn(
+        self, target_scene_pos, scale, forceGroupCall=False, recentrerCroix=True
+    ):
+        """Recadre la vue sur une position de la scène.
+
+        `recentrerCroix` à False laisse la croix où elle est : c'est ce qu'exige
+        le mode curseur libre (exigence EF-03), où la croix marque un point de
+        l'image et non le centre de la vue. Le défaut True conserve le
+        comportement de la navigation synchronisée.
+        """
         view = self.ui.graphicsView
 
         # Le centrage passe par centerOn() et non par une translation intégrée à
@@ -156,7 +165,8 @@ class graphicsWindow(QtWidgets.QMainWindow):
         view.setTransform(transform)
         view.centerOn(target_scene_pos)
 
-        self.centerCrosshair()
+        if recentrerCroix:
+            self.centerCrosshair()
 
         newAction = self.findScaleAction(scale)
         if self.tileGroupAction != newAction or forceGroupCall:

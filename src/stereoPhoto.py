@@ -79,6 +79,7 @@ from .drawFunction import (
     mergePolygon,
 )
 from .navigationQgsMapTool import navigationMapTool
+from .horsSyncQgsMapTool import horsSyncMapTool
 from .ui_widgetStereoPhoto import optionWindow
 
 from .gestionDossier import (
@@ -87,6 +88,7 @@ from .gestionDossier import (
     findPairWithCoord,
     compute_overlap,
 )
+from .orientationModele import directionProchainModele
 from .config import (
     NAVIGATION_CURSEUR_LIBRE_PAR_DEFAUT,
     PAR_CAMERA_ORIENTATION_TOLERANCE_DEG,
@@ -181,6 +183,9 @@ class stereoPhoto(object):
 
             self.optWindow = optionWindow(self.iface)
             self.navigMapTool = navigationMapTool(self.canvas, self.iface)
+            # Outil de l'état hors-synchronisation (décision D-14) : posé sur le
+            # canevas par windowHandler("qgis") là où l'outil était retiré.
+            self.horsSyncMapTool = horsSyncMapTool(self.canvas)
             # L'outil est neuf à chaque ouverture : il reprend le comportement
             # de navigation que porte le bouton de la barre d'outils.
             self.navigMapTool.curseurLibre = self.actionUnlockCursor.isChecked()
@@ -235,6 +240,10 @@ class stereoPhoto(object):
         self.cursorAltitude = None
         self.isLoadingPair = False
 
+        # Vrai entre ESC et le retour aux photos : les vues ne suivent plus le
+        # curseur, elles suivent le canevas de QGIS (exigence EF-03).
+        self.horsSynchronisation = False
+
     def setConnection(self):
 
         self.optWindow.ui.importLineProject.textChanged.connect(self.newPictureFile)
@@ -259,11 +268,17 @@ class stereoPhoto(object):
         self.navigMapTool.mouseMoved.connect(self.mouseMoveEvent)
         self.navigMapTool.keybordSignal.connect(self.keyboardHandler)
 
+        self.horsSyncMapTool.panDemande.connect(self.suivreCanevasHorsSync)
+        self.horsSyncMapTool.zoomDemande.connect(self.zoomerHorsSync)
+        self.horsSyncMapTool.retourSynchronise.connect(self.retourNavigationPhoto)
+
     # Fonction appelée lors de la fermeture du mOpt
     # Si l'on ferme le mOpt toutes les autres fenêtres Qt se ferment
     def closeAllSideWindows(self):
         self.enableShow = False
         self.canvas.unsetMapTool(self.navigMapTool)
+        self.canvas.unsetMapTool(self.horsSyncMapTool)
+        self.horsSynchronisation = False
         self.removeCurrentScene()
         self.deleteOldPolygon()
         if hasattr(self, "graphWindowLeft"):
@@ -425,7 +440,8 @@ class stereoPhoto(object):
         self.optWindow.ParamDict["position"]["scale"] = scaleStore
 
     def findNextPair(self, ori):
-        self.navigMapTool.deactivateMapTool()
+        if not self.horsSynchronisation:
+            self.navigMapTool.deactivateMapTool()
         self.setLastView()
 
         secondID = None
@@ -581,6 +597,12 @@ class stereoPhoto(object):
         QApplication.processEvents()
 
     def loadNewPair(self, ignoreMapTool=False):
+        # Le drapeau n'était jusqu'ici jamais levé, seulement abaissé : la garde
+        # de mouseMoveEvent() et de wheelActionEvent() ne protégeait rien. Un
+        # mouvement reçu pendant le chargement lisait des tuiles et un cadrage
+        # en cours de remplacement.
+        self.isLoadingPair = True
+
         self.removeCurrentScene()
 
         self.graphWindowLeft.ui.graphicsView.resetTransform()
@@ -658,7 +680,12 @@ class stereoPhoto(object):
         self.setExtent2Canvas()
 
         if ignoreMapTool:
-            self.navigMapTool.activateMapTool()
+            # Le chargement vient de la navigation elle-même : on remet l'outil
+            # de l'état courant, sans ramener les fenêtres photo au premier plan.
+            if self.horsSynchronisation:
+                self.canvas.setMapTool(self.horsSyncMapTool)
+            else:
+                self.navigMapTool.activateMapTool()
         else:
             self.windowHandler("picture")
 
@@ -1023,9 +1050,18 @@ class stereoPhoto(object):
         if window == "qgis":
             self.iface.mainWindow().raise_()
             self.iface.mainWindow().activateWindow()
-            self.canvas.unsetMapTool(self.navigMapTool)
 
+            # La vue est mémorisée avant la bascule : c'est elle qu'on
+            # retrouvera au retour par ESC.
             self.setLastView()
+
+            # Décision D-14 : le hors-synchronisation est un état porté par un
+            # outil, et non le retrait de l'outil de navigation. Sans outil, le
+            # zoom, le pan et le changement de modèle n'auraient aucun code pour
+            # s'exécuter. setMapTool() remplace l'outil courant de lui-même.
+            self.horsSynchronisation = True
+            self.canvas.setMapTool(self.horsSyncMapTool)
+            self.canvas.setFocus()
 
         if window == "picture":
             self.graphWindowRight.raise_()
@@ -1034,6 +1070,7 @@ class stereoPhoto(object):
             self.graphWindowLeft.activateWindow()
             self.iface.mainWindow().raise_()
             self.iface.mainWindow().activateWindow()
+            self.horsSynchronisation = False
             self.canvas.setMapTool(self.navigMapTool)
             self.canvas.setFocus()
 
@@ -1055,13 +1092,74 @@ class stereoPhoto(object):
             else "les photos se déplacent sous le curseur",
         )
 
+    # --- État hors-synchronisation (exigence EF-03, décision D-14) ---------
+    #
+    # Les trois récepteurs ci-dessous sont appelés après que l'outil a déjà
+    # déplacé ou zoomé le canevas de QGIS : les vues photo n'ont qu'à s'y
+    # réaligner. C'est l'inverse de setExtent2Canvas(), qui pousse la vue photo
+    # vers le canevas.
+
+    def suivreCanevasHorsSync(self):
+        """Pan « main » : les deux vues suivent le canevas, à échelle égale."""
+        self.recadrerVuesSurCanevas()
+
+    def zoomerHorsSync(self):
+        """Roulette : les deux vues suivent le canevas, échelle comprise."""
+        self.recadrerVuesSurCanevas(ajusterEchelle=True)
+
+    def retourNavigationPhoto(self):
+        """Retour en navigation synchronisée, sur la vue quittée."""
+        if self.enableShow:
+            self.windowHandler("picture")
+
+    def recadrerVuesSurCanevas(self, ajusterEchelle=False):
+        if self.isLoadingPair or not self.enableShow:
+            return
+        if self.cursorAltitude is None or not hasattr(self, "graphWindowLeft"):
+            return
+
+        if ajusterEchelle:
+            # Même calcul que la branche CTRL de wheelActionEvent() : l'échelle
+            # d'affichage des photos se déduit de celle du canevas.
+            self.currentScale = (
+                self.leftPictureManager.groundPixelSize / self.canvas.mapUnitsPerPixel()
+            )
+
+        centre = self.canvas.center()
+        coordCentre = (centre.x(), centre.y())
+
+        pxL, pyL = self.leftPictureManager.coordToPixel(
+            coordCentre, self.cursorAltitude
+        )
+        pxR, pyR = self.rightPictureManager.coordToPixel(
+            coordCentre, self.cursorAltitude
+        )
+
+        pointImageGauche = QPointF(pxL, pyL)
+        scenePointL = self.graphWindowLeft.imageRoot.mapToScene(pointImageGauche)
+        scenePointR = self.graphWindowRight.imageRoot.mapToScene(QPointF(pxR, pyR))
+
+        # La croix marque un point de l'image, pas le centre de la vue : un
+        # déplacement de vue ne doit pas l'emmener avec lui.
+        self.graphWindowLeft.custom_centerOn(
+            scenePointL, self.currentScale, recentrerCroix=False
+        )
+        self.graphWindowRight.custom_centerOn(
+            scenePointR, self.currentScale, recentrerCroix=False
+        )
+
+        self.changerModeleSiBordFranchi(pointImageGauche)
+
     # Fonction appelée lorsque les touches respectives du clavier sont appuyées
     # Les touches sont utiles lorsque le mode pan est en cours d'utilisation
     # Possibilité d'ajouter d'autres fonctions plus tard
     def keyboardHandler(self, event):
         if event.type() == QEvent.KeyPress:
             if event.key() == Qt.Key_Escape:
-                self.windowHandler("qgis")
+                if self.horsSynchronisation:
+                    self.retourNavigationPhoto()
+                else:
+                    self.windowHandler("qgis")
 
             elif event.key() in range(Qt.Key_F5, Qt.Key_F13):
                 val = event.key() - Qt.Key_F5
@@ -1352,29 +1450,11 @@ class stereoPhoto(object):
         else:
             self.updateUserAltitude()
 
-        pourcent = 2 / 100
-        deltaX = self.leftPicSize[0] * pourcent
-        deltaY = self.leftPicSize[1] * pourcent
+        rangeX, rangeY, horsCadre = self.bordFranchi(self.endDrawPointLeft)
 
-        rangeX = (
-            self.realCropValueLeft[0] + deltaX,
-            self.realCropValueLeft[2] - deltaX,
-        )
-        rangeY = (
-            self.realCropValueLeft[1] + deltaY,
-            self.realCropValueLeft[3] - deltaY,
-        )
-
-        out_x = (
-            self.endDrawPointLeft.x() <= rangeX[0]
-            or self.endDrawPointLeft.x() >= rangeX[1]
-        )
-        out_y = (
-            self.endDrawPointLeft.y() <= rangeY[0]
-            or self.endDrawPointLeft.y() >= rangeY[1]
-        )
-
-        if self.firstDrawClick and (out_x or out_y):
+        # Un tracé en cours interdit le changement de modèle : la géométrie
+        # serait coupée en deux par le chargement.
+        if self.firstDrawClick and horsCadre:
             self.calculNextPairWithPos(rangeX, rangeY, self.endDrawPointLeft)
 
             return
@@ -1471,51 +1551,67 @@ class stereoPhoto(object):
         self.currentLeftLineObj.setLine(lineL)
         self.currentRightLineObj.setLine(lineR)
 
-    def calculNextPairWithPos(self, rangeX, rangeY, qpoint):
-        threshold_deg = PAR_CAMERA_ORIENTATION_TOLERANCE_DEG
-        kappa = math.degrees(self.leftPictureManager.kappa)
+    def bordFranchi(self, pointImageGauche):
+        """Bornes du cadrage et franchissement, dans le repère de la photo gauche.
 
-        # Faire une liste des combinaison plutot que de répter 4 fois
-        # Nord à gauche (-90 + 90)
-        if abs(kappa + 90) < threshold_deg:
-            if qpoint.x() < rangeX[0] and self.currentUpID:
-                self.findNextPair("U")
-            elif qpoint.x() > rangeX[1] and self.currentDownID:
-                self.findNextPair("D")
-            elif qpoint.y() < rangeY[0] and self.currentRightID:
-                self.findNextPair("R")
-            elif qpoint.y() > rangeY[1] and self.currentLeftID:
-                self.findNextPair("L")
-        # Nord à droite (90 - 90)
-        elif abs(kappa - 90) < threshold_deg:
-            if qpoint.x() < rangeX[0] and self.currentDownID:
-                self.findNextPair("D")
-            elif qpoint.x() > rangeX[1] and self.currentUpID:
-                self.findNextPair("U")
-            elif qpoint.y() < rangeY[0] and self.currentLeftID:
-                self.findNextPair("L")
-            elif qpoint.y() > rangeY[1] and self.currentRightID:
-                self.findNextPair("R")
-        # Nord en bas (+/- 180 +/- 180)
-        elif abs(kappa - 180) < threshold_deg or abs(kappa + 180) < threshold_deg:
-            if qpoint.x() < rangeX[0] and self.currentRightID:
-                self.findNextPair("R")
-            elif qpoint.x() > rangeX[1] and self.currentLeftID:
-                self.findNextPair("L")
-            elif qpoint.y() < rangeY[0] and self.currentDownID:
-                self.findNextPair("D")
-            elif qpoint.y() > rangeY[1] and self.currentUpID:
-                self.findNextPair("U")
-        # Nord en haut
-        else:
-            if qpoint.x() < rangeX[0] and self.currentLeftID:
-                self.findNextPair("L")
-            elif qpoint.x() > rangeX[1] and self.currentRightID:
-                self.findNextPair("R")
-            elif qpoint.y() < rangeY[0] and self.currentUpID:
-                self.findNextPair("U")
-            elif qpoint.y() > rangeY[1] and self.currentDownID:
-                self.findNextPair("D")
+        La marge de 2 % du cadrage courant évite de déclencher un changement de
+        modèle sur un tremblement du curseur au ras du bord.
+        """
+        pourcent = 2 / 100
+        deltaX = self.leftPicSize[0] * pourcent
+        deltaY = self.leftPicSize[1] * pourcent
+
+        rangeX = (
+            self.realCropValueLeft[0] + deltaX,
+            self.realCropValueLeft[2] - deltaX,
+        )
+        rangeY = (
+            self.realCropValueLeft[1] + deltaY,
+            self.realCropValueLeft[3] - deltaY,
+        )
+
+        horsCadre = (
+            pointImageGauche.x() <= rangeX[0]
+            or pointImageGauche.x() >= rangeX[1]
+            or pointImageGauche.y() <= rangeY[0]
+            or pointImageGauche.y() >= rangeY[1]
+        )
+
+        return rangeX, rangeY, horsCadre
+
+    def changerModeleSiBordFranchi(self, pointImageGauche):
+        """Charge le modèle voisin si la position donnée sort du cadrage.
+
+        En hors-synchronisation, la position à tester est le centre de la vue
+        et non la croix : c'est la vue qui se déplace.
+        """
+        rangeX, rangeY, horsCadre = self.bordFranchi(pointImageGauche)
+        if horsCadre:
+            self.calculNextPairWithPos(rangeX, rangeY, pointImageGauche)
+
+    def calculNextPairWithPos(self, rangeX, rangeY, qpoint):
+        voisinDisponible = {
+            "U": bool(self.currentUpID),
+            "D": bool(self.currentDownID),
+            "L": bool(self.currentLeftID),
+            "R": bool(self.currentRightID),
+        }
+
+        # La table de correspondance bord franchi -> modèle voisin, qui dépend
+        # de l'orientation de la caméra, vit dans orientationModele.py : c'est
+        # la seule pièce de cette décision qui se vérifie sans QGIS.
+        direction = directionProchainModele(
+            math.degrees(self.leftPictureManager.kappa),
+            PAR_CAMERA_ORIENTATION_TOLERANCE_DEG,
+            qpoint.x(),
+            qpoint.y(),
+            rangeX,
+            rangeY,
+            voisinDisponible,
+        )
+
+        if direction is not None:
+            self.findNextPair(direction)
 
     def mousePressEvent(self, mouseButton, mousePos):
 
@@ -1670,7 +1766,16 @@ class stereoPhoto(object):
         center_scene_L = gwL.mapToScene(gwL.viewport().rect().center())
         center_scene_R = gwR.mapToScene(gwR.viewport().rect().center())
 
-        self.graphWindowLeft.custom_centerOn(center_scene_L, self.currentScale)
-        self.graphWindowRight.custom_centerOn(center_scene_R, self.currentScale)
+        # Le zoom clavier recadre sur le centre des vues. En mode curseur libre,
+        # la croix marque un point de l'image : la ramener au centre la ferait
+        # sauter le temps d'un zoom, puis se replacer au mouvement suivant.
+        recentrerCroix = not self.navigMapTool.curseurLibre
+
+        self.graphWindowLeft.custom_centerOn(
+            center_scene_L, self.currentScale, recentrerCroix=recentrerCroix
+        )
+        self.graphWindowRight.custom_centerOn(
+            center_scene_R, self.currentScale, recentrerCroix=recentrerCroix
+        )
 
         self.setExtent2Canvas()
