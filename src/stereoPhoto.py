@@ -212,6 +212,7 @@ class stereoPhoto(object):
         self.enableDraw = False
         self.enableShow = False
         self.ignoreMouseAction = False
+        self.fermetureEnCours = False
 
         self.zoomClick = False
         self.longClick = False
@@ -275,23 +276,36 @@ class stereoPhoto(object):
     # Fonction appelée lors de la fermeture du mOpt
     # Si l'on ferme le mOpt toutes les autres fenêtres Qt se ferment
     def closeAllSideWindows(self):
-        self.enableShow = False
-        self.canvas.unsetMapTool(self.navigMapTool)
-        self.canvas.unsetMapTool(self.horsSyncMapTool)
-        self.horsSynchronisation = False
-        self.removeCurrentScene()
-        self.deleteOldPolygon()
-        if hasattr(self, "graphWindowLeft"):
-            self.graphWindowLeft.close()
-            del self.graphWindowLeft
-        if hasattr(self, "graphWindowRight"):
-            self.graphWindowRight.close()
-            del self.graphWindowRight
-        if hasattr(self, "enhanceManager"):
-            self.enhanceManager.cancelEnhance()
-            del self.enhanceManager
-        self.optWindow.ui.pushButtonCloseWindow.setEnabled(False)
-        self.optWindow.saveParamFile()
+        # Garde de réentrance : fermer une fenêtre fille fait circuler les
+        # événements Qt, et la fermeture peut revenir ici par un autre chemin
+        # (bouton de fermeture, closeEvent du mOpt, changement de projet).
+        # Au second passage, les attributs étaient déjà retirés, d'où
+        # l'AttributeError sur enhanceManager.
+        if self.fermetureEnCours:
+            return
+        self.fermetureEnCours = True
+        try:
+            self.enableShow = False
+            self.canvas.unsetMapTool(self.navigMapTool)
+            self.canvas.unsetMapTool(self.horsSyncMapTool)
+            self.horsSynchronisation = False
+            self.removeCurrentScene()
+            self.deleteOldPolygon()
+            # L'attribut est retiré avant l'appel de fermeture : ainsi l'état
+            # reste cohérent même si cet appel redonne la main à Qt.
+            graphWindowLeft = self.__dict__.pop("graphWindowLeft", None)
+            if graphWindowLeft is not None:
+                graphWindowLeft.close()
+            graphWindowRight = self.__dict__.pop("graphWindowRight", None)
+            if graphWindowRight is not None:
+                graphWindowRight.close()
+            gestionRehaussement = self.__dict__.pop("enhanceManager", None)
+            if gestionRehaussement is not None:
+                gestionRehaussement.cancelEnhance()
+            self.optWindow.ui.pushButtonCloseWindow.setEnabled(False)
+            self.optWindow.saveParamFile()
+        finally:
+            self.fermetureEnCours = False
 
     def optWindowClose(self):
         self.closeAllSideWindows()
