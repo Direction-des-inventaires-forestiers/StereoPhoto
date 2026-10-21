@@ -1225,10 +1225,7 @@ class stereoPhoto(object):
             if altitude is not None:
                 self.cursorAltitude = altitude
 
-        # Altitude indéterminée : affichage de repli
-        self.optWindow.ui.labelAltitude.setText(
-            f"{self.cursorAltitude:.3f}" if self.cursorAltitude is not None else "N/D"
-        )
+        self.afficherAltitude()
 
     def openMNT(self):
         pass
@@ -1334,33 +1331,28 @@ class stereoPhoto(object):
         else:
             self.setCenterView()
 
-        self.updateUserAltitude()
+        # L'altitude du chargement est celle que setInitialCursorAltitude() a
+        # établie — mesurée au centre des découpes, ou lue du MNT, ou reprise de
+        # la vue précédente. La remesurer ici l'écraserait par la position des
+        # vues qu'elle vient elle-même de dicter (décision D-17).
+        self.afficherAltitude()
         self.buttonPosition = None
 
-    def updateUserAltitude(self, cPixelL=None, cPixelR=None):
-        """Met à jour l'altitude du curseur d'après ses deux positions image.
+    def afficherAltitude(self):
+        """Porte l'altitude courante au panneau, sans la recalculer.
 
-        L'altitude vient de l'écart entre la position de la croix sur la photo
-        de gauche et sur celle de droite, c'est-à-dire de la parallaxe.
+        Décision D-17 : la navigation ne mesure pas l'altitude, elle la porte.
+        Les deux vues étant toujours cadrées à partir de cursorAltitude, une
+        mesure prise sur leur position ne pouvait que rendre la valeur déjà
+        écrite, aux arrondis près — pixels entiers du défilement des vues,
+        miroir de la vue droite — et ces arrondis s'accumulaient dans le même
+        sens à chaque mouvement de souris.
 
-        Sans argument, les positions prises sont les centres des deux vues :
-        c'est le cas du mode synchronisé, où la croix y est immobile. En mode
-        curseur libre (EF-03), les photos ne bougent pas et la croix n'est plus
-        au centre : les appelants passent alors sa position sur chaque image.
+        L'altitude ne change donc que par le MNT suivi, par la roulette, ou au
+        chargement d'une paire, où setInitialCursorAltitude() l'établit. C'est
+        la seule mesure de parallaxe qui subsiste, et elle n'est prise qu'une
+        fois par paire, sur les centres des découpes.
         """
-        if cPixelL is None or cPixelR is None:
-            gwL = self.graphWindowLeft.ui.graphicsView
-            gwR = self.graphWindowRight.ui.graphicsView
-
-            sceneCenterL = gwL.mapToScene(gwL.viewport().rect().center())
-            cPixelL = self.graphWindowLeft.imageRoot.mapFromScene(sceneCenterL)
-
-            sceneCenterR = gwR.mapToScene(gwR.viewport().rect().center())
-            cPixelR = self.graphWindowRight.imageRoot.mapFromScene(sceneCenterR)
-
-        self.cursorAltitude = self.dualManager.calculateZ(
-            (cPixelL.x(), cPixelL.y()), (cPixelR.x(), cPixelR.y())
-        )
         # Altitude indéterminée : affichage de repli
         self.optWindow.ui.labelAltitude.setText(
             f"{self.cursorAltitude:.3f}" if self.cursorAltitude is not None else "N/D"
@@ -1459,10 +1451,13 @@ class stereoPhoto(object):
         self.graphWindowLeft.ui.graphicsView.viewport().update()
         self.graphWindowRight.ui.graphicsView.viewport().update()
 
-        if curseurLibre:
-            self.updateUserAltitude(self.endDrawPointLeft, self.endDrawPointRight)
-        else:
-            self.updateUserAltitude()
+        # Décision D-17 : le mouvement de souris n'est pas une mesure. Dans les
+        # deux modes, les positions image viennent d'être calculées à partir de
+        # cursorAltitude : en remesurer l'altitude reviendrait à lire la valeur
+        # qu'on vient d'écrire, aux arrondis près, et ces arrondis
+        # s'accumulaient. L'altitude ne change ici que par le MNG suivi, plus
+        # haut dans la fonction.
+        self.afficherAltitude()
 
         rangeX, rangeY, horsCadre = self.bordFranchi(self.endDrawPointLeft)
 
@@ -1531,11 +1526,15 @@ class stereoPhoto(object):
         if self.navigMapTool.curseurLibre and not modifier & Qt.ControlModifier:
             self.graphWindowLeft.placerCroix(scenePointL)
             self.graphWindowRight.placerCroix(scenePointR)
-            self.updateUserAltitude(self.endDrawPointLeft, self.endDrawPointRight)
         else:
             self.graphWindowLeft.custom_centerOn(scenePointL, self.currentScale)
             self.graphWindowRight.custom_centerOn(scenePointR, self.currentScale)
-            self.updateUserAltitude()
+
+        # Décision D-17 : la roulette commande l'altitude, elle ne la mesure
+        # pas. newAltitude est la valeur voulue — celle du pas de parallaxe, ou
+        # l'altitude inchangée sous CTRL, où la roulette ne fait que zoomer.
+        self.cursorAltitude = newAltitude
+        self.afficherAltitude()
 
         if (
             not self.firstDrawClick

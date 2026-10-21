@@ -7,10 +7,10 @@ passer par l'interface :
 1. `navigationMapTool.recenterMouse()` — le piège à souris. En mode synchronisé
    il recentre la carte et téléporte le curseur ; en mode curseur libre il doit
    être inerte, sans quoi les photos continueraient de défiler.
-2. `stereoPhoto.updateUserAltitude()` — le calcul de l'altitude par la
-   parallaxe. Sans argument il lit le centre des deux vues, ce qu'exige le mode
-   synchronisé ; avec les positions de la croix il doit s'en servir, ce qu'exige
-   le mode curseur libre, où la croix n'est plus au centre.
+2. `stereoPhoto.afficherAltitude()` — l'affichage de l'altitude au panneau.
+   Elle est portée par les deux modes et ne doit jamais être recalculée depuis
+   la position des vues (décision D-17, #48) : seul son affichage est ici en
+   jeu, avec le repli « N/D » quand la parallaxe est incalculable.
 
 Les deux fonctions sont extraites de leur fichier source par analyse
 syntaxique, puis exécutées avec des bouchons : aucune dépendance à QGIS, Qt,
@@ -61,22 +61,6 @@ def extraire_methode(chemin, classe_visee, methode_visee, espace):
     return espace[methode_visee]
 
 
-class PointBouchon:
-    """Remplace QPointF : seules les lectures x() et y() sont utilisées."""
-
-    def __init__(self, x, y):
-        self._x, self._y = float(x), float(y)
-
-    def x(self):
-        return self._x
-
-    def y(self):
-        return self._y
-
-    def __repr__(self):
-        return "PointBouchon(%g, %g)" % (self._x, self._y)
-
-
 class CanevasBouchon:
     def __init__(self):
         self.centres = []
@@ -119,53 +103,6 @@ class OutilBouchon:
         self.recentrages += 1
 
 
-class VueBouchon:
-    """Vue graphique : seul le centre du viewport est lu."""
-
-    def __init__(self, centre):
-        self.centre = centre
-
-    def mapToScene(self, point):
-        return self.centre
-
-    def viewport(self):
-        return self
-
-    def rect(self):
-        return self
-
-    def center(self):
-        return None
-
-
-class RacineImageBouchon:
-    """imageRoot : rend la position image correspondant à un point de scène."""
-
-    def __init__(self, correspondances):
-        self.correspondances = correspondances
-
-    def mapFromScene(self, point_scene):
-        return self.correspondances[point_scene]
-
-
-class FenetreBouchon:
-    def __init__(self, centre_scene, pixel_du_centre):
-        self.ui = types.SimpleNamespace(graphicsView=VueBouchon(centre_scene))
-        self.imageRoot = RacineImageBouchon({centre_scene: pixel_du_centre})
-
-
-class GestionnaireDoubleBouchon:
-    """dualManager : relève les positions image reçues et rend une altitude."""
-
-    def __init__(self, altitude):
-        self.altitude = altitude
-        self.appels = []
-
-    def calculateZ(self, pixel_gauche, pixel_droit):
-        self.appels.append((pixel_gauche, pixel_droit))
-        return self.altitude
-
-
 class EtiquetteBouchon:
     def __init__(self):
         self.texte = None
@@ -175,23 +112,14 @@ class EtiquetteBouchon:
 
 
 class ApplicationBouchon:
-    """Porte l'état que updateUserAltitude() lit sur la classe stereoPhoto."""
+    """Porte l'état que afficherAltitude() lit sur la classe stereoPhoto."""
 
     def __init__(self, altitude=212.5):
-        # Centres des deux vues, et position image à laquelle ils correspondent.
-        self.graphWindowLeft = FenetreBouchon("centreScèneG", PointBouchon(5000, 7000))
-        self.graphWindowRight = FenetreBouchon("centreScèneD", PointBouchon(5100, 7000))
-        self.dualManager = GestionnaireDoubleBouchon(altitude)
         self.etiquette = EtiquetteBouchon()
         self.optWindow = types.SimpleNamespace(
             ui=types.SimpleNamespace(labelAltitude=self.etiquette)
         )
-        self.cursorAltitude = None
-
-
-# Positions de la croix en mode curseur libre : ailleurs qu'au centre des vues.
-CROIX_GAUCHE = PointBouchon(1234, 4321)
-CROIX_DROITE = PointBouchon(1300, 4321)
+        self.cursorAltitude = altitude
 
 
 def cas_piege_a_souris(chemin_outil):
@@ -236,22 +164,22 @@ def cas_piege_a_souris(chemin_outil):
 
 
 def cas_altitude(chemin_app):
-    """L'altitude vient du centre des vues, ou de la croix si elle est donnée."""
+    """L'altitude est affichée telle qu'elle est portée, jamais recalculée."""
     echecs = []
     espace = {}
-    updateUserAltitude = extraire_methode(
-        chemin_app, "stereoPhoto", "updateUserAltitude", espace
+    afficherAltitude = extraire_methode(
+        chemin_app, "stereoPhoto", "afficherAltitude", espace
     )
 
-    # Mode synchronisé : aucun argument, les centres des vues sont lus.
-    libelle = "mode synchronisé : altitude prise au centre des vues"
-    app = ApplicationBouchon()
+    # L'altitude portée est affichée à trois décimales, dans les deux modes :
+    # ni la position des vues ni celle de la croix n'entrent dans son calcul.
+    libelle = "altitude portée : affichée telle quelle"
+    app = ApplicationBouchon(altitude=212.5)
     try:
-        updateUserAltitude(app)
-        assert app.dualManager.appels == [((5000.0, 7000.0), (5100.0, 7000.0))], (
-            "positions reçues %r" % (app.dualManager.appels,)
+        afficherAltitude(app)
+        assert app.cursorAltitude == 212.5, "altitude modifiée par l'affichage : %r" % (
+            app.cursorAltitude,
         )
-        assert app.cursorAltitude == 212.5, "altitude %r" % (app.cursorAltitude,)
         assert app.etiquette.texte == "212.500", "étiquette %r" % (app.etiquette.texte,)
     except AssertionError as erreur:
         echecs.append((libelle, erreur))
@@ -259,14 +187,13 @@ def cas_altitude(chemin_app):
     else:
         print("OK     %-52s" % libelle)
 
-    # Mode curseur libre : les positions de la croix priment sur les centres.
-    libelle = "mode curseur libre : altitude prise à la croix"
-    app = ApplicationBouchon()
+    # Une altitude négative s'affiche comme les autres : c'est la dérive de #48
+    # qui était en cause, pas la valeur, qui peut être sous le niveau de la mer.
+    libelle = "altitude négative : affichée sans traitement"
+    app = ApplicationBouchon(altitude=-12.25)
     try:
-        updateUserAltitude(app, CROIX_GAUCHE, CROIX_DROITE)
-        assert app.dualManager.appels == [((1234.0, 4321.0), (1300.0, 4321.0))], (
-            "positions reçues %r" % (app.dualManager.appels,)
-        )
+        afficherAltitude(app)
+        assert app.etiquette.texte == "-12.250", "étiquette %r" % (app.etiquette.texte,)
     except AssertionError as erreur:
         echecs.append((libelle, erreur))
         print("ECHEC  %-52s %s" % (libelle, erreur))
@@ -278,7 +205,7 @@ def cas_altitude(chemin_app):
     libelle = "altitude indéterminée : repli « N/D »"
     app = ApplicationBouchon(altitude=None)
     try:
-        updateUserAltitude(app, CROIX_GAUCHE, CROIX_DROITE)
+        afficherAltitude(app)
         assert app.etiquette.texte == "N/D", "étiquette %r" % (app.etiquette.texte,)
     except AssertionError as erreur:
         echecs.append((libelle, erreur))
