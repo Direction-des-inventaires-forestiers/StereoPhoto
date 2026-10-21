@@ -109,9 +109,14 @@ class OutilBouchon:
         self.currentMouseCoord = (381000.0, 5391500.0)
         self.lastEmittedCoord = None
         self.ignoringSyntheticMove = False
+        self.recentrages = 0
 
     def clearSyntheticGuard(self):
         self.ignoringSyntheticMove = False
+
+    def tracerRecentrages(self):
+        # Diagnostic du piège : compté ici, sans journalisation.
+        self.recentrages += 1
 
 
 class VueBouchon:

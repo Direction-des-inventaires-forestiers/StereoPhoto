@@ -1,3 +1,5 @@
+import time
+
 from qgis.core import QgsWkbTypes
 from qgis.gui import QgsMapTool, QgsRubberBand
 from qgis.PyQt.QtCore import (
@@ -11,6 +13,18 @@ from qgis.PyQt.QtCore import (
 )
 from qgis.PyQt.QtGui import QCursor, QKeyEvent
 from qgis.PyQt.QtWidgets import qApp
+
+from .config import (
+    NAVIGATION_TRACE_RECENTRAGE_INTERVALLE_S,
+    NAVIGATION_TRACE_RECENTRAGE_SEUIL_PAR_S,
+    NAVIGATION_ZONE_SURE_COTE_MIN_PX,
+    NAVIGATION_ZONE_SURE_MARGE_MAX_PX,
+    NAVIGATION_ZONE_SURE_MARGE_MIN_PX,
+    NAVIGATION_ZONE_SURE_MARGE_RATIO,
+)
+from .journal import avertir_utilisateur, obtenir_journal
+
+journal = obtenir_journal(__name__)
 
 
 class keyboardInterceptor(QObject):
@@ -56,9 +70,17 @@ class navigationMapTool(QgsMapTool):
         self.drawing = False
         self.activateDrawing = False
 
-        self.borderRange = 150
+        # Zone sûre du piège à souris. None : zone inutilisable, piège levé.
         self.safeRect = None
         self.centerGlobalPos = None
+
+        # Vrai quand la zone est jugée inutilisable : porté à part de
+        # safeRect, qui vaut aussi None avant le premier calcul.
+        self.zoneSureLevee = False
+
+        # Diagnostic du piège (voir tracerRecentrages()).
+        self.recentragesDepuisTrace = 0
+        self.derniereTraceRecentrage = time.monotonic()
 
         # 125Hz Timer (8ms)
         # self.sendPosTimer = QTimer()
@@ -96,9 +118,16 @@ class navigationMapTool(QgsMapTool):
 
             # Piège à souris, propre au mode synchronisé : sorti de la zone
             # sûre, le curseur est ramené au centre et la carte suit.
+            # `is not None` et non une évaluation booléenne : None est
+            # désormais un état porté — zone jugée inutilisable, piège levé —
+            # qu'il faut distinguer explicitement. Une zone vide était déjà
+            # écartée par l'ancienne garde booléenne (PyQt5 rend un QRect vide
+            # faux), mais silencieusement : le piège cessait d'agir sans que
+            # rien ne le signale, et la course du curseur se trouvait limitée
+            # à la taille du canevas.
             if (
                 not self.curseurLibre
-                and self.safeRect
+                and self.safeRect is not None
                 and not self.safeRect.contains(new_pixel_pos)
             ):
                 self.recenterMouse()
@@ -137,6 +166,8 @@ class navigationMapTool(QgsMapTool):
 
         if self.ignoringSyntheticMove:
             return
+
+        self.tracerRecentrages()
 
         target_map_coord = self.currentMouseCoord
 
@@ -220,12 +251,110 @@ class navigationMapTool(QgsMapTool):
         self.drawing = False
 
     def updateSafeZone(self):
+        """Recalcule la zone sûre du piège à souris et le centre du canevas.
 
+        La marge n'est pas une constante : une marge fixe de 150 px exige un
+        canevas de plus de 300 px de côté, condition remplie au poste de
+        stéréoscopie mais pas sur un canevas réduit par les panneaux latéraux.
+        Elle suit donc une part de la dimension du canevas, bornée en pixels.
+
+        Sous un côté minimal, la zone est jugée inutilisable et mise à None :
+        le piège est levé pour ce canevas plutôt que de recentrer le curseur à
+        chaque mouvement.
+        """
         rect = self.canvas.viewport().rect()
-        self.safeRect = rect.adjusted(
-            self.borderRange, self.borderRange, -self.borderRange, -self.borderRange
-        )
+
+        margeX = self.margeZoneSure(rect.width())
+        margeY = self.margeZoneSure(rect.height())
+        zone = rect.adjusted(margeX, margeY, -margeX, -margeY)
+
+        if (
+            zone.width() < NAVIGATION_ZONE_SURE_COTE_MIN_PX
+            or zone.height() < NAVIGATION_ZONE_SURE_COTE_MIN_PX
+        ):
+            if not self.zoneSureLevee:
+                # Porté au bandeau de QGIS, et pas seulement au journal : la
+                # condition demande une action de l'utilisateur, et le journal
+                # n'est pas consulté en cours de photo-interprétation. Durée
+                # nulle : le message reste affiché jusqu'à ce qu'il le ferme.
+                avertir_utilisateur(
+                    f"Canevas de {rect.width()}x{rect.height()} px trop petit "
+                    "pour la navigation : le curseur ne peut plus être ramené "
+                    "au centre et sa course est limitée à la largeur du "
+                    "canevas. Agrandir le canevas de QGIS — réduire, replier "
+                    "ou détacher les panneaux latéraux.",
+                    duree_secondes=0,
+                )
+            self.safeRect = None
+            self.zoneSureLevee = True
+        else:
+            if self.zoneSureLevee:
+                # Le rétablissement reste au journal : l'utilisateur vient
+                # d'agrandir le canevas, il n'a pas besoin qu'on le lui dise.
+                journal.info(
+                    "Canevas de %dx%d px : zone sûre de %dx%d px, "
+                    "piège à souris rétabli.",
+                    rect.width(),
+                    rect.height(),
+                    zone.width(),
+                    zone.height(),
+                )
+            self.zoneSureLevee = False
+            journal.debug(
+                "Zone sûre : %dx%d px (marges %d/%d) pour un canevas de %dx%d px",
+                zone.width(),
+                zone.height(),
+                margeX,
+                margeY,
+                rect.width(),
+                rect.height(),
+            )
+            self.safeRect = zone
+
         self.centerGlobalPos = self.canvas.viewport().mapToGlobal(rect.center())
+
+    @staticmethod
+    def margeZoneSure(dimension):
+        """Marge (pixels) à retirer de chaque côté pour une dimension donnée."""
+        marge = int(dimension * NAVIGATION_ZONE_SURE_MARGE_RATIO)
+        marge = max(marge, NAVIGATION_ZONE_SURE_MARGE_MIN_PX)
+        return min(marge, NAVIGATION_ZONE_SURE_MARGE_MAX_PX)
+
+    def tracerRecentrages(self):
+        """Compte les recentrages et en trace le taux, par intervalles.
+
+        Un recentrage par mouvement de souris est le symptôme d'une zone sûre
+        trop étroite : le curseur reste collé au centre et la carte n'avance
+        plus que par pas d'un pixel. La trace est agrégée pour ne pas inonder
+        le journal, et passe en information au-delà du taux attendu.
+        """
+        self.recentragesDepuisTrace += 1
+
+        ecoule = time.monotonic() - self.derniereTraceRecentrage
+        if ecoule < NAVIGATION_TRACE_RECENTRAGE_INTERVALLE_S:
+            return
+
+        taux = self.recentragesDepuisTrace / ecoule
+        zone = (
+            f"{self.safeRect.width()}x{self.safeRect.height()}"
+            if self.safeRect is not None
+            else "levée"
+        )
+        tracer = (
+            journal.info
+            if taux > NAVIGATION_TRACE_RECENTRAGE_SEUIL_PAR_S
+            else journal.debug
+        )
+        tracer(
+            "Piège à souris : %d recentrages en %.1f s (%.1f/s), zone sûre %s",
+            self.recentragesDepuisTrace,
+            ecoule,
+            taux,
+            zone,
+        )
+
+        self.recentragesDepuisTrace = 0
+        self.derniereTraceRecentrage = time.monotonic()
 
     def canvasResizeEvent(self, event):
         self.updateSafeZone()

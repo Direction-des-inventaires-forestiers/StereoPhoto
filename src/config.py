@@ -32,6 +32,27 @@ PAR_MIN_OVERLAP_RATIO = 0.05
 # par le bouton « Débarrer le curseur » de la barre d'outils ou par la touche C.
 NAVIGATION_CURSEUR_LIBRE_PAR_DEFAUT = False
 
+# Zone sûre du piège à souris, en mode synchronisé : tant que le curseur y
+# reste, aucun recentrage n'a lieu. La marge est une part de la dimension du
+# canevas, bornée en pixels, pour que la zone garde une taille utilisable aussi
+# bien sur le grand canevas du poste de stéréoscopie que sur un canevas réduit
+# par les panneaux latéraux.
+NAVIGATION_ZONE_SURE_MARGE_RATIO = 0.2
+NAVIGATION_ZONE_SURE_MARGE_MIN_PX = 20
+NAVIGATION_ZONE_SURE_MARGE_MAX_PX = 150
+
+# Côté minimal (pixels) sous lequel la zone sûre est jugée inutilisable. Le
+# piège est alors levé explicitement, et la condition journalisée : sans zone,
+# le curseur n'est jamais ramené au centre et sa course se limite à la taille
+# du canevas, ce qui rend la navigation impraticable sans rien signaler.
+NAVIGATION_ZONE_SURE_COTE_MIN_PX = 60
+
+# Diagnostic du piège à souris : intervalle (secondes) entre deux traces du
+# nombre de recentrages, et taux (recentrages par seconde) au-delà duquel la
+# trace passe d'un message de mise au point à un message d'information.
+NAVIGATION_TRACE_RECENTRAGE_INTERVALLE_S = 2.0
+NAVIGATION_TRACE_RECENTRAGE_SEUIL_PAR_S = 10.0
+
 # Interface graphique (stereoPhoto.py)
 
 # Épaisseur du trait de la ligne en cours de tracé (pixels écran)
