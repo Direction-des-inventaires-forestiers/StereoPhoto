@@ -53,6 +53,20 @@ NAVIGATION_ZONE_SURE_COTE_MIN_PX = 60
 NAVIGATION_TRACE_RECENTRAGE_INTERVALLE_S = 2.0
 NAVIGATION_TRACE_RECENTRAGE_SEUIL_PAR_S = 10.0
 
+# Système de référence des coordonnées (stereoPhoto.py, gestionDossier.py)
+
+# SCR des données photogrammétriques du mandat : NAD83(CSRS) / MTM zone 6.
+# Valeur reprise de gestionDossier.save_bbox_to_gpkg(), où elle était en dur
+# depuis l'origine du code ; à confirmer auprès de la DIF pour les secteurs
+# hors de la zone 6, un SCR projeté déjà posé sur le projet étant de toute
+# façon conservé tel quel (décision D-18).
+# Les fichiers PAR portent des coordonnées projetées en mètres, et tout le
+# calcul de navigation — conversion coordonnée ↔ pixel image, accord d'échelle
+# entre le canevas et les vues photo — suppose des mètres. Un projet QGIS dans
+# un SCR géographique (degrés) fausse ce calcul d'un facteur d'environ 100 000
+# sans qu'aucune erreur ne soit levée : la navigation paraît figée.
+DONNEES_SCR_EPSG = 2948
+
 # Interface graphique (stereoPhoto.py)
 
 # Épaisseur du trait de la ligne en cours de tracé (pixels écran)

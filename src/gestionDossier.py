@@ -3,6 +3,7 @@ import math
 from osgeo import gdal, ogr, osr
 from qgis.core import QgsApplication
 from .config import (
+    DONNEES_SCR_EPSG,
     PAR_CAMERA_ORIENTATION_TOLERANCE_DEG,
     PAR_PAIR_PROXIMITY_BUFFER_M,
     PAR_DIRECTION_BUFFER_M,
@@ -262,7 +263,7 @@ def get_neighbors_and_pairs(parID, parDict, direction_buffer=PAR_DIRECTION_BUFFE
     }
 
 
-def save_bbox_to_gpkg(bbox, gpkg_path, layer_name="bbox", crs_epsg=2948):
+def save_bbox_to_gpkg(bbox, gpkg_path, layer_name="bbox", crs_epsg=DONNEES_SCR_EPSG):
 
     if os.path.exists(gpkg_path):
         os.remove(gpkg_path)

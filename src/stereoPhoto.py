@@ -38,6 +38,7 @@ Dans EFOTO, il semble avoir un décalage de 16 pixels en x et en y pour la photo
 """
 
 from qgis.core import (
+    QgsCoordinateReferenceSystem,
     QgsGeometry,
     QgsLineString,
     QgsPoint,
@@ -90,6 +91,7 @@ from .gestionDossier import (
 )
 from .orientationModele import directionProchainModele
 from .config import (
+    DONNEES_SCR_EPSG,
     NAVIGATION_CURSEUR_LIBRE_PAR_DEFAUT,
     PAR_CAMERA_ORIENTATION_TOLERANCE_DEG,
     DRAW_LINE_PEN_WIDTH_PX,
@@ -102,6 +104,7 @@ from .journal import (
     obtenir_journal,
     avertir_utilisateur,
 )
+import logging
 import os
 import math
 
@@ -191,6 +194,9 @@ class stereoPhoto(object):
             self.navigMapTool.curseurLibre = self.actionUnlockCursor.isChecked()
 
             self.setConnection()
+            # Décision D-18 : le SCR est vérifié avant toute lecture de photos,
+            # pour que l'avertissement précède la navigation et non l'inverse.
+            self.verifierScrProjet()
             self.optWindow.loadParamFile()
             self.iface.addDockWidget(Qt.RightDockWidgetArea, self.optWindow)
             self.optWindow.raise_()
@@ -315,6 +321,11 @@ class stereoPhoto(object):
             self.actionMainMenu.setChecked(False)
 
     def newPictureFile(self):
+
+        # Le SCR peut avoir changé depuis l'ouverture de la session : un projet
+        # chargé entre-temps apporte le sien.
+        if not self.verifierScrProjet():
+            return
 
         self.currentMainPath = self.optWindow.ui.importLineProject.text()
         self.optWindow.projectPath = os.path.dirname(self.currentMainPath)
@@ -798,6 +809,51 @@ class stereoPhoto(object):
         yEnd = max(0, min(yEnd, height))
 
         return (xStart, yStart, xEnd, yEnd)
+
+    def verifierScrProjet(self):
+        """S'assure que le projet est dans un SCR projeté en mètres.
+
+        Décision D-18 : tout le calcul de navigation suppose des mètres. Les
+        fichiers PAR portent des coordonnées projetées, `setExtent2Canvas()`
+        accorde l'échelle du canevas sur celle des vues photo en mètres par
+        pixel, et `coordToPixel()` reçoit la coordonnée du canevas telle quelle.
+
+        Un projet dans un SCR géographique fait donc traiter des degrés comme
+        des mètres : le déplacement image devient d'environ 10⁻⁵ pixel par
+        pixel de souris, et la navigation paraît figée sans qu'aucune erreur ne
+        soit levée. C'est l'état par défaut d'un projet neuf (WGS 84), et celui
+        qu'on obtient dès que les rasters ne déclarent aucun SCR.
+
+        Le SCR est alors posé depuis la configuration plutôt que refusé : la
+        navigation reste possible, et l'utilisateur est averti du changement.
+        Retourne True si la navigation peut se poursuivre.
+        """
+        projet = QgsProject.instance()
+        scr = projet.crs()
+
+        if scr.isValid() and not scr.isGeographic():
+            self.journal.debug("SCR du projet : %s", scr.authid())
+            return True
+
+        scrDonnees = QgsCoordinateReferenceSystem.fromEpsgId(DONNEES_SCR_EPSG)
+        if not scrDonnees.isValid():
+            avertir_utilisateur(
+                f"Le SCR EPSG:{DONNEES_SCR_EPSG} des données est introuvable "
+                "dans cette installation de QGIS : la navigation est "
+                "impossible. Vérifier l'installation de PROJ.",
+                logging.ERROR,
+            )
+            return False
+
+        ancien = scr.authid() if scr.isValid() else "aucun"
+        projet.setCrs(scrDonnees)
+        avertir_utilisateur(
+            f"Le SCR du projet ({ancien}) ne convient pas aux coordonnées des "
+            f"photos, exprimées en mètres. Il est remplacé par "
+            f"{scrDonnees.authid()}. Si les données du secteur sont dans un "
+            "autre SCR projeté, le poser avant d'ouvrir les photos."
+        )
+        return True
 
     # Fonction qui récupère la couche vectorielle et change le SIG de QGIS
     # Si possible appel la fonction pour afficher la couche vectorielle sur les images
