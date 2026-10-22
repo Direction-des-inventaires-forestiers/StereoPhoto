@@ -34,7 +34,7 @@ from qgis.PyQt.QtCore import QPointF, QThread, QVariant
 from qgis.PyQt.QtGui import QPainterPath, QPolygonF
 
 import math
-from osgeo import gdal
+from .lectureRaster import ouvrir_raster
 from .journal import obtenir_journal
 import numpy as np
 from .worldManager import pictureManager, dualManager
@@ -187,7 +187,18 @@ class calculatePolygon(QThread):
     def run(self):
         while self.running:
             if self.mntPath != "":
-                self.mntDS = gdal.Open(self.mntPath, gdal.GA_ReadOnly)
+                self.mntDS = ouvrir_raster(self.mntPath)
+                if self.mntDS is None:
+                    # Sans MNT lisible, les altitudes reviennent au calcul
+                    # stéréoscopique. Le chemin est vidé plutôt que de laisser
+                    # getAltitude() chercher une fenêtre qui n'existe pas : il
+                    # compterait alors chaque sommet comme hors MNT, et le
+                    # résumé de fin de traitement désignerait une mauvaise
+                    # cause. L'avertissement nommant le fichier est déjà au
+                    # journal, posé par ouvrir_raster().
+                    self.mntPath = ""
+
+            if self.mntPath != "":
                 self.mntBand = self.mntDS.GetRasterBand(1)
                 self.mntGeo = self.mntDS.GetGeoTransform()
                 self.mntSize = (self.mntDS.RasterXSize, self.mntDS.RasterYSize)

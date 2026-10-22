@@ -1,6 +1,6 @@
 import os
 import math
-from osgeo import gdal, ogr, osr
+from osgeo import ogr, osr
 from qgis.core import QgsApplication
 from .config import (
     DONNEES_SCR_EPSG,
@@ -10,6 +10,7 @@ from .config import (
     PAR_MIN_OVERLAP_RATIO,
 )
 from .parFile import parse_par_file, PAR_REQUIRED_KEYWORDS
+from .lectureRaster import ouvrir_raster
 from .journal import obtenir_journal
 
 _journal = obtenir_journal(__name__)
@@ -33,10 +34,12 @@ def getParDict(dossierImages):
         if not os.path.exists(pathImg):
             continue
         else:
-            imgDS = gdal.Open(pathImg, gdal.GA_ReadOnly)
-            # gdal.Open() retourne None sur une image illisible ou corrompue. On rejète
-            # le PAR comme lorsque l'image est absente, plutôt que de laisser un
-            # AttributeError interrompre la lecture de tout le dossier.
+            # ouvrir_raster() ramène à None les deux façons dont GDAL signale une
+            # image illisible — retour None, ou RuntimeError selon l'état de
+            # gdal.UseExceptions(), que QGIS active. On rejète alors le PAR comme
+            # lorsque l'image est absente, plutôt que de laisser l'échec d'une
+            # seule image interrompre la lecture de tout le dossier.
+            imgDS = ouvrir_raster(pathImg)
             if imgDS is None:
                 continue
             sizeImg = (imgDS.RasterXSize, imgDS.RasterYSize)

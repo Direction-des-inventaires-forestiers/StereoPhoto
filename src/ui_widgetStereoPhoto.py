@@ -13,14 +13,14 @@ import os
 import json
 import math
 from urllib.parse import urlparse
-from osgeo import gdal
+from .lectureRaster import ouvrir_raster
 import numpy as np
 from qgis.utils import iface
 from qgis.core import QgsMapLayerType, QgsWkbTypes
 from . import resources  # noqa: F401 — enregistre les icônes auprès de Qt
 from .ui_getVectorLayer import getVectorLayerCustomList
 from .ui_graphicsWindow import Ui_graphicsWindow
-from .journal import obtenir_journal
+from .journal import avertir_utilisateur, obtenir_journal
 
 # Journal du module; le préfixe « _ » l'exclut des imports étoile
 _journal = obtenir_journal(__name__)
@@ -465,6 +465,11 @@ class optionWindow(QtWidgets.QDockWidget):
 
         # self.currentMNTPath = ''
 
+        # Dernier chemin de MNT dont l'illisibilité a été portée au bandeau.
+        # Évite de répéter le message à chaque chargement de paire, sans masquer
+        # le cas d'un autre MNT également illisible.
+        self.mntCheminIllisibleSignale = ""
+
     def showImportDirectory(self):
         fname = QtWidgets.QFileDialog.getExistingDirectory(
             self, "Importer un dossier de photos aériennes", self.projectPath
@@ -548,6 +553,9 @@ class optionWindow(QtWidgets.QDockWidget):
 
         self.currentMNTPath = file
         self.mntLocation = os.path.dirname(file)
+        # Un MNT fraîchement choisi a droit à son avertissement, même si c'est
+        # le même chemin qu'avant : l'utilisateur vient de refaire le geste.
+        self.mntCheminIllisibleSignale = ""
         self.setStateMNT(True, os.path.basename(file))
 
     def getMNTWithCoord(self, rectCoord):
@@ -556,7 +564,25 @@ class optionWindow(QtWidgets.QDockWidget):
             self.mntArr = None
             return
 
-        mntDS = gdal.Open(self.currentMNTPath, gdal.GA_ReadOnly)
+        mntDS = ouvrir_raster(self.currentMNTPath)
+        if mntDS is None:
+            # La fenêtre du MNT précédent ne doit pas rester en place : sans
+            # cette remise à None, readMNTWithCoord() continuerait de rendre des
+            # altitudes lues dans l'ancien MNT, sans que rien ne signale
+            # qu'elles ne correspondent plus au fichier nommé au panneau.
+            self.mntArr = None
+            if self.mntCheminIllisibleSignale != self.currentMNTPath:
+                # Porté au bandeau une seule fois par chemin : getMNTWithCoord()
+                # est rejouée à chaque chargement de paire, et le message
+                # reviendrait donc à chaque changement de modèle.
+                avertir_utilisateur(
+                    "MNT illisible, il n'est pas utilisé : "
+                    f"{os.path.basename(self.currentMNTPath)}. L'altitude "
+                    "revient au calcul stéréoscopique."
+                )
+                self.mntCheminIllisibleSignale = self.currentMNTPath
+            return
+
         mntBand = mntDS.GetRasterBand(1)
         self.mntGeo = mntDS.GetGeoTransform()
         self.mntSize = (mntDS.RasterXSize, mntDS.RasterYSize)
@@ -647,6 +673,7 @@ class optionWindow(QtWidgets.QDockWidget):
 
     def removeImportMNT(self):
         self.currentMNTPath = ""
+        self.mntCheminIllisibleSignale = ""
         self.setStateMNT(False, self.currentMNTPath)
 
     def setStateMNT(self, enabled, label):

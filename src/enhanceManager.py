@@ -53,6 +53,7 @@ import gc
 from scipy.ndimage import uniform_filter
 from osgeo import gdal
 from math import ceil
+from .lectureRaster import ouvrir_raster
 from .journal import obtenir_journal
 
 _journal = obtenir_journal(__name__)
@@ -483,7 +484,10 @@ class threadShow(QThread):
 
         # Open GDAL dataset ONCE here
         # gdal.SetCacheMax(256 * 1024 * 1024)
-        self.ds = gdal.Open(self.picturePath, gdal.GA_ReadOnly)
+        # ouvrir_raster() ramène à None les deux conventions d'erreur de GDAL :
+        # sans lui, le RuntimeError levé en session QGIS passait devant la garde
+        # ci-dessous, qui ne voyait que le retour None.
+        self.ds = ouvrir_raster(self.picturePath)
         # Vérification avant tout accès : elle suivait les trois lignes ci-dessous et
         # ne pouvait donc jamais se déclencher (AttributeError levée avant).
         if self.ds is None:
