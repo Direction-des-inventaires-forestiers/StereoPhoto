@@ -390,28 +390,49 @@ class calculatePolygon(QThread):
     def getAltitude(self, x, y, z=None):
         mntAlt = None
 
-        if self.mntPath != "":  # and  self.mntArr is not self.mntNodata:
-            pxPoint = math.floor((x - self.mntGeo[0]) / self.mntGeo[1])
-            pyPoint = math.floor((y - self.mntGeo[3]) / self.mntGeo[5])
+        if self.mntPath != "":
+            fenetre = getattr(self, "mntArr", None)
 
             try:
-                # Array numpy l'axe Y en premier
-                mntAlt = self.mntArr[pyPoint - self.pyStart, pxPoint - self.pxStart]
-                if mntAlt != self.mntNodata:
-                    return mntAlt
-            # if pxPoint in range(0,self.mntSize[0]) and pyPoint in range(0,self.mntSize[1]) :
-            #    try :
-            #
-            #        mntAlt = self.mntBand.ReadAsArray(pxPoint,pyPoint,1,1)
-            #        if mntAlt != self.mntNodata :
-            #            return mntAlt
+                pxPoint = math.floor((x - self.mntGeo[0]) / self.mntGeo[1])
+                pyPoint = math.floor((y - self.mntGeo[3]) / self.mntGeo[5])
+
+                # Array numpy : l'axe Y en premier
+                iy = pyPoint - self.pyStart
+                ix = pxPoint - self.pxStart
+
+                # Bornes explicites sur les deux indices, et non un `except` sur
+                # l'indexation : numpy ne lève que pour un indice supérieur ou
+                # égal à la taille de l'axe. Un indice négatif compris dans
+                # cette taille est une indexation valide — il désigne une
+                # cellule à partir de la fin de l'axe. Un sommet sorti au nord
+                # ou à l'ouest de la fenêtre chargée recevait ainsi l'altitude
+                # du bord opposé du MNT : sans lever, sans être compté, et sans
+                # retomber sur le calcul stéréoscopique. C'est la forme que
+                # readMNTWithCoord() emploie déjà de son côté.
+                if (
+                    fenetre is not None
+                    and 0 <= iy < fenetre.shape[0]
+                    and 0 <= ix < fenetre.shape[1]
+                ):
+                    mntAlt = fenetre[iy, ix]
+                    if mntAlt != self.mntNodata:
+                        return mntAlt
+                else:
+                    # Sommet hors de la fenêtre de MNT chargée. Appelé une fois
+                    # par sommet : jamais de trace par sommet au-delà du niveau
+                    # débogage, un seul résumé à la fin du traitement.
+                    self.nbSommetsHorsMNT += 1
+                    _journal.debug("Sommet hors de la fenêtre de MNT en (%s, %s)", x, y)
 
             except Exception:
-                # Sommet hors de la fenêtre de MNT chargée, ou lecture impossible.
-                # Appelé une fois par sommet : jamais de trace par sommet au-delà
-                # du niveau débogage, un seul résumé à la fin du traitement.
+                # Le calcul d'indice ou la lecture a échoué : le sommet est
+                # traité comme hors MNT plutôt que d'interrompre le thread de
+                # calcul des géométries pour un seul point.
                 self.nbSommetsHorsMNT += 1
-                _journal.debug("Altitude du MNT indisponible en (%s, %s)", x, y)
+                _journal.debug(
+                    "Lecture du MNT impossible en (%s, %s)", x, y, exc_info=True
+                )
 
         if z is None:
             pl = self.leftManager.coordToPixel((x, y), self.initAltitude)
