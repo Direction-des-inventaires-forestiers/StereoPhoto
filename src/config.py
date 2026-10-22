@@ -47,6 +47,14 @@ NAVIGATION_ZONE_SURE_MARGE_MAX_PX = 150
 # du canevas, ce qui rend la navigation impraticable sans rien signaler.
 NAVIGATION_ZONE_SURE_COTE_MIN_PX = 60
 
+# Délai maximal (millisecondes) d'attente de l'arrêt d'un thread d'affichage,
+# au changement de modèle ou à la fermeture. L'attente est bornée pour que
+# l'interface ne puisse pas rester figée sur un thread qui ne se termine pas.
+# Au-delà du délai, le thread est conservé le temps qu'il finisse plutôt que
+# relâché : c'est le relâchement d'un QThread en cours d'exécution qui fait
+# interrompre le processus par Qt, et non l'attente.
+NAVIGATION_ARRET_THREAD_DELAI_MAX_MS = 5000
+
 # Diagnostic du piège à souris : intervalle (secondes) entre deux traces du
 # nombre de recentrages, et taux (recentrages par seconde) au-delà duquel la
 # trace passe d'un message de mise au point à un message d'information.

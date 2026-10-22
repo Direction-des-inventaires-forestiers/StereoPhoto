@@ -53,6 +53,7 @@ import gc
 from scipy.ndimage import uniform_filter
 from osgeo import gdal
 from math import ceil
+from .config import NAVIGATION_ARRET_THREAD_DELAI_MAX_MS
 from .lectureRaster import ouvrir_raster
 from .journal import obtenir_journal
 
@@ -92,6 +93,10 @@ class enhanceManager(QObject):
 
         self.statusKeepCurrentView = False
 
+        # Threads d'aperçu dont l'arrêt a dépassé le délai : conservés le temps
+        # qu'ils se terminent, pour ne pas détruire un QThread en exécution.
+        self.threadsEnArret = []
+
         self.colorWindow.ui.zoomInButton.clicked.connect(self.zoomIn)
         self.colorWindow.ui.zoomOutButton.clicked.connect(self.zoomOut)
 
@@ -119,11 +124,27 @@ class enhanceManager(QObject):
     def removeCurrentScene(self):
 
         if hasattr(self, "tSeek"):
-            if self.tSeek.showThreadInProcess:
-                self.tSeek.blockSignals(True)
-                self.tSeek.keepRunning = False
-                self.tSeek.wait()
-                self.tSeek.showThreadInProcess = False
+            # Même garde que stereoPhoto.arreterThreadAffichage(), et pour la
+            # même raison : showThreadInProcess est posé et retiré dans run(),
+            # donc faux entre start() et l'entrée dans run() comme entre la fin
+            # du travail et celle du thread. Conditionner l'attente à ce drapeau
+            # laissait relâcher la dernière référence d'un QThread en cours
+            # d'exécution, et Qt interrompait le processus.
+            self.tSeek.blockSignals(True)
+            self.tSeek.keepRunning = False
+            if self.tSeek.isRunning() and not self.tSeek.wait(
+                NAVIGATION_ARRET_THREAD_DELAI_MAX_MS
+            ):
+                # Thread toujours vivant : il est gardé de côté plutôt que
+                # relâché. L'aperçu de rehaussement est jetable, la fenêtre se
+                # ferme sans lui ; le processus, non.
+                _journal.warning(
+                    "Thread d'aperçu encore en cours après %d ms : conservé le "
+                    "temps qu'il se termine.",
+                    NAVIGATION_ARRET_THREAD_DELAI_MAX_MS,
+                )
+                self.threadsEnArret.append(self.tSeek)
+            self.tSeek.showThreadInProcess = False
             del self.tSeek
 
         for item in list(self.scene.items()):

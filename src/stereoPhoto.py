@@ -92,6 +92,7 @@ from .gestionDossier import (
 from .orientationModele import directionProchainModele
 from .config import (
     DONNEES_SCR_EPSG,
+    NAVIGATION_ARRET_THREAD_DELAI_MAX_MS,
     NAVIGATION_CURSEUR_LIBRE_PAR_DEFAUT,
     PAR_CAMERA_ORIENTATION_TOLERANCE_DEG,
     DRAW_LINE_PEN_WIDTH_PX,
@@ -249,6 +250,11 @@ class stereoPhoto(object):
 
         self.tSeekLeft = None
         self.tSeekRight = None
+
+        # Threads d'affichage dont l'arrêt a dépassé le délai d'attente :
+        # conservés ici le temps qu'ils se terminent, pour que Qt ne détruise
+        # pas un QThread en cours d'exécution (voir arreterThreadAffichage).
+        self.threadsEnArret = []
 
         self.polygonL2Draw = {}
         self.polygonR2Draw = {}
@@ -654,24 +660,74 @@ class stereoPhoto(object):
         self.canvas.setFocus()
         self.loadNewPair()
 
+    def arreterThreadAffichage(self, thread):
+        """Arrête un thread d'affichage et ne rend la main qu'une fois sûr.
+
+        La condition d'attente porte sur `isRunning()`, et non sur
+        `showThreadInProcess` : ce drapeau est posé et retiré *dans* `run()`,
+        donc sur le thread de travail. Il est faux entre `start()` et l'entrée
+        dans `run()` — de 24 à 98 ms, mesuré sur quatorze changements de modèle
+        — puis de nouveau entre son retrait dans le `finally` de `run()` et la
+        fin réelle du thread. Dans ces deux fenêtres, la garde précédente
+        laissait relâcher la dernière référence Python d'un QThread en cours
+        d'exécution, et Qt interrompait le processus sans rien journaliser.
+
+        L'attente est bornée : l'interface ne doit pas rester figée sur un
+        thread qui ne se terminerait pas. Mais un thread encore vivant au bout
+        du délai n'est pas relâché pour autant — il est gardé de côté le temps
+        qu'il finisse, car c'est le relâchement qui tue le processus, pas
+        l'attente.
+        """
+        if thread is None:
+            return
+
+        # Signaux coupés avant l'arrêt : le chargement en cours est abandonné,
+        # ses tuiles ne doivent plus rejoindre la scène de la paire suivante.
+        thread.blockSignals(True)
+        thread.keepRunning = False
+
+        if not thread.isRunning():
+            return
+
+        if thread.wait(NAVIGATION_ARRET_THREAD_DELAI_MAX_MS):
+            return
+
+        self.journal.warning(
+            "Thread d'affichage encore en cours après %d ms : conservé le "
+            "temps qu'il se termine, pour ne pas détruire un QThread en "
+            "exécution.",
+            NAVIGATION_ARRET_THREAD_DELAI_MAX_MS,
+        )
+        self.threadsEnArret.append(thread)
+
+    def purgerThreadsEnArret(self):
+        """Relâche les threads gardés de côté qui se sont terminés depuis."""
+
+        if not self.threadsEnArret:
+            return
+
+        restants = [t for t in self.threadsEnArret if t.isRunning()]
+        relaches = len(self.threadsEnArret) - len(restants)
+        if relaches:
+            self.journal.debug(
+                "%d thread(s) d'affichage relâché(s), %d encore en cours",
+                relaches,
+                len(restants),
+            )
+        self.threadsEnArret = restants
+
     def removeCurrentScene(self):
 
-        if self.tSeekLeft is not None:
-            if self.tSeekLeft.showThreadInProcess:
-                self.tSeekLeft.blockSignals(True)
-                self.tSeekLeft.keepRunning = False
-                self.tSeekLeft.wait()
-            self.tSeekLeft = None
+        self.purgerThreadsEnArret()
+
+        self.arreterThreadAffichage(self.tSeekLeft)
+        self.tSeekLeft = None
 
         if hasattr(self, "graphWindowLeft"):
             self.graphWindowLeft.resetTileGroup()
 
-        if self.tSeekRight is not None:
-            if self.tSeekRight.showThreadInProcess:
-                self.tSeekRight.blockSignals(True)
-                self.tSeekRight.keepRunning = False
-                self.tSeekRight.wait()
-            self.tSeekRight = None
+        self.arreterThreadAffichage(self.tSeekRight)
+        self.tSeekRight = None
 
         if hasattr(self, "graphWindowRight"):
             self.graphWindowRight.resetTileGroup()
