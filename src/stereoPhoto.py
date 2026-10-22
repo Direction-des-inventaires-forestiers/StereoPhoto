@@ -164,8 +164,19 @@ class stereoPhoto(object):
 
         self.iface.addPluginToMenu("&StereoPhoto", self.actionMainMenu)
 
+        # Raccordement au projet posé ici, et non dans setConnection() : le
+        # projet est un singleton qui survit aux sessions, et setConnection()
+        # étant rejouée à chaque ouverture, les connexions s'y empileraient.
+        QgsProject.instance().cleared.connect(self.projetChange)
+
     # Retire le bouton de l'application dans QGIS
     def unload(self):
+        try:
+            QgsProject.instance().cleared.disconnect(self.projetChange)
+        except TypeError:
+            # Connexion déjà rompue : cas normal si initGui() n'a pas tourné.
+            self.journal.debug("Aucun raccordement au projet à rompre")
+
         self.iface.removePluginMenu("&StereoPhoto", self.actionMainMenu)
         # self.iface.removeToolBarIcon(self.actionMainMenu)
 
@@ -219,6 +230,7 @@ class stereoPhoto(object):
         self.enableShow = False
         self.ignoreMouseAction = False
         self.fermetureEnCours = False
+        self.fermetureSessionEnCours = False
 
         self.zoomClick = False
         self.longClick = False
@@ -313,12 +325,57 @@ class stereoPhoto(object):
         finally:
             self.fermetureEnCours = False
 
+    def projetChange(self):
+        """Ferme la session de navigation quand le projet est vidé ou remplacé.
+
+        QGIS émet `cleared` avant de lire un nouveau projet, comme à la demande
+        d'un projet neuf. Sans ce raccordement, rien ne s'exécutait : les deux
+        vues photo restaient ouvertes en plein écran sur un projet qui n'a plus
+        le SCR des photos ni leurs couches, l'outil de navigation restait posé
+        sur ce canevas — ramenant le symptôme de la navigation figée, la garde
+        verifierScrProjet() n'étant rejouée qu'à l'ouverture d'une session ou
+        d'un dossier — et les paramètres de la session étaient perdus.
+        """
+        if not self.actionMainMenu.isChecked():
+            # Aucune session ouverte : le projet peut changer librement.
+            return
+
+        self.journal.info("Projet vidé ou remplacé : fermeture de la session")
+        # La vue courante est mémorisée avant la démolition, pour que la
+        # position se retrouve à la prochaine ouverture du dossier.
+        if self.enableShow:
+            self.setLastView()
+        avertir_utilisateur(
+            "Le projet a changé : la session StereoPhoto est fermée et ses "
+            "paramètres enregistrés. Rouvrir le menu principal pour reprendre "
+            "la navigation."
+        )
+        # Déclenche run(), qui retire le panneau puis appelle optWindowClose(),
+        # lequel écrit le fichier de paramètres par closeAllSideWindows().
+        self.actionMainMenu.setChecked(False)
+
     def optWindowClose(self):
-        self.closeAllSideWindows()
-        self.optWindow.close()
-        self.optWindow.vectorWindow.close()
-        if self.actionMainMenu.isChecked():
-            self.actionMainMenu.setChecked(False)
+        # Garde de réentrance, comme celle de closeAllSideWindows() un niveau
+        # plus bas. optWindow.close() déclenche son closeEvent, qui réémet
+        # closeWindow et rappelle cette méthode. L'appel imbriqué atteignait
+        # alors setChecked(False), donc le `del self.optWindow` de run(), et
+        # l'appel extérieur trouvait l'attribut disparu à la ligne suivante.
+        if self.fermetureSessionEnCours:
+            return
+        self.fermetureSessionEnCours = True
+        try:
+            self.closeAllSideWindows()
+            # Référence locale plutôt que l'attribut : la fermeture fait
+            # circuler les événements Qt, et l'attribut peut disparaître entre
+            # deux lignes.
+            optWindow = getattr(self, "optWindow", None)
+            if optWindow is not None:
+                optWindow.close()
+                optWindow.vectorWindow.close()
+            if self.actionMainMenu.isChecked():
+                self.actionMainMenu.setChecked(False)
+        finally:
+            self.fermetureSessionEnCours = False
 
     def newPictureFile(self):
 
