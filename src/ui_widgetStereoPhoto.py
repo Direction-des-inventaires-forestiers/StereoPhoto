@@ -9,14 +9,19 @@
 
 from qgis.PyQt import QtCore, QtGui, QtWidgets
 from qgis.PyQt.QtCore import pyqtSignal
+import copy
 import os
 import json
 import math
 from urllib.parse import urlparse
-from .lectureRaster import ouvrir_raster
-import numpy as np
+from .lectureRaster import fenetre_mnt, ouvrir_raster
 from qgis.utils import iface
-from qgis.core import QgsMapLayerType, QgsWkbTypes
+from qgis.core import (
+    QgsCoordinateReferenceSystem,
+    QgsMapLayerType,
+    QgsProject,
+    QgsWkbTypes,
+)
 from . import resources  # noqa: F401 — enregistre les icônes auprès de Qt
 from .ui_getVectorLayer import getVectorLayerCustomList
 from .ui_graphicsWindow import Ui_graphicsWindow
@@ -24,6 +29,16 @@ from .journal import avertir_utilisateur, obtenir_journal
 
 # Journal du module; le préfixe « _ » l'exclut des imports étoile
 _journal = obtenir_journal(__name__)
+
+# État d'une première utilisation, et repli quand le fichier de paramètres est
+# illisible. Même structure que le paramStoring.json livré avec l'extension :
+# le fichier porte l'état enregistré, ces valeurs portent le point de départ.
+PARAMETRES_PAR_DEFAUT = {
+    "position": {"longitude": 0.0, "latitude": 0.0, "altitude": 0.0, "scale": 0.0},
+    "stereoscope": {"ecran_bas": 0, "ecran_haut": 0, "miroir_OFF": False},
+    "info_raster": {"mnt_file": "", "image_dir": "", "user_image": ""},
+    "rehaussement": [0, 0, 0, 0, 0, 0, 0, False, False, []],
+}
 
 
 class Ui_StereoDockWidget(object):
@@ -557,6 +572,62 @@ class optionWindow(QtWidgets.QDockWidget):
         # le même chemin qu'avant : l'utilisateur vient de refaire le geste.
         self.mntCheminIllisibleSignale = ""
         self.setStateMNT(True, os.path.basename(file))
+        self.verifierScrMnt()
+
+    def verifierScrMnt(self):
+        """Avertit quand le SCR du MNT n'est pas celui du projet.
+
+        Le guide d'utilisation l'exige — images, couches vectorielles et MNT
+        dans le même système — mais rien ne le contrôlait, et le sélecteur
+        accepte n'importe quel `.tif` ou `.vrt`. Or le MNT 1/20 000 du MERN,
+        celui que la DIF emploie, est diffusé en coordonnées géographiques :
+        chargé tel quel sur un projet en mètres, son emprise ne recoupe pas
+        celle de la vue et aucune altitude n'est lue. Sans cet avertissement,
+        l'utilisateur voit des altitudes issues du seul calcul stéréoscopique
+        et croit son MNT en service.
+
+        L'avertissement n'empêche rien : c'est un constat porté à l'utilisateur,
+        à lui de reprojeter son MNT s'il veut s'en servir.
+        """
+
+        jeu = ouvrir_raster(self.currentMNTPath)
+        if jeu is None:
+            # Raster illisible : déjà journalisé par ouvrir_raster(), et
+            # getMNTWithCoord() avertira l'utilisateur au chargement de paire.
+            return
+
+        try:
+            wkt = jeu.GetProjection()
+        finally:
+            jeu = None
+
+        scrMnt = (
+            QgsCoordinateReferenceSystem.fromWkt(wkt)
+            if wkt
+            else QgsCoordinateReferenceSystem()
+        )
+        scrProjet = QgsProject.instance().crs()
+
+        if not scrMnt.isValid():
+            avertir_utilisateur(
+                f"Le MNT {os.path.basename(self.currentMNTPath)} ne déclare "
+                "aucun système de coordonnées. Il sera lu comme s'il était "
+                f"dans celui du projet ({scrProjet.authid()}) ; vérifier qu'il "
+                "l'est bien, sinon aucune altitude n'en sera tirée."
+            )
+            return
+
+        if scrMnt == scrProjet:
+            _journal.debug("SCR du MNT : %s, conforme au projet", scrMnt.authid())
+            return
+
+        avertir_utilisateur(
+            f"Le MNT est en {scrMnt.authid() or 'un système non identifié'}"
+            + (" (coordonnées géographiques)" if scrMnt.isGeographic() else "")
+            + f", le projet en {scrProjet.authid()}. Aucune altitude n'en sera "
+            "tirée tant que les deux diffèrent : reprojeter le MNT dans le "
+            "système du projet avant de l'utiliser."
+        )
 
     def getMNTWithCoord(self, rectCoord):
 
@@ -588,67 +659,25 @@ class optionWindow(QtWidgets.QDockWidget):
         self.mntSize = (mntDS.RasterXSize, mntDS.RasterYSize)
         self.mntNodata = mntBand.GetNoDataValue()
 
-        pxStart = math.floor((rectCoord.xMinimum() - self.mntGeo[0]) / self.mntGeo[1])
-        pyStart = math.floor((rectCoord.yMaximum() - self.mntGeo[3]) / self.mntGeo[5])
-
-        self.pxStart = pxStart
-        self.pyStart = pyStart
-
-        pxEnd = math.floor((rectCoord.xMaximum() - self.mntGeo[0]) / self.mntGeo[1])
-        pyEnd = math.floor((rectCoord.yMinimum() - self.mntGeo[3]) / self.mntGeo[5])
-
-        # Requested output size
-        sizeX = pxEnd - pxStart
-        sizeY = pyEnd - pyStart
-        mntArr = np.full((sizeY, sizeX), self.mntNodata, dtype=np.float32)
-
-        if (
-            pxStart >= self.mntSize[0]
-            or pxStart + sizeX <= 0
-            or pyStart >= self.mntSize[1]
-            or pyStart + sizeY <= 0
-        ):
-            self.mntArr = mntArr
-
-        else:
-            # Where the read starts *in the raster*
-            read_xoff = max(0, pxStart)
-            read_yoff = max(0, pyStart)
-
-            # Where the read starts *inside the output array*
-            arr_xoff = read_xoff - pxStart
-            arr_yoff = read_yoff - pyStart
-
-            # Compute read size inside raster bounds
-            read_xsize = min(pxStart + sizeX, self.mntSize[0]) - read_xoff
-            read_ysize = min(pyStart + sizeY, self.mntSize[1]) - read_yoff
-
-            if read_xsize > 0 and read_ysize > 0:
-                try:
-                    sub = mntBand.ReadAsArray(
-                        read_xoff, read_yoff, read_xsize, read_ysize
-                    )
-                    # Place into output array
-                    mntArr[
-                        arr_yoff : arr_yoff + read_ysize,
-                        arr_xoff : arr_xoff + read_xsize,
-                    ] = sub
-
-                except Exception:
-                    # Reading failed → keep nodata-filled array
-                    _journal.warning(
-                        "Lecture du MNT impossible, fenêtre laissée à nodata : "
-                        "%s, lecture (%s, %s) de %sx%s",
-                        self.currentMNTPath,
-                        read_xoff,
-                        read_yoff,
-                        read_xsize,
-                        read_ysize,
-                        exc_info=True,
-                    )
-
-            # Store final result
-            self.mntArr = mntArr
+        # fenetre_mnt() borne la fenêtre au raster avant de l'allouer. Le
+        # calcul qu'elle remplace allouait d'abord : un MNT dont le pas n'est
+        # pas dans l'unité du canevas — celui du MERN, en degrés — faisait
+        # demander des pétaoctets et interrompait le chargement de la paire.
+        # pxStart et pyStart sont désormais l'origine de la fenêtre retenue,
+        # celle à laquelle readMNTWithCoord() rapporte ses indices.
+        self.mntArr, self.pxStart, self.pyStart = fenetre_mnt(
+            mntBand,
+            self.mntGeo,
+            self.mntSize,
+            (
+                rectCoord.xMinimum(),
+                rectCoord.yMinimum(),
+                rectCoord.xMaximum(),
+                rectCoord.yMaximum(),
+            ),
+            self.mntNodata,
+            self.currentMNTPath,
+        )
 
         mntDS = None
 
@@ -666,7 +695,14 @@ class optionWindow(QtWidgets.QDockWidget):
         rows, cols = self.mntArr.shape
 
         if 0 <= pxRead < cols and 0 <= pyRead < rows:
-            return self.mntArr[pyRead, pxRead]
+            # float() et non la valeur numpy telle quelle : c'est le seul point
+            # par lequel une valeur du MNT entre dans l'extension, et elle
+            # ressort de là en numpy.float32. Portée jusqu'à ParamDict par
+            # setLastView(), elle faisait lever json.dump() à l'enregistrement
+            # des paramètres — « Object of type float32 is not JSON
+            # serializable » — après que l'ouverture en écriture avait déjà
+            # vidé le fichier. Convertie ici, aucun appelant n'a à y penser.
+            return float(self.mntArr[pyRead, pxRead])
 
         else:
             return None
@@ -690,8 +726,31 @@ class optionWindow(QtWidgets.QDockWidget):
         self.ParamDict = {}
 
         self.currentNoValidKey = []
-        with open(self.JSONPath) as f:
-            self.ParamDict = json.load(f)
+        # Un fichier illisible ou incomplet ne doit pas empêcher l'ouverture
+        # d'une session : sans ce repli, la moindre anomalie du JSON faisait
+        # lever loadParamFile(), run() s'arrêtait en chemin et l'extension
+        # devenait inutilisable jusqu'à réparation du fichier à la main.
+        # Les valeurs par défaut valent celles d'une première utilisation.
+        try:
+            with open(self.JSONPath, encoding="utf-8") as f:
+                charge = json.load(f)
+        except (OSError, ValueError):
+            _journal.exception(
+                "Paramètres de session illisibles, valeurs par défaut appliquées : %s",
+                self.JSONPath,
+            )
+            charge = {}
+
+        self.ParamDict = copy.deepcopy(PARAMETRES_PAR_DEFAUT)
+        # Fusion par section : une clé absente ou une section tronquée reprend
+        # sa valeur par défaut, le reste du fichier étant conservé.
+        for section, valeur in charge.items():
+            if isinstance(valeur, dict) and isinstance(
+                self.ParamDict.get(section), dict
+            ):
+                self.ParamDict[section].update(valeur)
+            else:
+                self.ParamDict[section] = valeur
 
         info_raster = self.ParamDict["info_raster"]
         stereoscope = self.ParamDict["stereoscope"]
@@ -732,8 +791,26 @@ class optionWindow(QtWidgets.QDockWidget):
 
         self.ParamDict["rehaussement"] = self.rehaussementParam
 
-        with open(self.JSONPath, "w", encoding="utf-8") as f:
-            json.dump(self.ParamDict, f, indent=2, ensure_ascii=False)
+        # Écriture atomique : le contenu est d'abord porté dans un fichier
+        # voisin, puis substitué d'un coup par os.replace(). Écrire directement
+        # dans le fichier de destination le vidait avant d'écrire : toute levée
+        # en cours de sérialisation laissait un JSON tronqué, et la session
+        # suivante ne pouvait plus s'ouvrir du tout, loadParamFile() n'ayant
+        # alors aucun repli. C'est arrivé sur une altitude numpy.float32.
+        provisoire = self.JSONPath + ".nouveau"
+        try:
+            with open(provisoire, "w", encoding="utf-8") as f:
+                json.dump(self.ParamDict, f, indent=2, ensure_ascii=False)
+            os.replace(provisoire, self.JSONPath)
+        except Exception:
+            _journal.exception(
+                "Paramètres de session non enregistrés : %s conservé en l'état",
+                self.JSONPath,
+            )
+            try:
+                os.remove(provisoire)
+            except OSError:
+                pass
 
     def actionShowScreenNumber(self):
 

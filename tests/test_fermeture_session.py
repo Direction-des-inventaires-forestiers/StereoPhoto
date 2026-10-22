@@ -137,6 +137,7 @@ class ApplicationBouchon:
         self.appels = []
         self.vues_memorisees = 0
         self.panneaux_retires = 0
+        self.setLastView_leve = False
 
     # closeAllSideWindows() n'est pas sous test ici : son effet est relevé.
     def closeAllSideWindows(self):
@@ -145,6 +146,10 @@ class ApplicationBouchon:
 
     def setLastView(self):
         self.vues_memorisees += 1
+        if self.setLastView_leve:
+            # Reproduit ce que faisait setLastView() sur une altitude
+            # indéterminée : un TypeError depuis pixelToCoord().
+            raise TypeError("unsupported operand type(s) for -: 'NoneType' and 'float'")
 
 
 def verifier(libelle, echecs, controle):
@@ -306,6 +311,43 @@ def executer(dossier_source):
 
     verifier(
         "Projet changé sans session : aucun effet", echecs, projet_change_sans_session
+    )
+
+    # --- Mémorisation impossible : la fermeture doit aboutir quand même ----
+    def memorisation_impossible():
+        alertes = []
+        methodes, app, journal = monter(
+            chemin_app, alertes, ("optWindowClose", "projetChange")
+        )
+        fermer = methodes["optWindowClose"]
+        projetChange = methodes["projetChange"]
+
+        def au_decochage():
+            app.panneaux_retires += 1
+            fermer(app)
+
+        app.optWindow = OptWindowBouchon()
+        app.actionMainMenu = ActionBouchon(True, au_decochage=au_decochage)
+        app.enableShow = True
+        # L'altitude du curseur est indéterminée : setLastView() levait alors un
+        # TypeError, qui partait vers la fenêtre d'erreur de QGIS et bloquait la
+        # session derrière un dialogue modal, la fermeture n'ayant pas lieu.
+        app.setLastView_leve = True
+
+        projetChange(app)
+
+        assert app.actionMainMenu.decochages == 1, (
+            "la session n'est pas fermée : la mémorisation de la vue ne doit "
+            "pas emporter la démolition"
+        )
+        assert app.optWindow.parametres_ecrits == 1, (
+            "le fichier de paramètres n'est pas écrit"
+        )
+
+    verifier(
+        "Vue non mémorisable : la fermeture aboutit quand même",
+        echecs,
+        memorisation_impossible,
     )
 
     # --- Garde permanente : le greffon se raccorde bien au projet ------------

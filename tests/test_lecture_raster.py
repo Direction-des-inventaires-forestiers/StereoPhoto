@@ -308,12 +308,23 @@ def executer_gardes(dossier_source):
     def utilitaire_autonome():
         chemin_lecture = os.path.join(dossier_source, "lectureRaster.py")
         assert os.path.exists(chemin_lecture), "lectureRaster.py absent"
-        source = io.open(chemin_lecture, encoding="utf-8").read()
-        for interdit in ("qgis", "PyQt", "Qt"):
-            assert interdit not in source, (
-                "lectureRaster.py ne doit pas dépendre de %s : il sert aussi "
-                "les threads" % interdit
-            )
+        # La garde porte sur les imports, et non sur une occurrence du mot dans
+        # le texte : la documentation du module a toute raison de nommer QGIS
+        # et Qt pour expliquer pourquoi elle n'en dépend pas.
+        arbre = ast.parse(io.open(chemin_lecture, encoding="utf-8").read())
+        modules = set()
+        for n in ast.walk(arbre):
+            if isinstance(n, ast.Import):
+                modules.update(a.name for a in n.names)
+            elif isinstance(n, ast.ImportFrom) and n.module:
+                modules.add(n.module)
+        fautifs = sorted(
+            m for m in modules if m.split(".")[0] in ("qgis", "PyQt", "PyQt5")
+        )
+        assert not fautifs, (
+            "lectureRaster.py importe %s : il sert aussi les threads et doit "
+            "rester sans dépendance à QGIS ni à Qt" % ", ".join(fautifs)
+        )
 
     verifier(
         "lectureRaster.py : sans dépendance à QGIS ni Qt", echecs, utilitaire_autonome

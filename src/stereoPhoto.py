@@ -348,9 +348,18 @@ class stereoPhoto(object):
 
         self.journal.info("Projet vidé ou remplacé : fermeture de la session")
         # La vue courante est mémorisée avant la démolition, pour que la
-        # position se retrouve à la prochaine ouverture du dossier.
+        # position se retrouve à la prochaine ouverture du dossier. L'échec de
+        # cette mémorisation ne doit jamais empêcher la fermeture : cette
+        # méthode répond à un signal, et une exception qui s'en échappe part
+        # vers la fenêtre d'erreur Python de QGIS, dont le dialogue modal
+        # bloque la session — l'inverse de ce que le raccordement cherche.
         if self.enableShow:
-            self.setLastView()
+            try:
+                self.setLastView()
+            except Exception:
+                self.journal.exception(
+                    "Vue courante non mémorisée ; la fermeture se poursuit"
+                )
         avertir_utilisateur(
             "Le projet a changé : la session StereoPhoto est fermée et ses "
             "paramètres enregistrés. Rouvrir le menu principal pour reprendre "
@@ -508,6 +517,17 @@ class stereoPhoto(object):
         if not hasattr(self, "graphWindowLeft"):
             return
 
+        if self.cursorAltitude is None:
+            # Sans altitude, pixelToCoord() ne peut pas rendre de coordonnée :
+            # il soustrait l'altitude du curseur à celle de la prise de vue, et
+            # lève un TypeError sur None. L'altitude est indéterminée tant
+            # qu'une paire n'a pas été mesurée, ou quand la mesure a échoué.
+            # Mémoriser la vue n'a alors pas de sens, et la levée partirait
+            # vers la fenêtre d'erreur Python de QGIS — par le signal du
+            # projet, elle bloquait la session derrière un dialogue modal.
+            self.journal.debug("Altitude indéterminée : vue courante non mémorisée")
+            return
+
         LGV = self.graphWindowLeft.ui.graphicsView
         sceneRect = LGV.mapToScene(LGV.viewport().rect()).boundingRect()
         sceneCenter = sceneRect.center()
@@ -522,10 +542,14 @@ class stereoPhoto(object):
         )
         self.lastCurrentView = (cx, cy, self.cursorAltitude, scaleStore)
 
-        self.optWindow.ParamDict["position"]["longitude"] = cx
-        self.optWindow.ParamDict["position"]["latitude"] = cy
-        self.optWindow.ParamDict["position"]["altitude"] = self.cursorAltitude
-        self.optWindow.ParamDict["position"]["scale"] = scaleStore
+        # Types natifs pour ce qui part au fichier de paramètres : une valeur
+        # numpy y ferait lever json.dump(), et l'échec détruirait le fichier.
+        # La conversion est faite ici plutôt que laissée à saveParamFile(),
+        # pour que ParamDict ne contienne jamais que du sérialisable.
+        self.optWindow.ParamDict["position"]["longitude"] = float(cx)
+        self.optWindow.ParamDict["position"]["latitude"] = float(cy)
+        self.optWindow.ParamDict["position"]["altitude"] = float(self.cursorAltitude)
+        self.optWindow.ParamDict["position"]["scale"] = float(scaleStore)
 
     def findNextPair(self, ori):
         if not self.horsSynchronisation:

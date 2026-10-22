@@ -34,9 +34,8 @@ from qgis.PyQt.QtCore import QPointF, QThread, QVariant
 from qgis.PyQt.QtGui import QPainterPath, QPolygonF
 
 import math
-from .lectureRaster import ouvrir_raster
+from .lectureRaster import fenetre_mnt, ouvrir_raster
 from .journal import obtenir_journal
-import numpy as np
 from .worldManager import pictureManager, dualManager
 
 # Journal du module; le préfixe « _ » le réserve à l'usage interne
@@ -204,69 +203,25 @@ class calculatePolygon(QThread):
                 self.mntSize = (self.mntDS.RasterXSize, self.mntDS.RasterYSize)
                 self.mntNodata = self.mntBand.GetNoDataValue()
 
-                pxStart = math.floor(
-                    (self.rectCoord.xMinimum() - self.mntGeo[0]) / self.mntGeo[1]
+                # Même fenêtre, même garde que du côté du panneau d'options :
+                # le bornage au raster précède l'allocation. Le calcul remplacé
+                # allouait d'abord, et un MNT dont le pas n'est pas dans
+                # l'unité de l'emprise faisait demander des pétaoctets.
+                # pxStart et pyStart sont l'origine de la fenêtre retenue,
+                # celle à laquelle getAltitude() rapporte ses indices.
+                self.mntArr, self.pxStart, self.pyStart = fenetre_mnt(
+                    self.mntBand,
+                    self.mntGeo,
+                    self.mntSize,
+                    (
+                        self.rectCoord.xMinimum(),
+                        self.rectCoord.yMinimum(),
+                        self.rectCoord.xMaximum(),
+                        self.rectCoord.yMaximum(),
+                    ),
+                    self.mntNodata,
+                    self.mntPath,
                 )
-                pyStart = math.floor(
-                    (self.rectCoord.yMaximum() - self.mntGeo[3]) / self.mntGeo[5]
-                )
-
-                self.pxStart = pxStart
-                self.pyStart = pyStart
-
-                pxEnd = math.floor(
-                    (self.rectCoord.xMaximum() - self.mntGeo[0]) / self.mntGeo[1]
-                )
-                pyEnd = math.floor(
-                    (self.rectCoord.yMinimum() - self.mntGeo[3]) / self.mntGeo[5]
-                )
-
-                # Requested output size
-                sizeX = pxEnd - pxStart
-                sizeY = pyEnd - pyStart
-                mntArr = np.full((sizeY, sizeX), self.mntNodata, dtype=np.float32)
-
-                if (
-                    pxStart >= self.mntSize[0]
-                    or pxStart + sizeX <= 0
-                    or pyStart >= self.mntSize[1]
-                    or pyStart + sizeY <= 0
-                ):
-                    self.mntArr = mntArr
-
-                else:
-                    # Where the read starts *in the raster*
-                    read_xoff = max(0, pxStart)
-                    read_yoff = max(0, pyStart)
-
-                    # Where the read starts *inside the output array*
-                    arr_xoff = max(0, -pxStart)
-                    arr_yoff = max(0, -pyStart)
-
-                    # Compute read size inside raster bounds
-                    read_xsize = min(pxStart + sizeX, self.mntSize[0]) - read_xoff
-                    read_ysize = min(pyStart + sizeY, self.mntSize[1]) - read_yoff
-
-                    if read_xsize > 0 and read_ysize > 0:
-                        try:
-                            sub = self.mntBand.ReadAsArray(
-                                read_xoff, read_yoff, read_xsize, read_ysize
-                            )
-                            # Place into output array
-                            mntArr[
-                                arr_yoff : arr_yoff + read_ysize,
-                                arr_xoff : arr_xoff + read_xsize,
-                            ] = sub
-
-                        except Exception as e:
-                            # Reading failed → keep nodata-filled array
-                            _journal.warning(
-                                "Lecture du MNT impossible, tuile laissée à nodata : %s",
-                                e,
-                            )
-
-                    # Store final result
-                    self.mntArr = mntArr
 
             for layer in iface.mapCanvas().layers():
                 try:
