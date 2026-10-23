@@ -21,6 +21,11 @@ Le test couvre les trois pièces de la correction :
    avec les dimensions du canevas et la marche à suivre : la condition demande
    une action de l'utilisateur, et le journal n'est pas consulté en cours de
    photo-interprétation. Le rétablissement, lui, reste au journal.
+4. `avertirZoneSureLevee()` — l'avertissement est différé par une minuterie que
+   `updateSafeZone()` relance à chaque recalcul : le canevas passe par des
+   tailles minuscules au montage de la fenêtre de QGIS et pendant le
+   déplacement d'un panneau, et ces états de passage n'ont pas à encombrer le
+   bandeau. Un canevas agrandi avant l'échéance n'avertit donc jamais.
 
 Les deux méthodes sont extraites du fichier source par analyse syntaxique, puis
 exécutées avec des bouchons : aucune dépendance à QGIS ni à Qt n'est
@@ -185,6 +190,31 @@ class BandeauBouchon:
         self.messages.append((niveau, message, duree_secondes))
 
 
+class MinuterieBouchon:
+    """Remplace le QTimer de l'alerte : retient l'état et le dernier délai.
+
+    Le déclenchement n'est pas simulé par le bouchon : le test appelle
+    `avertirZoneSureLevee()` lui-même, ce qui permet de vérifier aussi bien
+    l'échéance atteinte que la minuterie arrêtée avant son terme.
+    """
+
+    def __init__(self):
+        self.active = False
+        self.delai = None
+        self.departs = 0
+
+    def start(self, delai):
+        self.active = True
+        self.delai = delai
+        self.departs += 1
+
+    def stop(self):
+        self.active = False
+
+    def isActive(self):
+        return self.active
+
+
 class OutilBouchon:
     """Porte les seuls attributs que `updateSafeZone()` lit et écrit."""
 
@@ -194,6 +224,8 @@ class OutilBouchon:
         self.zoneSureLevee = False
         self.centerGlobalPos = None
         self.margeZoneSure = margeZoneSure
+        self.minuterieAlerteZoneSure = MinuterieBouchon()
+        self.alerteZoneSureAffichee = False
 
 
 def cas_marges(chemin_outil, constantes):
@@ -240,12 +272,14 @@ def cas_zone(chemin_outil, constantes):
     methodes = extraire_methodes(
         chemin_outil,
         "navigationMapTool",
-        ["margeZoneSure", "updateSafeZone"],
+        ["margeZoneSure", "updateSafeZone", "avertirZoneSureLevee"],
         espace,
     )
     margeZoneSure = methodes["margeZoneSure"]
     updateSafeZone = methodes["updateSafeZone"]
+    avertirZoneSureLevee = methodes["avertirZoneSureLevee"]
     coteMin = constantes["NAVIGATION_ZONE_SURE_COTE_MIN_PX"]
+    delai = constantes["NAVIGATION_ZONE_SURE_ALERTE_DELAI_MS"]
 
     echecs = []
 
@@ -274,9 +308,10 @@ def cas_zone(chemin_outil, constantes):
                 % (libelle, outil.safeRect.width(), outil.safeRect.height())
             )
 
-    # Canevas trop petit pour toute zone : le piège est levé, et la condition
-    # portée au bandeau de QGIS — elle demande une action de l'utilisateur.
-    libelle = "piège levé : avertissement au bandeau de QGIS"
+    # Canevas trop petit pour toute zone : le piège est levé tout de suite, mais
+    # l'alerte attend l'échéance de la minuterie — la disposition de la fenêtre
+    # de QGIS n'est pas encore stabilisée au premier calcul.
+    libelle = "piège levé : alerte armée, bandeau encore vide"
     outil = OutilBouchon(CanevasBouchon(100, 80), margeZoneSure)
     del journal.messages[:]
     del bandeau.messages[:]
@@ -284,6 +319,22 @@ def cas_zone(chemin_outil, constantes):
         updateSafeZone(outil)
         assert outil.safeRect is None, "zone conservée alors qu'elle est inutilisable"
         assert outil.zoneSureLevee, "drapeau de zone levée non posé"
+        assert bandeau.messages == [], "alerte immédiate : %r" % (bandeau.messages,)
+        assert outil.minuterieAlerteZoneSure.isActive(), "minuterie non armée"
+        assert outil.minuterieAlerteZoneSure.delai == delai, (
+            "délai %r au lieu de %r" % (outil.minuterieAlerteZoneSure.delai, delai)
+        )
+    except AssertionError as erreur:
+        echecs.append((libelle, erreur))
+        print("ECHEC  %-52s %s" % (libelle, erreur))
+    else:
+        print("OK     %-52s %d ms" % (libelle, delai))
+
+    # Échéance atteinte sur un canevas resté petit : la condition est portée au
+    # bandeau de QGIS, elle demande une action de l'utilisateur.
+    libelle = "échéance atteinte : avertissement au bandeau de QGIS"
+    try:
+        avertirZoneSureLevee(outil)
         assert len(bandeau.messages) == 1, "%d message(s) au bandeau" % len(
             bandeau.messages
         )
@@ -295,9 +346,36 @@ def cas_zone(chemin_outil, constantes):
             duree,
         )
 
-        # Deuxième calcul sans changement : pas de second message.
+        # Deuxième calcul sans changement, puis seconde échéance : le message
+        # ne doit pas se répéter tant que le canevas n'a pas grandi.
         updateSafeZone(outil)
+        avertirZoneSureLevee(outil)
         assert len(bandeau.messages) == 1, "message répété : %d" % len(bandeau.messages)
+    except AssertionError as erreur:
+        echecs.append((libelle, erreur))
+        print("ECHEC  %-52s %s" % (libelle, erreur))
+    else:
+        print("OK     %-52s" % libelle)
+
+    # Taille de passage, celle du montage de la fenêtre ou d'un panneau en cours
+    # de déplacement : le canevas est agrandi avant l'échéance, et rien n'est
+    # porté au bandeau même si la minuterie arrive malgré tout à son terme.
+    libelle = "taille de passage : aucune alerte après l'agrandissement"
+    passage = OutilBouchon(CanevasBouchon(98, 28), margeZoneSure)
+    del journal.messages[:]
+    del bandeau.messages[:]
+    try:
+        updateSafeZone(passage)
+        assert passage.minuterieAlerteZoneSure.isActive(), "minuterie non armée"
+        passage.canvas.redimensionner(1600, 1200)
+        updateSafeZone(passage)
+        assert not passage.minuterieAlerteZoneSure.isActive(), (
+            "minuterie encore armée sur un canevas redevenu grand"
+        )
+        avertirZoneSureLevee(passage)
+        assert bandeau.messages == [], "alerte sur un état de passage : %r" % (
+            bandeau.messages,
+        )
     except AssertionError as erreur:
         echecs.append((libelle, erreur))
         print("ECHEC  %-52s %s" % (libelle, erreur))
@@ -314,6 +392,10 @@ def cas_zone(chemin_outil, constantes):
         updateSafeZone(outil)
         assert outil.safeRect is not None, "zone non rétablie"
         assert not outil.zoneSureLevee, "drapeau de zone levée non retiré"
+        assert not outil.alerteZoneSureAffichee, (
+            "alerte toujours tenue pour affichée : une dégradation ultérieure "
+            "ne serait plus signalée"
+        )
         assert len(journal.niveaux("info")) == 1, "%d trace(s) de rétablissement" % len(
             journal.niveaux("info")
         )
@@ -339,6 +421,7 @@ def executer(dossier_source):
         "NAVIGATION_ZONE_SURE_MARGE_MIN_PX",
         "NAVIGATION_ZONE_SURE_MARGE_MAX_PX",
         "NAVIGATION_ZONE_SURE_COTE_MIN_PX",
+        "NAVIGATION_ZONE_SURE_ALERTE_DELAI_MS",
     }
     manquantes = attendues - set(constantes)
     if manquantes:

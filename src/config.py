@@ -47,6 +47,14 @@ NAVIGATION_ZONE_SURE_MARGE_MAX_PX = 150
 # du canevas, ce qui rend la navigation impraticable sans rien signaler.
 NAVIGATION_ZONE_SURE_COTE_MIN_PX = 60
 
+# Délai (millisecondes) avant que la condition de canevas trop petit soit
+# portée au bandeau de QGIS. L'alerte est différée, et la minuterie relancée à
+# chaque redimensionnement : la taille du canevas n'est stable ni au montage de
+# la fenêtre de QGIS, ni pendant que l'utilisateur déplace un panneau latéral,
+# et un état de passage n'a pas à encombrer le bandeau. Seule une condition qui
+# tient encore après ce délai demande une action de l'utilisateur.
+NAVIGATION_ZONE_SURE_ALERTE_DELAI_MS = 1500
+
 # Délai maximal (millisecondes) d'attente de l'arrêt d'un thread d'affichage,
 # au changement de modèle ou à la fermeture. L'attente est bornée pour que
 # l'interface ne puisse pas rester figée sur un thread qui ne se termine pas.

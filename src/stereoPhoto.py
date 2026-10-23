@@ -139,7 +139,7 @@ class stereoPhoto(object):
         iconSuivreMNT = ":/Anaglyph/Icons/SuivreMNT.png"
         self.actionSuivreMNT = QAction(
             QIcon(iconSuivreMNT),
-            "Suivre le MNT ; Appuyer sur 'M' ",
+            "Suivre le MNT (touche M)",
             self.iface.mainWindow(),
         )
 
@@ -148,7 +148,7 @@ class stereoPhoto(object):
         iconUnlockCursor = ":/Anaglyph/Icons/UnlockCursor.png"
         self.actionUnlockCursor = QAction(
             QIcon(iconUnlockCursor),
-            "Débarrer le curseur  ; Appuyer sur 'C' ",
+            "Débarrer le curseur (touche C)",
             self.iface.mainWindow(),
         )
 
@@ -206,9 +206,12 @@ class stereoPhoto(object):
             self.navigMapTool.curseurLibre = self.actionUnlockCursor.isChecked()
 
             self.setConnection()
-            # Décision D-18 : le SCR est vérifié avant toute lecture de photos,
-            # pour que l'avertissement précède la navigation et non l'inverse.
-            self.verifierScrProjet()
+            # Décision D-18 : le SCR est vérifié à l'affichage des photos, par
+            # createGraphicsWindows(), et non ici. L'ouverture du menu principal
+            # ne transforme aucune coordonnée : vérifier le SCR à cet instant
+            # avertissait — et remplaçait le SCR du projet — sur un projet que
+            # l'utilisateur n'a pas fini de monter, souvent un projet neuf
+            # encore en WGS 84 dont les couches arrivent après.
             self.optWindow.loadParamFile()
             self.iface.addDockWidget(Qt.RightDockWidgetArea, self.optWindow)
             self.optWindow.raise_()
@@ -339,8 +342,8 @@ class stereoPhoto(object):
         vues photo restaient ouvertes en plein écran sur un projet qui n'a plus
         le SCR des photos ni leurs couches, l'outil de navigation restait posé
         sur ce canevas — ramenant le symptôme de la navigation figée, la garde
-        verifierScrProjet() n'étant rejouée qu'à l'ouverture d'une session ou
-        d'un dossier — et les paramètres de la session étaient perdus.
+        verifierScrProjet() n'étant rejouée qu'à l'affichage des photos — et
+        les paramètres de la session étaient perdus.
         """
         if not self.actionMainMenu.isChecked():
             # Aucune session ouverte : le projet peut changer librement.
@@ -394,11 +397,13 @@ class stereoPhoto(object):
 
     def newPictureFile(self):
 
-        # Le SCR peut avoir changé depuis l'ouverture de la session : un projet
-        # chargé entre-temps apporte le sien.
-        if not self.verifierScrProjet():
-            return
-
+        # Aucune garde de SCR ici : la lecture du dossier ne fait que dresser la
+        # liste des paires et préparer la paire courante, sans transformer une
+        # coordonnée. Cette méthode répond de plus à `textChanged`, donc au
+        # dossier restauré par loadParamFile() à l'ouverture de la session —
+        # avertir ici revenait à avertir au démarrage, avant que l'utilisateur
+        # ait monté son projet. La garde est posée là où les mètres servent :
+        # createGraphicsWindows() et findPairWithPosition().
         self.currentMainPath = self.optWindow.ui.importLineProject.text()
         self.optWindow.projectPath = os.path.dirname(self.currentMainPath)
         self.currentParDict = getParDict(self.currentMainPath)
@@ -605,6 +610,12 @@ class stereoPhoto(object):
 
     def findPairWithPosition(self):
 
+        # La vue du canevas est lue en mètres pour la comparer aux coordonnées
+        # des photos : même garde qu'à l'affichage, et même moment choisi par
+        # l'utilisateur.
+        if not self.verifierScrProjet():
+            return
+
         qgisExtent = self.canvas.extent()
         centerCoord = (
             qgisExtent.xMinimum() + qgisExtent.width() / 2,
@@ -634,6 +645,13 @@ class stereoPhoto(object):
             )
 
     def createGraphicsWindows(self):
+
+        # Décision D-18 : première opération qui transforme des coordonnées de
+        # photos en position de canevas. Le projet est monté, l'utilisateur
+        # vient de demander l'affichage : c'est ici que l'avertissement de SCR
+        # a un sens, et qu'il précède encore toute navigation.
+        if not self.verifierScrProjet():
+            return
 
         if self.enableShow:
             self.setExtent2Canvas()
@@ -964,6 +982,12 @@ class stereoPhoto(object):
         Le SCR est alors posé depuis la configuration plutôt que refusé : la
         navigation reste possible, et l'utilisateur est averti du changement.
         Retourne True si la navigation peut se poursuivre.
+
+        La garde est posée aux deux opérations qui consomment des mètres —
+        l'affichage des photos et la recherche de paire par la vue — et non à
+        l'ouverture de la session : un projet neuf y est encore en WGS 84 et
+        ses couches arrivent après, de sorte que l'avertissement tombait au
+        démarrage, sur un projet que l'utilisateur n'avait pas fini de monter.
         """
         projet = QgsProject.instance()
         scr = projet.crs()

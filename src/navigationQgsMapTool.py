@@ -17,6 +17,7 @@ from qgis.PyQt.QtWidgets import qApp
 from .config import (
     NAVIGATION_TRACE_RECENTRAGE_INTERVALLE_S,
     NAVIGATION_TRACE_RECENTRAGE_SEUIL_PAR_S,
+    NAVIGATION_ZONE_SURE_ALERTE_DELAI_MS,
     NAVIGATION_ZONE_SURE_COTE_MIN_PX,
     NAVIGATION_ZONE_SURE_MARGE_MAX_PX,
     NAVIGATION_ZONE_SURE_MARGE_MIN_PX,
@@ -77,6 +78,15 @@ class navigationMapTool(QgsMapTool):
         # Vrai quand la zone est jugée inutilisable : porté à part de
         # safeRect, qui vaut aussi None avant le premier calcul.
         self.zoneSureLevee = False
+
+        # Alerte de canevas trop petit : différée par cette minuterie, et
+        # relancée à chaque recalcul tant que la condition tient (voir
+        # updateSafeZone()). Le drapeau évite de répéter le message tant que le
+        # canevas n'a pas retrouvé une zone utilisable.
+        self.minuterieAlerteZoneSure = QTimer()
+        self.minuterieAlerteZoneSure.setSingleShot(True)
+        self.minuterieAlerteZoneSure.timeout.connect(self.avertirZoneSureLevee)
+        self.alerteZoneSureAffichee = False
 
         # Diagnostic du piège (voir tracerRecentrages()).
         self.recentragesDepuisTrace = 0
@@ -244,6 +254,9 @@ class navigationMapTool(QgsMapTool):
         super().deactivate()
 
     def deactivateMapTool(self):
+        # L'alerte en attente tombe avec l'outil : la taille du canevas ne
+        # demande plus rien à l'utilisateur dès que la navigation s'arrête.
+        self.minuterieAlerteZoneSure.stop()
         self.canvas.viewport().removeEventFilter(self)
         # self.sendPosTimer.stop()
         self.rubberBand.reset(QgsWkbTypes.GeometryType.LineGeometry)
@@ -261,6 +274,14 @@ class navigationMapTool(QgsMapTool):
         Sous un côté minimal, la zone est jugée inutilisable et mise à None :
         le piège est levé pour ce canevas plutôt que de recentrer le curseur à
         chaque mouvement.
+
+        La condition est portée au bandeau de QGIS par `avertirZoneSureLevee()`
+        seulement, après un délai que la minuterie relance ici à chaque recalcul.
+        Le canevas passe en effet par des tailles minuscules que personne ne
+        voit : au montage de la fenêtre de QGIS, à l'ouverture du panneau de
+        l'extension, et tout au long d'un déplacement de panneau latéral.
+        Avertir sur l'état de passage remplissait le bandeau d'un message
+        d'action impossible — le canevas était déjà redevenu grand.
         """
         rect = self.canvas.viewport().rect()
 
@@ -272,22 +293,18 @@ class navigationMapTool(QgsMapTool):
             zone.width() < NAVIGATION_ZONE_SURE_COTE_MIN_PX
             or zone.height() < NAVIGATION_ZONE_SURE_COTE_MIN_PX
         ):
-            if not self.zoneSureLevee:
-                # Porté au bandeau de QGIS, et pas seulement au journal : la
-                # condition demande une action de l'utilisateur, et le journal
-                # n'est pas consulté en cours de photo-interprétation. Durée
-                # nulle : le message reste affiché jusqu'à ce qu'il le ferme.
-                avertir_utilisateur(
-                    f"Canevas de {rect.width()}x{rect.height()} px trop petit "
-                    "pour la navigation : le curseur ne peut plus être ramené "
-                    "au centre et sa course est limitée à la largeur du "
-                    "canevas. Agrandir le canevas de QGIS — réduire, replier "
-                    "ou détacher les panneaux latéraux.",
-                    duree_secondes=0,
-                )
+            journal.debug(
+                "Canevas de %dx%d px : zone sûre inutilisable, piège levé ; "
+                "alerte différée de %d ms",
+                rect.width(),
+                rect.height(),
+                NAVIGATION_ZONE_SURE_ALERTE_DELAI_MS,
+            )
             self.safeRect = None
             self.zoneSureLevee = True
+            self.minuterieAlerteZoneSure.start(NAVIGATION_ZONE_SURE_ALERTE_DELAI_MS)
         else:
+            self.minuterieAlerteZoneSure.stop()
             if self.zoneSureLevee:
                 # Le rétablissement reste au journal : l'utilisateur vient
                 # d'agrandir le canevas, il n'a pas besoin qu'on le lui dise.
@@ -300,6 +317,7 @@ class navigationMapTool(QgsMapTool):
                     zone.height(),
                 )
             self.zoneSureLevee = False
+            self.alerteZoneSureAffichee = False
             journal.debug(
                 "Zone sûre : %dx%d px (marges %d/%d) pour un canevas de %dx%d px",
                 zone.width(),
@@ -312,6 +330,35 @@ class navigationMapTool(QgsMapTool):
             self.safeRect = zone
 
         self.centerGlobalPos = self.canvas.viewport().mapToGlobal(rect.center())
+
+    def avertirZoneSureLevee(self):
+        """Porte au bandeau de QGIS un canevas resté trop petit.
+
+        Appelée par la minuterie de `updateSafeZone()`, donc seulement sur une
+        condition qui tient depuis NAVIGATION_ZONE_SURE_ALERTE_DELAI_MS : la
+        disposition de la fenêtre est stabilisée, et la taille annoncée est
+        celle que l'utilisateur a réellement sous les yeux — elle est relue ici
+        plutôt que reprise du calcul qui a armé la minuterie.
+
+        Le message va au bandeau, et pas seulement au journal : la condition
+        demande une action de l'utilisateur, et le journal n'est pas consulté en
+        cours de photo-interprétation. Durée nulle : le message reste affiché
+        jusqu'à ce qu'il le ferme.
+        """
+        if not self.zoneSureLevee or self.alerteZoneSureAffichee:
+            # Canevas agrandi entre-temps, ou condition déjà signalée.
+            return
+
+        rect = self.canvas.viewport().rect()
+        avertir_utilisateur(
+            f"Canevas de {rect.width()}x{rect.height()} px trop petit "
+            "pour la navigation : le curseur ne peut plus être ramené "
+            "au centre et sa course est limitée à la largeur du "
+            "canevas. Agrandir le canevas de QGIS — réduire, replier "
+            "ou détacher les panneaux latéraux.",
+            duree_secondes=0,
+        )
+        self.alerteZoneSureAffichee = True
 
     @staticmethod
     def margeZoneSure(dimension):
