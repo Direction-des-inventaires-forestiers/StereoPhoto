@@ -292,6 +292,9 @@ color: rgb(220, 147, 0);</string>
     </item>
     <item>
      <widget class="QPushButton" name="pushButtonShowPicture">
+      <property name="toolTip">
+       <string>Ouvrir la navigation stéréo&#10;Échap : basculer entre QGIS et les photos&#10;F5 à F12 : niveaux de zoom, du plus fort (F5) à l'image entière (F12)</string>
+      </property>
       <property name="enabled">
        <bool>false</bool>
       </property>
@@ -447,6 +450,9 @@ color: rgb(220, 147, 0);</string>
        </item>
        <item row="1" column="0">
         <widget class="QRadioButton" name="radioButtonDraw">
+         <property name="toolTip">
+          <string>Dessiner la ligne de travail&#10;Touche 1 : alterne entre Dessiner et Découper</string>
+         </property>
          <property name="enabled">
           <bool>false</bool>
          </property>
@@ -484,6 +490,9 @@ color: rgb(220, 147, 0);</string>
        </item>
        <item row="2" column="0">
         <widget class="QRadioButton" name="radioButtonCut">
+         <property name="toolTip">
+          <string>Découper avec la ligne de travail&#10;Touche 1 : alterne entre Dessiner et Découper</string>
+         </property>
          <property name="enabled">
           <bool>false</bool>
          </property>

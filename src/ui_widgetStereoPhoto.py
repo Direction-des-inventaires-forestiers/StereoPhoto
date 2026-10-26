@@ -348,6 +348,14 @@ class Ui_StereoDockWidget(object):
         )
         self.enhanceButton.setText(_translate("StereoDockWidget", "Rehausser"))
         self.pushButtonShowPicture.setText(_translate("StereoDockWidget", "Naviguer"))
+        self.pushButtonShowPicture.setToolTip(
+            _translate(
+                "StereoDockWidget",
+                "Ouvrir la navigation stéréo\n"
+                "Échap : basculer entre QGIS et les photos\n"
+                "F5 à F12 : niveaux de zoom, du plus fort (F5) à l'image entière (F12)",
+            )
+        )
         self.pushButtonCloseWindow.setText(_translate("StereoDockWidget", "Fermer"))
         self.pushButtonAffVecteur.setText(
             _translate("StereoDockWidget", "Gestion des couches vectorielles")
@@ -358,10 +366,24 @@ class Ui_StereoDockWidget(object):
         )
         self.importToolMNT.setText(_translate("StereoDockWidget", "..."))
         self.radioButtonDraw.setText(_translate("StereoDockWidget", "Dessiner"))
+        self.radioButtonDraw.setToolTip(
+            _translate(
+                "StereoDockWidget",
+                "Dessiner la ligne de travail\n"
+                "Touche 1 : alterne entre Dessiner et Découper",
+            )
+        )
         self.pushButtonRemoveMNT.setText(
             _translate("StereoDockWidget", "Retirer le modèle")
         )
         self.radioButtonCut.setText(_translate("StereoDockWidget", "Découper"))
+        self.radioButtonCut.setToolTip(
+            _translate(
+                "StereoDockWidget",
+                "Découper avec la ligne de travail\n"
+                "Touche 1 : alterne entre Dessiner et Découper",
+            )
+        )
         self.label_5.setText(_translate("StereoDockWidget", "Altitude du curseur"))
         self.labelAltitude.setText(_translate("StereoDockWidget", "100.000000000"))
 
