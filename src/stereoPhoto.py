@@ -1551,14 +1551,14 @@ class stereoPhoto(object):
         # L'altitude du chargement est celle que setInitialCursorAltitude() a
         # établie — mesurée au centre des découpes, ou lue du MNT, ou reprise de
         # la vue précédente. La remesurer ici l'écraserait par la position des
-        # vues qu'elle vient elle-même de dicter (décision D-17).
+        # vues qu'elle vient elle-même de dicter (décision D-19).
         self.afficherAltitude()
         self.buttonPosition = None
 
     def afficherAltitude(self):
         """Porte l'altitude courante au panneau, sans la recalculer.
 
-        Décision D-17 : la navigation ne mesure pas l'altitude, elle la porte.
+        Décision D-19 : la navigation ne mesure pas l'altitude, elle la porte.
         Les deux vues étant toujours cadrées à partir de cursorAltitude, une
         mesure prise sur leur position ne pouvait que rendre la valeur déjà
         écrite, aux arrondis près — pixels entiers du défilement des vues,
@@ -1668,7 +1668,7 @@ class stereoPhoto(object):
         self.graphWindowLeft.ui.graphicsView.viewport().update()
         self.graphWindowRight.ui.graphicsView.viewport().update()
 
-        # Décision D-17 : le mouvement de souris n'est pas une mesure. Dans les
+        # Décision D-19 : le mouvement de souris n'est pas une mesure. Dans les
         # deux modes, les positions image viennent d'être calculées à partir de
         # cursorAltitude : en remesurer l'altitude reviendrait à lire la valeur
         # qu'on vient d'écrire, aux arrondis près, et ces arrondis
@@ -1747,7 +1747,7 @@ class stereoPhoto(object):
             self.graphWindowLeft.custom_centerOn(scenePointL, self.currentScale)
             self.graphWindowRight.custom_centerOn(scenePointR, self.currentScale)
 
-        # Décision D-17 : la roulette commande l'altitude, elle ne la mesure
+        # Décision D-19 : la roulette commande l'altitude, elle ne la mesure
         # pas. newAltitude est la valeur voulue — celle du pas de parallaxe, ou
         # l'altitude inchangée sous CTRL, où la roulette ne fait que zoomer.
         self.cursorAltitude = newAltitude

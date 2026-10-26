@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Garde contre le retour de la boucle de rétroaction sur l'altitude (D-17).
+"""Garde contre le retour de la boucle de rétroaction sur l'altitude (D-19).
 
 `mouseMoveEvent()` et `wheelActionEvent()` calculent les positions image de la
 croix à partir de `cursorAltitude`, puis cadrent les vues dessus. Y mesurer

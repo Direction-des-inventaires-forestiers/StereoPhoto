@@ -9,7 +9,7 @@ passer par l'interface :
    être inerte, sans quoi les photos continueraient de défiler.
 2. `stereoPhoto.afficherAltitude()` — l'affichage de l'altitude au panneau.
    Elle est portée par les deux modes et ne doit jamais être recalculée depuis
-   la position des vues (décision D-17, #48) : seul son affichage est ici en
+   la position des vues (décision D-19, #48) : seul son affichage est ici en
    jeu, avec le repli « N/D » quand la parallaxe est incalculable.
 
 Les deux fonctions sont extraites de leur fichier source par analyse
