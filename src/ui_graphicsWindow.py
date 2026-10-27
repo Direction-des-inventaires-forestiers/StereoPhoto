@@ -92,6 +92,15 @@ class graphicsWindow(QtWidgets.QMainWindow):
         self.geometryItemGroup.setZValue(100)
         self.scene.addItem(self.geometryItemGroup)
 
+        # Surbrillance des entités sélectionnées. Au-dessus des
+        # géométries, qu'elle double, et sous les masques hors-photo, qui
+        # doivent la couvrir comme ils couvrent le reste du dessin : les
+        # géométries des vues sont des objets de scène et non des entités de
+        # QGIS, la surbrillance native de QGIS ne les atteint donc pas.
+        self.selectionItemGroup = QtWidgets.QGraphicsItemGroup()
+        self.selectionItemGroup.setZValue(150)
+        self.scene.addItem(self.selectionItemGroup)
+
         self.offboundRectGroup = QtWidgets.QGraphicsItemGroup()
         self.offboundRectGroup.setZValue(200)
         self.scene.addItem(self.offboundRectGroup)
@@ -125,7 +134,7 @@ class graphicsWindow(QtWidgets.QMainWindow):
         """Place la croix à une position de la scène.
 
         En mode synchronisé, cette position est toujours le centre de la vue,
-        et centerCrosshair() l'appelle. En mode curseur libre (exigence EF-03),
+        et centerCrosshair() l'appelle. En mode curseur libre,
         l'image reste fixe et c'est la croix qui se déplace : stereoPhoto passe
         alors la position du curseur sur l'image.
         """
@@ -146,7 +155,7 @@ class graphicsWindow(QtWidgets.QMainWindow):
         """Recadre la vue sur une position de la scène.
 
         `recentrerCroix` à False laisse la croix où elle est : c'est ce qu'exige
-        le mode curseur libre (exigence EF-03), où la croix marque un point de
+        le mode curseur libre, où la croix marque un point de
         l'image et non le centre de la vue. Le défaut True conserve le
         comportement de la navigation synchronisée.
         """

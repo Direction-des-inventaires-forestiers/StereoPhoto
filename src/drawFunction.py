@@ -235,7 +235,18 @@ class calculatePolygon(QThread):
                         layer.type() == QgsMapLayerType.VectorLayer
                         and name in self.vectorToShow.keys()
                     ):
-                        self.dictPolyL[name] = [[], couleur, layer.geometryType()]
+                        # [formes, couleur, type de géométrie, identifiants
+                        # des entités, identifiant de la couche]. Les
+                        # identifiants sont parallèles aux formes : une entité
+                        # multipartie en porte plusieurs, toutes sous le même
+                        # identifiant.
+                        self.dictPolyL[name] = [
+                            [],
+                            couleur,
+                            layer.geometryType(),
+                            [],
+                            layer.id(),
+                        ]
                         self.dictPolyR[name] = [[]]
                         features = layer.getFeatures(self.rectCoord)
 
@@ -274,6 +285,7 @@ class calculatePolygon(QThread):
 
                                     self.dictPolyL[name][0].append(polygonL)
                                     self.dictPolyR[name][0].append(polygonR)
+                                    self.dictPolyL[name][3].append(item.id())
                             elif (
                                 not featureGeo.isNull()
                                 and featureGeo.type() == QgsWkbTypes.LineGeometry
@@ -298,6 +310,7 @@ class calculatePolygon(QThread):
 
                                     self.dictPolyL[name][0].append(lineL)
                                     self.dictPolyR[name][0].append(lineR)
+                                    self.dictPolyL[name][3].append(item.id())
 
                             elif (
                                 not featureGeo.isNull()
@@ -310,6 +323,7 @@ class calculatePolygon(QThread):
 
                                     self.dictPolyL[name][0].append((pixL[0], pixL[1]))
                                     self.dictPolyR[name][0].append((pixR[0], pixR[1]))
+                                    self.dictPolyL[name][3].append(item.id())
 
                 except Exception:
                     _journal.exception("Erreur dans le thread de calcul des polygones")
