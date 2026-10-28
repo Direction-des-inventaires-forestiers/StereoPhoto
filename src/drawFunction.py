@@ -1,36 +1,31 @@
-"""
-L'entièreté du code a été réalisé par Frédérick Pineault (frederick.pineault@mffp.gouv.qc.ca)
+"""Projection des couches vectorielles dans les deux vues photo.
 
-Ce dossier contient des fonctions qui permettent de tracer des polygones dans QGIS
-Les fonctions utilisent des fonctions et des objets de QGIS pour faire le traitement
+Le code d'origine a été réalisé par Frédérick Pineault
+(frederick.pineault@mffp.gouv.qc.ca).
 
-Il est possible de :
-    - Créer un shapefile de type Vector Layer
-    - Récupérer la couche active
-    - Ajouter un polygon sur la couche
-    - Fusionner 2 polygons
-    - Découper un polygon
-    - Reformer un polygon pour faire place à un nouveau
+Ce module ne porte plus qu'une seule chose : le fil `calculatePolygon`, qui lit
+les couches vectorielles affichées et projette leurs géométries en coordonnées
+pixel des deux photos, pour que `stereoPhoto` les dessine dans les scènes.
 
-Des fonctionnalités supplémentaires seront ajouter dans le futur pour agrémenter l'outil de trace :
-    - Trace automatique (sans click)
-    - Accrochage des segments entre les formes via les segments ou les arêtes
-    - Ajout de points et de lignes
-    et bien d'autre
+Les primitives d'écriture qui s'y trouvaient (ajout, fusion, découpage,
+remodelage) sont parties dans `editionVecteur.py` : elles écrivaient par le
+fournisseur de données, hors du tampon d'édition, donc hors d'atteinte de
+l'annulation. Le remodelage et la trace automatique, dont aucun appel n'était
+actif, sont retirés en attendant d'être repris.
+
+Chaque forme projetée est accompagnée de l'identifiant de l'entité dont elle
+vient, et chaque couche de son identifiant de couche : c'est la condition pour
+que la surbrillance de la sélection puisse désigner, dans les vues photo, la
+même entité que la sélection de QGIS. Une entité multipartie donne plusieurs
+formes portant le même identifiant.
 """
 
 from qgis.core import (
-    QgsCoordinateReferenceSystem,
-    QgsFeature,
-    QgsField,
-    QgsFields,
     QgsMapLayerType,
-    QgsVectorFileWriter,
-    QgsVectorLayerEditUtils,
     QgsWkbTypes,
 )
 from qgis.utils import iface
-from qgis.PyQt.QtCore import QPointF, QThread, QVariant
+from qgis.PyQt.QtCore import QPointF, QThread
 from qgis.PyQt.QtGui import QPainterPath, QPolygonF
 
 import math
@@ -40,124 +35,6 @@ from .worldManager import pictureManager, dualManager
 
 # Journal du module; le préfixe « _ » le réserve à l'usage interne
 _journal = obtenir_journal(__name__)
-
-
-# Création d'un vector layer dans QGIS
-# Ajout d'un ID pour être similaire à la création normale de QGIS
-def createShape(shapeName, EPSG):
-    # shapeName = "U:/StereoPhoto/ShapeFile/TestLayer.shp"
-    fields = QgsFields()
-    fields.append(QgsField("id", QVariant.Int))
-    feature = QgsFeature()
-    vectorWriter = QgsVectorFileWriter(
-        shapeName,
-        "System",
-        fields,
-        QgsWkbTypes.MultiPolygon,
-        QgsCoordinateReferenceSystem(EPSG),
-        "ESRI Shapefile",
-    )
-    vectorWriter.addFeature(feature)
-    del vectorWriter
-    vectorLayer = iface.addVectorLayer(shapeName, "", "ogr")
-    return vectorLayer
-
-
-# Future fonction propose la liste des current layers et choisir parmis la liste ou tout simplement créer une nouvelle couche
-# Pour le moment, elle retourne la couche active
-def getVectorActiveLayer():
-    return iface.activeLayer()
-
-
-def getRectPolygon(rect, vectorLayer):
-    return list(vectorLayer.getFeatures(rect))
-
-
-# Ajout d'un polygon sur la couche
-# Avec geometry comme intrant on considère déja un QgsGeometry
-def addPolygon(vectorLayer, geometry):
-    vectorLayer.startEditing()
-    feat = QgsFeature()
-    feat.setGeometry(geometry)
-    vectorLayer.dataProvider().addFeature(feat)
-    vectorLayer.commitChanges()
-
-
-# Fusion 2 polygones ensemble
-def mergePolygon(currentGeo, currentIndex, extraGeo, vectorLayer):
-    vectorLayer.startEditing()
-    newGeo = currentGeo.combine(extraGeo)
-    vectorLayer.changeGeometry(currentIndex, newGeo)
-    vectorLayer.commitChanges()
-    return newGeo
-
-
-def reshapeLayer(lineString, listFeatures, vectorLayer):
-    vectorLayer.startEditing()
-    for feat in listFeatures:
-        geo = feat.geometry()
-        _journal.debug("reshapeLayer : géométrie initiale %s", geo)
-        retval = geo.reshapeGeometry(lineString)
-        if retval == 0:
-            _journal.debug("reshapeLayer : géométrie remodelée %s", geo)
-            vectorLayer.changeGeometry(feat.id(), geo)
-        else:
-            _journal.warning("reshapeLayer : reshapeGeometry a retourné %s", retval)
-    vectorLayer.commitChanges()
-
-
-# Découpe la couche en fonction d'une ligne tracer par l'utilisateur
-# Si les lignes tracées se croisent aucune coupe à lieu (IDEM à QGIS)
-def cutPolygon(vectorLayer, line):
-    if len(line) < 2:
-        return
-
-    # splitLineGeometry = QgsGeometry.fromPolylineXY(line)
-    vectorLayer.startEditing()
-    vectorLayer.removeSelection()
-    # vectorLayer.splitFeatures(line)
-    editUtils = QgsVectorLayerEditUtils(vectorLayer)
-    result_code = editUtils.splitFeatures(line)
-
-    if result_code == 0:
-        vectorLayer.commitChanges()
-
-
-# Lorsqu'un nouveau polygon entre en contact avec un polygon existant
-# Le nouveau est conservé dans son entièreté et l'ancien est reformé pour laisser la place au nouveau
-def automaticPolygon(oldGeo, currentIndex, newGeo, vectorLayer):
-    vectorLayer.startEditing()
-    finalGeo = oldGeo.difference(newGeo)
-
-    firstShape = True
-    for item in finalGeo.asGeometryCollection():
-        if firstShape:
-            vectorLayer.changeGeometry(currentIndex, item)
-            firstShape = False
-        else:
-            feat = QgsFeature()
-            feat.setGeometry(item)
-            vectorLayer.dataProvider().addFeature(feat)
-
-    feat = QgsFeature()
-    feat.setGeometry(newGeo)
-    vectorLayer.dataProvider().addFeature(feat)
-    vectorLayer.commitChanges()
-
-
-def addPoint(vectorLayer, geometry):
-    vectorLayer.startEditing()
-
-    feature = QgsFeature()
-    # geom = QgsGeometry()
-    feature.setGeometry(geometry)
-    feature.setFields(vectorLayer.fields())
-
-    vectorLayer.dataProvider().addFeature(feature)
-    vectorLayer.commitChanges()
-    vectorLayer.triggerRepaint()
-
-    return feature
 
 
 class calculatePolygon(QThread):
@@ -373,7 +250,7 @@ class calculatePolygon(QThread):
                 # Bornes explicites sur les deux indices, et non un `except` sur
                 # l'indexation : numpy ne lève que pour un indice supérieur ou
                 # égal à la taille de l'axe. Un indice négatif compris dans
-                # cette taille est une indexation valide — il désigne une
+                # cette taille est une indexation valide : il désigne une
                 # cellule à partir de la fin de l'axe. Un sommet sorti au nord
                 # ou à l'ouest de la fenêtre chargée recevait ainsi l'altitude
                 # du bord opposé du MNT : sans lever, sans être compté, et sans

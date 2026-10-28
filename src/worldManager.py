@@ -242,18 +242,3 @@ class dualManager:
             self.rightManager.sizePicture[1],
         )
         return rectL, rectR
-
-
-def createWKTString(coordList, strName):
-    if strName == "PolygonZ":
-        retSTR = strName + "(("
-        for coord in coordList:
-            retSTR += str(coord[0])
-            retSTR += " "
-            retSTR += str(coord[1])
-            retSTR += " "
-            retSTR += str(coord[2])
-            retSTR += ","
-        retSTR += "))"
-
-        return retSTR

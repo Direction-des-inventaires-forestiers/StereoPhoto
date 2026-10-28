@@ -13,7 +13,7 @@ Sans avoir recours au guide d'utilisation voici les éléments importants à con
 - Les fichiers d'orientation (.PAR) doivent se situer dans le même dossier que les photographies aériennes (.TIF)
 - Le système de coordonnées de référence (SCR) à utiliser doit être imposé avant de lancer la navigation
 - Pour une navigation en stéréoscopie fonctionnelle, QGIS ne doit pas être dans son état initial, le canevas doit être activé via l'ajout d'une couche quelconque
-- L'ajout d'une couche vectorielle via le menu des couches de l'application changera automatiquement le système de coordonnées
+- L'ajout d'une couche vectorielle via le menu des couches de l'application changera automatiquement le système de coordonnées, à condition que la couche soit dans un système projeté ; une couche en coordonnées géographiques est refusée
 - Les images, les couches vectorielles et le modèle numérique de terrain doivent tous utiliser le même système de coordonnées
 - La sélection manuelle des écrans du stéréoscope doit se faire via le choix de leur numéro d'écran, le bouton **Voir Écran** permet d'aider à la sélection 
 - Pour faire l'affichage de couches vectorielles lors de la navigation, elles doivent être ajoutées et être actives dans QGIS

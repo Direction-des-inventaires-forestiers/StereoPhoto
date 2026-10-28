@@ -138,6 +138,16 @@ class ApplicationBouchon:
         self.vues_memorisees = 0
         self.panneaux_retires = 0
         self.setLastView_leve = False
+        self.vectorLayer = None
+        self.vectorLayerName = None
+
+    # La question du sort des modifications n'est pas sous test ici, son appel
+    # est relevé. La fermeture ne doit pas en dépendre pour aboutir.
+    def demanderSortEditions(self):
+        self.appels.append("demanderSortEditions")
+
+    def rompreRaccordementCouche(self):
+        self.appels.append("rompreRaccordementCouche")
 
     # closeAllSideWindows() n'est pas sous test ici : son effet est relevé.
     def closeAllSideWindows(self):
@@ -181,7 +191,17 @@ def monter(chemin_app, alertes, methodes_voulues):
     def avertir_utilisateur(message, *args, **kwargs):
         alertes.append(message)
 
-    espace = {"avertir_utilisateur": avertir_utilisateur}
+    class EditionVecteurBouchon:
+        """Le module d'écriture, réduit à ce que la fermeture lui demande."""
+
+        @staticmethod
+        def modificationsEnAttente(_couche):
+            return False, 0
+
+    espace = {
+        "avertir_utilisateur": avertir_utilisateur,
+        "editionVecteur": EditionVecteurBouchon,
+    }
     methodes = extraire_methodes(chemin_app, "stereoPhoto", methodes_voulues, espace)
     return methodes, app, journal
 
@@ -418,6 +438,31 @@ def executer(dossier_source):
         "Garde : optWindowClose() porte sa garde de réentrance",
         echecs,
         garde_presente,
+    )
+
+    # --- Le sort des modifications est demandé avant la démolition, et ------
+    # jamais après : la couche et son tampon doivent encore être là pour que
+    # la question ait un sens.
+    def question_avant_demolition():
+        alertes = []
+        methodes, app, journal = monter(chemin_app, alertes, ("optWindowClose",))
+        app.optWindow = OptWindowBouchon()
+        app.actionMainMenu = ActionBouchon(False)
+
+        methodes["optWindowClose"](app)
+
+        assert "demanderSortEditions" in app.appels, (
+            "le sort des modifications en attente n'est pas demandé : %r"
+            % (app.appels,)
+        )
+        assert app.appels.index("demanderSortEditions") < app.appels.index(
+            "closeAllSideWindows"
+        ), "la question arrive après la démolition : %r" % (app.appels,)
+
+    verifier(
+        "Modifications en attente : question avant la démolition",
+        echecs,
+        question_avant_demolition,
     )
 
     return echecs

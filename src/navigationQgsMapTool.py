@@ -42,7 +42,10 @@ class keyboardInterceptor(QObject):
 
 
 class navigationMapTool(QgsMapTool):
-    mouseClicked = pyqtSignal(Qt.MouseButton, tuple)
+    # Les modificateurs voyagent avec le clic : la sélection additive (Ctrl ou
+    # Maj) en a besoin, et ils étaient perdus ici, event.modifiers() n'étant lu
+    # que par la roulette.
+    mouseClicked = pyqtSignal(Qt.MouseButton, tuple, Qt.KeyboardModifiers)
     mouseMoved = pyqtSignal(tuple)
     wheelActivate = pyqtSignal(int, Qt.KeyboardModifier, tuple)
     keybordSignal = pyqtSignal(QKeyEvent)
@@ -57,7 +60,7 @@ class navigationMapTool(QgsMapTool):
 
         self.ignoringSyntheticMove = False
 
-        # Comportement de navigation (exigence EF-03). False : les photos
+        # Comportement de navigation. False : les photos
         # défilent sous un curseur ramené au centre par recenterMouse().
         # True : le piège à souris est levé, le curseur parcourt les photos.
         # L'état est posé par stereoPhoto, qui porte le bouton de bascule.
@@ -129,7 +132,7 @@ class navigationMapTool(QgsMapTool):
             # Piège à souris, propre au mode synchronisé : sorti de la zone
             # sûre, le curseur est ramené au centre et la carte suit.
             # `is not None` et non une évaluation booléenne : None est
-            # désormais un état porté — zone jugée inutilisable, piège levé —
+            # désormais un état porté (zone jugée inutilisable, piège levé)
             # qu'il faut distinguer explicitement. Une zone vide était déjà
             # écartée par l'ancienne garde booléenne (PyQt5 rend un QRect vide
             # faux), mais silencieusement : le piège cessait d'agir sans que
@@ -149,7 +152,7 @@ class navigationMapTool(QgsMapTool):
 
         mapPoint = self.toMapCoordinates(event.pos())
         coordFormat = (float(mapPoint.x()), float(mapPoint.y()))
-        self.mouseClicked.emit(event.button(), coordFormat)
+        self.mouseClicked.emit(event.button(), coordFormat, event.modifiers())
 
         if self.activateDrawing:
             if event.button() == Qt.LeftButton:
@@ -161,10 +164,21 @@ class navigationMapTool(QgsMapTool):
                     self.rubberBand.addPoint(mapPoint)
 
             elif event.button() == Qt.RightButton and self.drawing:
-                self.drawing = False
-                self.rubberBand.reset(QgsWkbTypes.GeometryType.LineGeometry)
+                self.reinitialiserTrace()
 
         event.accept()
+
+    def reinitialiserTrace(self):
+        """Efface la bande élastique du tracé en cours sur le canevas.
+
+        Appelée au clic droit, mais aussi par `annulerTraceEnCours()` de
+        stereoPhoto : le tracé s'abandonne au changement d'outil et
+        au changement de modèle photo, et la bande élastique doit partir avec
+        lui. Elle restait auparavant à l'écran, figurant un geste qui n'existait
+        plus.
+        """
+        self.drawing = False
+        self.rubberBand.reset(QgsWkbTypes.GeometryType.LineGeometry)
 
     def recenterMouse(self):
         if self.curseurLibre:
@@ -281,7 +295,7 @@ class navigationMapTool(QgsMapTool):
         voit : au montage de la fenêtre de QGIS, à l'ouverture du panneau de
         l'extension, et tout au long d'un déplacement de panneau latéral.
         Avertir sur l'état de passage remplissait le bandeau d'un message
-        d'action impossible — le canevas était déjà redevenu grand.
+        d'action impossible, le canevas étant déjà redevenu grand.
         """
         rect = self.canvas.viewport().rect()
 
@@ -337,7 +351,7 @@ class navigationMapTool(QgsMapTool):
         Appelée par la minuterie de `updateSafeZone()`, donc seulement sur une
         condition qui tient depuis NAVIGATION_ZONE_SURE_ALERTE_DELAI_MS : la
         disposition de la fenêtre est stabilisée, et la taille annoncée est
-        celle que l'utilisateur a réellement sous les yeux — elle est relue ici
+        celle que l'utilisateur a réellement sous les yeux : elle est relue ici
         plutôt que reprise du calcul qui a armé la minuterie.
 
         Le message va au bandeau, et pas seulement au journal : la condition
@@ -354,8 +368,8 @@ class navigationMapTool(QgsMapTool):
             f"Canevas de {rect.width()}x{rect.height()} px trop petit "
             "pour la navigation : le curseur ne peut plus être ramené "
             "au centre et sa course est limitée à la largeur du "
-            "canevas. Agrandir le canevas de QGIS — réduire, replier "
-            "ou détacher les panneaux latéraux.",
+            "canevas. Agrandir le canevas de QGIS en réduisant, repliant "
+            "ou détachant les panneaux latéraux.",
             duree_secondes=0,
         )
         self.alerteZoneSureAffichee = True

@@ -25,9 +25,9 @@ PAR_MIN_OVERLAP_RATIO = 0.05
 
 # Navigation (navigationQgsMapTool.py, stereoPhoto.py)
 
-# Comportement de navigation à l'ouverture d'une session (exigence EF-03) :
-#   False — les photos se déplacent sous un curseur immobile au centre de la vue
-#   True  — le curseur se déplace sur les photos, qui restent fixes
+# Comportement de navigation à l'ouverture d'une session :
+#   False : les photos se déplacent sous un curseur immobile au centre de la vue
+#   True  : le curseur se déplace sur les photos, qui restent fixes
 # Le photo-interprète bascule d'un comportement à l'autre en cours de session,
 # par le bouton « Débarrer le curseur » de la barre d'outils ou par la touche C.
 NAVIGATION_CURSEUR_LIBRE_PAR_DEFAUT = False
@@ -75,13 +75,37 @@ NAVIGATION_TRACE_RECENTRAGE_SEUIL_PAR_S = 10.0
 # Valeur reprise de gestionDossier.save_bbox_to_gpkg(), où elle était en dur
 # depuis l'origine du code ; à confirmer auprès de la DIF pour les secteurs
 # hors de la zone 6, un SCR projeté déjà posé sur le projet étant de toute
-# façon conservé tel quel (décision D-18).
+# façon conservé tel quel.
 # Les fichiers PAR portent des coordonnées projetées en mètres, et tout le
-# calcul de navigation — conversion coordonnée ↔ pixel image, accord d'échelle
-# entre le canevas et les vues photo — suppose des mètres. Un projet QGIS dans
+# calcul de navigation (conversion coordonnée ↔ pixel image, accord d'échelle
+# entre le canevas et les vues photo) suppose des mètres. Un projet QGIS dans
 # un SCR géographique (degrés) fausse ce calcul d'un facteur d'environ 100 000
 # sans qu'aucune erreur ne soit levée : la navigation paraît figée.
 DONNEES_SCR_EPSG = 2948
+
+# Édition vectorielle (stereoPhoto.py, editionOutils.py, editionVecteur.py)
+
+# Outil d'édition actif à l'ouverture d'une session. Valeurs admises : les
+# constantes OUTIL_* de editionOutils.py. « ajouter » reprend le comportement
+# des versions où le tracé était le seul geste offert.
+# Le photo-interprète change d'outil par la barre d'outils en cours de session.
+EDITION_OUTIL_PAR_DEFAUT = "ajouter"
+
+# Rayon de désignation d'une entité au clic, en pixels de canevas. Converti en
+# unités terrain à chaque clic par mapUnitsPerPixel() : la tolérance suit donc
+# l'échelle, et vaut autant de pixels à l'écran stéréo qu'au canevas, les deux
+# échelles étant accordées par setExtent2Canvas().
+EDITION_SELECTION_TOLERANCE_PX = 8
+
+# Épaisseur du trait des entités sélectionnées dans les vues photo (pixels
+# écran). Plus épais que GEOMETRY_PEN_WIDTH_PX, la surbrillance étant tracée
+# par-dessus la géométrie qu'elle désigne.
+EDITION_SELECTION_PEN_WIDTH_PX = 7
+
+# Couleur du trait des entités sélectionnées dans les vues photo. Reprend le
+# jaune de la sélection de QGIS, pour que les deux écrans et le canevas
+# désignent la même entité de la même façon.
+EDITION_SELECTION_COULEUR = "#ffff00"
 
 # Interface graphique (stereoPhoto.py)
 

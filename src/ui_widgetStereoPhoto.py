@@ -22,7 +22,7 @@ from qgis.core import (
     QgsProject,
     QgsWkbTypes,
 )
-from . import resources  # noqa: F401 — enregistre les icônes auprès de Qt
+from . import resources  # noqa: F401  (enregistre les icônes auprès de Qt)
 from .ui_getVectorLayer import getVectorLayerCustomList
 from .ui_graphicsWindow import Ui_graphicsWindow
 from .journal import avertir_utilisateur, obtenir_journal
@@ -599,8 +599,8 @@ class optionWindow(QtWidgets.QDockWidget):
     def verifierScrMnt(self):
         """Avertit quand le SCR du MNT n'est pas celui du projet.
 
-        Le guide d'utilisation l'exige — images, couches vectorielles et MNT
-        dans le même système — mais rien ne le contrôlait, et le sélecteur
+        Le guide d'utilisation l'exige, images, couches vectorielles et MNT
+        dans le même système, mais rien ne le contrôlait, et le sélecteur
         accepte n'importe quel `.tif` ou `.vrt`. Or le MNT 1/20 000 du MERN,
         celui que la DIF emploie, est diffusé en coordonnées géographiques :
         chargé tel quel sur un projet en mètres, son emprise ne recoupe pas
@@ -683,7 +683,7 @@ class optionWindow(QtWidgets.QDockWidget):
 
         # fenetre_mnt() borne la fenêtre au raster avant de l'allouer. Le
         # calcul qu'elle remplace allouait d'abord : un MNT dont le pas n'est
-        # pas dans l'unité du canevas — celui du MERN, en degrés — faisait
+        # pas dans l'unité du canevas (celui du MERN, en degrés) faisait
         # demander des pétaoctets et interrompait le chargement de la paire.
         # pxStart et pyStart sont désormais l'origine de la fenêtre retenue,
         # celle à laquelle readMNTWithCoord() rapporte ses indices.
@@ -721,8 +721,8 @@ class optionWindow(QtWidgets.QDockWidget):
             # par lequel une valeur du MNT entre dans l'extension, et elle
             # ressort de là en numpy.float32. Portée jusqu'à ParamDict par
             # setLastView(), elle faisait lever json.dump() à l'enregistrement
-            # des paramètres — « Object of type float32 is not JSON
-            # serializable » — après que l'ouverture en écriture avait déjà
+            # des paramètres (« Object of type float32 is not JSON
+            # serializable ») après que l'ouverture en écriture avait déjà
             # vidé le fichier. Convertie ici, aucun appelant n'a à y penser.
             return float(self.mntArr[pyRead, pxRead])
 
@@ -735,8 +735,15 @@ class optionWindow(QtWidgets.QDockWidget):
         self.setStateMNT(False, self.currentMNTPath)
 
     def setStateMNT(self, enabled, label):
-        self.ui.radioButtonCut.setEnabled(enabled)
-        self.ui.radioButtonDraw.setEnabled(enabled)
+        """Active ce que la présence d'un MNT commande, et rien de plus.
+
+        Les radios Dessiner et Découper en dépendaient : sans MNT elles
+        restaient grises, parce que l'édition de polygones était alors
+        impossible. Le MNT n'est plus exigé pour éditer : une couche sans
+        altitude n'en a pas besoin, et ces deux radios suivent l'outil actif,
+        non le MNT. Elles sont pilotées par stereoPhoto, qui seul connaît
+        l'outil actif et la couche choisie.
+        """
         self.ui.pushButtonRemoveMNT.setEnabled(enabled)
         self.ui.importLineMNT.setText(label)
 
@@ -783,8 +790,6 @@ class optionWindow(QtWidgets.QDockWidget):
         if info_raster["mnt_file"]:
             self.currentMNTPath = info_raster["mnt_file"]
             self.ui.importLineMNT.setText(os.path.basename(self.currentMNTPath))
-            self.ui.radioButtonCut.setEnabled(True)
-            self.ui.radioButtonDraw.setEnabled(True)
             self.ui.pushButtonRemoveMNT.setEnabled(True)
         else:
             self.currentMNTPath = ""
