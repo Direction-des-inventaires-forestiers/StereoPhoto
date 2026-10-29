@@ -1,4 +1,4 @@
-# Contrôle automatique du style à l'entrée du dépôt (issue GOV-01, décision D-13).
+# Contrôle automatique du style à l'entrée du dépôt.
 # Installation, une fois par poste :
 #     pip install pre-commit
 #     pre-commit install

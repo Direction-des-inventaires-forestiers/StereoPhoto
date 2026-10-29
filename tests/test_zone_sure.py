@@ -1,27 +1,27 @@
 # -*- coding: utf-8 -*-
-"""Test de la zone sûre du piège à souris (navigation synchronisée, EF-03).
+"""Test de la zone sûre du piège à souris (navigation synchronisée).
 
 Le piège à souris ne recentre le curseur que lorsqu'il sort de la zone sûre.
 Avec une marge fixe de 150 px, cette zone exigeait un canevas de plus de 300 px
 de côté : remplie au poste de stéréoscopie, la condition tombe sur un canevas
 réduit par les panneaux latéraux, et la zone dégénérait en rectangle vide.
 PyQt5 rendant un QRect vide faux, la garde booléenne de `eventFilter()` cessait
-alors de laisser passer le recentrage — sans que rien ne le signale. Le curseur
+alors de laisser passer le recentrage, sans que rien ne le signale. Le curseur
 n'était donc plus jamais ramené au centre, et sa course se limitait à la taille
 du canevas : mesuré à 98 x 28 px en session sur un poste à un seul écran, ce
 qui rend la navigation impraticable.
 
 Le test couvre les trois pièces de la correction :
 
-1. `margeZoneSure()` — la marge suit une part de la dimension du canevas,
+1. `margeZoneSure()` : la marge suit une part de la dimension du canevas,
    bornée en pixels, et reste à 150 px sur un grand canevas.
-2. `updateSafeZone()` — la zone est mise à None sous le côté minimal, et
+2. `updateSafeZone()` : la zone est mise à None sous le côté minimal, et
    rétablie dès que le canevas grandit.
 3. L'avertissement est porté au bandeau de QGIS, une seule fois par transition,
    avec les dimensions du canevas et la marche à suivre : la condition demande
    une action de l'utilisateur, et le journal n'est pas consulté en cours de
    photo-interprétation. Le rétablissement, lui, reste au journal.
-4. `avertirZoneSureLevee()` — l'avertissement est différé par une minuterie que
+4. `avertirZoneSureLevee()` : l'avertissement est différé par une minuterie que
    `updateSafeZone()` relance à chaque recalcul : le canevas passe par des
    tailles minuscules au montage de la fenêtre de QGIS et pendant le
    déplacement d'un panneau, et ces états de passage n'ont pas à encombrer le
@@ -309,7 +309,7 @@ def cas_zone(chemin_outil, constantes):
             )
 
     # Canevas trop petit pour toute zone : le piège est levé tout de suite, mais
-    # l'alerte attend l'échéance de la minuterie — la disposition de la fenêtre
+    # l'alerte attend l'échéance de la minuterie : la disposition de la fenêtre
     # de QGIS n'est pas encore stabilisée au premier calcul.
     libelle = "piège levé : alerte armée, bandeau encore vide"
     outil = OutilBouchon(CanevasBouchon(100, 80), margeZoneSure)

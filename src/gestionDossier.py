@@ -35,7 +35,7 @@ def getParDict(dossierImages):
             continue
         else:
             # ouvrir_raster() ramène à None les deux façons dont GDAL signale une
-            # image illisible — retour None, ou RuntimeError selon l'état de
+            # image illisible : retour None, ou RuntimeError selon l'état de
             # gdal.UseExceptions(), que QGIS active. On rejète alors le PAR comme
             # lorsque l'image est absente, plutôt que de laisser l'échec d'une
             # seule image interrompre la lecture de tout le dossier.

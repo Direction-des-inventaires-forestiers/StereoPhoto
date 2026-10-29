@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
-"""Test de la table d'orientation du changement de modèle (plan 3A.3, 3A.6).
+"""Test de la table d'orientation du changement de modèle.
 
 Couvre `src/orientationModele.py`, extrait de `calculNextPairWithPos()` : pour
 chacune des quatre orientations de caméra que donne l'angle kappa, chaque bord
 de cadrage franchi doit mener au bon modèle voisin. Une erreur dans cette table
-ne se voit pas en lecture — elle se manifeste par un saut vers le mauvais
+ne se voit pas en lecture : elle se manifeste par un saut vers le mauvais
 modèle, au bout d'une heure de photo-interprétation.
 
 Trois familles de cas :

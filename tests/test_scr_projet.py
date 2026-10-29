@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
-"""Test de la garde sur le SCR du projet (décision D-18).
+"""Test de la garde sur le SCR du projet.
 
 Tout le calcul de navigation suppose des coordonnées projetées en mètres : les
 fichiers PAR en portent, `setExtent2Canvas()` accorde l'échelle du canevas sur
 celle des vues en mètres par pixel, et `coordToPixel()` reçoit la coordonnée du
 canevas telle quelle. Un projet dans un SCR géographique fait donc traiter des
-degrés comme des mètres — le déplacement image tombe à environ 10⁻⁵ pixel par
+degrés comme des mètres : le déplacement image tombe à environ 10⁻⁵ pixel par
 pixel de souris, et la navigation paraît figée, sans qu'aucune erreur ne soit
 levée. C'est l'état d'un projet neuf (WGS 84), et celui qu'on obtient dès que
 les rasters ne déclarent aucun SCR.

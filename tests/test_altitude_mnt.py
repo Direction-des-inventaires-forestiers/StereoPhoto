@@ -6,7 +6,7 @@ traitait la sortie de fenêtre par un `except` sur l'indexation. Or numpy ne lè
 que pour un indice **supérieur ou égal** à la taille de l'axe : un indice
 négatif compris dans cette taille est une indexation valide, qui désigne une
 cellule à partir de la fin de l'axe. Un sommet sorti au nord ou à l'ouest de la
-fenêtre recevait donc l'altitude du bord opposé du MNT — sans lever, sans être
+fenêtre recevait donc l'altitude du bord opposé du MNT, sans lever, sans être
 compté au résumé de fin de traitement, et sans retomber sur le calcul
 stéréoscopique.
 

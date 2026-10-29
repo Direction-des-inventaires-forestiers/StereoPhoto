@@ -1,20 +1,20 @@
 # -*- coding: utf-8 -*-
-"""Garde contre le retour de la boucle de rétroaction sur l'altitude (D-19).
+"""Garde contre le retour de la boucle de rétroaction sur l'altitude.
 
 `mouseMoveEvent()` et `wheelActionEvent()` calculent les positions image de la
 croix à partir de `cursorAltitude`, puis cadrent les vues dessus. Y mesurer
 ensuite l'altitude par la parallaxe entre les deux vues referme une boucle :
 la mesure ne peut que rendre la valeur qui vient d'être écrite, aux arrondis
-près — pixels entiers du défilement des vues, miroir de la vue droite — et ces
+près (pixels entiers du défilement des vues, miroir de la vue droite), et ces
 arrondis s'accumulent dans le même sens. L'altitude dérivait ainsi de plusieurs
 milliers de mètres au fil d'une session, sans jamais remonter.
 
 Le défaut est de structure et non de valeur : il ne se voit pas sur un appel
 isolé, mais sur l'enchaînement de milliers de mouvements. Le test est donc lui
-aussi structurel — il lit l'arbre syntaxique de `stereoPhoto.py` et vérifie que
+aussi structurel : il lit l'arbre syntaxique de `stereoPhoto.py` et vérifie que
 les chemins de navigation ne mesurent plus l'altitude :
 
-1. aucun chemin de navigation ne mesure l'altitude — ni par un appel à
+1. aucun chemin de navigation ne mesure l'altitude, ni par un appel à
    l'ancienne méthode `updateUserAltitude()`, retirée du module, ni par un
    appel direct à `calculateZ()` ;
 2. la mesure de parallaxe n'a lieu qu'au chargement d'une paire, dans
@@ -96,7 +96,7 @@ def appelle_parallaxe(noeud):
     """Vrai si le corps d'une méthode appelle calculateZ(), sur quoi que ce soit.
 
     Le porteur n'est pas vérifié : `self.dualManager.calculateZ()` aujourd'hui,
-    un gestionnaire rangé autrement demain — c'est l'appel à la mesure qui est
+    un gestionnaire rangé autrement demain : c'est l'appel à la mesure qui est
     surveillé, pas le chemin qui y mène.
     """
     for interne in ast.walk(noeud):

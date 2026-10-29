@@ -11,7 +11,7 @@ Trois défauts enchaînés, relevés à l'usage le 2026-10-22 dès qu'un MNT ré
    stéréoscopique, en `float` natif, et le défaut dormait.
 
 2. **Une écriture non atomique.** `saveParamFile()` ouvrait le fichier de
-   destination en écriture — ce qui le vide — puis sérialisait dedans. La levée
+   destination en écriture, ce qui le vide, puis sérialisait dedans. La levée
    ci-dessus laissait donc un JSON tronqué : `{ "position": { "longitude":`.
 
 3. **Une lecture sans repli.** `loadParamFile()` lisait sans gestion d'erreur :

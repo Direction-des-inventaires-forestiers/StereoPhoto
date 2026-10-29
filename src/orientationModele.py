@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Orientation de la caméra et direction du modèle voisin (plan 3A.3).
+"""Orientation de la caméra et direction du modèle voisin.
 
 Quand la vue atteint le bord du modèle affiché, le modèle voisin à charger
 dépend de l'orientation de la caméra : un bord franchi à gauche dans le repère

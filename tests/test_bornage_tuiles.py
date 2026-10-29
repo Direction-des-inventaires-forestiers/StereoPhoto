@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Test du bornage des rectangles de chargement de tuiles (registre P1-I).
+"""Test du bornage des rectangles de chargement de tuiles.
 
 Rejoue le scénario du journal du 2026-09-29 : la vue de la fenêtre d'affichage
 se retrouve entièrement hors de l'image, `calculate_load_rects()` produit des

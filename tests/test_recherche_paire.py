@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Test de la recherche de paire par position (registre P1-J).
+"""Test de la recherche de paire par position.
 
 Rejoue l'erreur relevée en test manuel le 2026-09-30 : le centre du canevas
 QGIS se trouvait à environ 10 730 km de la zone des photos, aucune distance ne

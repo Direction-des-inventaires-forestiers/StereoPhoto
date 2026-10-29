@@ -1,4 +1,4 @@
-# Vérification du style sur chaque demande de tirage (issue GOV-01, décision D-13).
+# Vérification du style sur chaque demande de tirage.
 # Le hook local n'est pas installé par un simple clonage et peut être contourné
 # avec `git commit --no-verify` : seule cette vérification, combinée à la
 # protection de la branche principale, garantit le contrôle.

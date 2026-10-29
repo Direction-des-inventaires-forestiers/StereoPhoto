@@ -1,4 +1,4 @@
-# Exécution du banc de tests sur chaque demande de tirage (issues A7 et 3A.6).
+# Exécution du banc de tests sur chaque demande de tirage.
 # Même raison que pour le contrôle du style : le banc s'exécutait à la main sur
 # le poste de développement, donc rien ne garantissait qu'une demande de tirage
 # le laisse vert. Combinée à la protection de la branche principale, cette
@@ -8,7 +8,7 @@
 # module par analyse syntaxique et l'exécute avec des bouchons. Seul
 # tests/test_altitude_mnt.py demande numpy, la lecture d'altitude étant éprouvée
 # sur un vrai tableau. La dépendance est installée ici plutôt que déclarée dans
-# un fichier de dépendances, le dépôt de la DIF n'en portant pas (décision D-11).
+# un fichier de dépendances, le dépôt de la DIF n'en portant pas.
 name: Tests
 
 on:

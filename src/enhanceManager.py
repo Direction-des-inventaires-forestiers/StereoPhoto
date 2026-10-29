@@ -473,7 +473,7 @@ class enhanceManager(QObject):
                 self.currentPixVal = self.prevListParam[9]
 
     # Calcul de l'histogramme sur une portion de la photo lorsque l'on veut conserver le min/max pour la vue courante
-    # ATTENTION (registre B-02, item P1-E) : la fonction retourne une plage fixe 0-255 par bande.
+    # ATTENTION : la fonction retourne une plage fixe 0-255 par bande.
     # Le calcul réel de l'histogramme se trouvait après ce return et n'a donc jamais été exécuté;
     # il a été retiré le 2026-09-17 comme code mort (récupérable dans l'historique Git).
     # Conséquence fonctionnelle : l'option « conserver le min/max de la vue courante » est sans effet,
@@ -596,7 +596,7 @@ class threadShow(QThread):
             or self.sceneRect.top() > y1
         ):
             _journal.warning(
-                "Vue hors de la zone utile — image %sx%s, rognage %s, "
+                "Vue hors de la zone utile : image %sx%s, rognage %s, "
                 "vue [%.1f, %.1f, %.1f, %.1f]; aucune tuile à charger",
                 self.width,
                 self.height,
@@ -611,7 +611,7 @@ class threadShow(QThread):
         # dizaines de milliers de pixels de l'image sans que la cause amont soit
         # identifiée. À retirer une fois le positionnement de la vue validé.
         _journal.debug(
-            "Rectangles de chargement — image %sx%s, rognage %s, "
+            "Rectangles de chargement : image %sx%s, rognage %s, "
             "vue [%.1f, %.1f, %.1f, %.1f], rectangles %s",
             self.width,
             self.height,
@@ -717,7 +717,7 @@ class threadShow(QThread):
     def applyEnhancements(self, arr, params):
         arr = arr.astype(np.float32, copy=False)
 
-        # --- Min–Max Stretch ---
+        # --- Min/Max Stretch ---
         if params[7]:  # stretch flag
             stats = []
             if self.stats is None:
@@ -839,7 +839,7 @@ class threadShow(QThread):
 
             else:
                 # Retour None (et non None, None) : applyEnhancements() teste « if self.stats is None »,
-                # un tuple aurait franchi la garde et fait échouer l'étirement min/max (registre B-02, item P1-G).
+                # un tuple aurait franchi la garde et fait échouer l'étirement min/max.
                 return None
 
             arr_flat = arr[np.isfinite(arr)]

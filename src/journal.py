@@ -348,7 +348,7 @@ def initialiser_journal(dossier=None, niveau=None):
 
     version = version_extension()
     logger.info(
-        "Journalisation démarrée — StereoPhoto %s, niveau %s, fichier %s",
+        "Journalisation démarrée : StereoPhoto %s, niveau %s, fichier %s",
         version or "version inconnue",
         niveau,
         chemin or "aucun",

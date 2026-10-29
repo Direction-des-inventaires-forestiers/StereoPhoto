@@ -1,18 +1,18 @@
 # -*- coding: utf-8 -*-
-"""Outil de carte de l'état hors-synchronisation (plan 3A.3, décision D-14).
+"""Outil de carte de l'état hors-synchronisation.
 
 Avant ce module, la touche ESC retirait l'outil de navigation du canevas
 (`unsetMapTool`) : l'état atteint n'était pas un mode mais une absence d'outil,
-plus aucun code de l'extension ne s'exécutait, et les trois fonctions demandées
-par l'exigence EF-03 — zoom à la roulette, navigation « main », changement
-automatique de modèle à la limite — étaient irréalisables.
+plus aucun code de l'extension ne s'exécutait, et les trois fonctions attendues
+dans cet état (zoom à la roulette, navigation « main », changement automatique
+de modèle à la limite) étaient irréalisables.
 
 Cet outil occupe cette place. Il garde de `navigationMapTool` le seul couplage
 aux vues photo qui existe, les signaux Qt, et laisse tomber ce qui gêne hors
 navigation :
 
 - pas de filtre d'événements posé sur `qApp` : les raccourcis natifs de QGIS
-  répondent de nouveau, ce qui lève le risque R-13 ;
+  répondent de nouveau ;
 - pas de piège à souris : le curseur sort librement du canevas ;
 - pas de tracé : l'édition reste à la navigation synchronisée.
 
@@ -75,7 +75,7 @@ class horsSyncMapTool(QgsMapTool):
             event.accept()
 
     def wheelEvent(self, event):
-        # Décision D-15 : la roulette seule zoome ici, alors qu'elle règle la
+        # La roulette seule zoome ici, alors qu'elle règle la
         # parallaxe en navigation synchronisée. Le photo-interprète ne règle
         # pas la parallaxe dans un état où les photos ne suivent plus.
         if event.angleDelta().y() < 0:

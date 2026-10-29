@@ -4,8 +4,8 @@
 `removeCurrentScene()` conditionnait son attente au drapeau
 `showThreadInProcess`, puis relâchait la dernière référence Python du thread.
 Or ce drapeau est posé et retiré *dans* `run()`, donc sur le thread de travail :
-il est faux entre `start()` et l'entrée dans `run()` — de 24 à 98 ms, mesuré sur
-quatorze changements de modèle — puis de nouveau entre son retrait dans le
+il est faux entre `start()` et l'entrée dans `run()` (de 24 à 98 ms, mesuré
+sur quatorze changements de modèle), puis de nouveau entre son retrait dans le
 `finally` de `run()` et la fin réelle du thread. Dans ces deux fenêtres,
 l'attente était sautée et un QThread en cours d'exécution se faisait détruire :
 Qt interrompait alors le processus, sans trace au journal.

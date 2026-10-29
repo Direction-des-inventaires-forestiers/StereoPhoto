@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Lanceur du banc de tests du dépôt (registre A7, tâche 3A.6).
+"""Lanceur du banc de tests du dépôt.
 
 Le banc est fait de scripts autonomes : chaque fichier `tests/test_*.py`
 extrait par analyse syntaxique la fonction visée de son module, l'exécute avec
@@ -64,7 +64,7 @@ def executer_un(nom):
     # Les libellés sont accentués. Sans PYTHONIOENCODING, le processus enfant
     # suit la page de codes de la console sous Windows : la sortie revient
     # illisible, ou l'enfant lève à l'écriture. Même dépendance à la page de
-    # codes que le défaut P1-H, et même traitement.
+    # codes que le repli d'encodage des fichiers PAR, et même traitement.
     environnement = dict(os.environ, PYTHONIOENCODING="utf-8")
     depart = time.monotonic()
     resultat = subprocess.run(

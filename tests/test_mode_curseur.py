@@ -1,15 +1,15 @@
 # -*- coding: utf-8 -*-
-"""Test de la bascule entre les deux comportements de navigation (plan 3A.2).
+"""Test de la bascule entre les deux comportements de navigation.
 
-Couvre les deux pièces de l'exigence EF-03 qui décident du comportement, sans
+Couvre les deux pièces qui décident du comportement, sans
 passer par l'interface :
 
-1. `navigationMapTool.recenterMouse()` — le piège à souris. En mode synchronisé
+1. `navigationMapTool.recenterMouse()`, le piège à souris. En mode synchronisé
    il recentre la carte et téléporte le curseur ; en mode curseur libre il doit
    être inerte, sans quoi les photos continueraient de défiler.
-2. `stereoPhoto.afficherAltitude()` — l'affichage de l'altitude au panneau.
+2. `stereoPhoto.afficherAltitude()`, l'affichage de l'altitude au panneau.
    Elle est portée par les deux modes et ne doit jamais être recalculée depuis
-   la position des vues (décision D-19, #48) : seul son affichage est ici en
+   la position des vues : seul son affichage est ici en
    jeu, avec le repli « N/D » quand la parallaxe est incalculable.
 
 Les deux fonctions sont extraites de leur fichier source par analyse
@@ -200,7 +200,7 @@ def cas_altitude(chemin_app):
     else:
         print("OK     %-52s" % libelle)
 
-    # Altitude indéterminée : le repli « N/D » de P1-D doit tenir dans les deux
+    # Altitude indéterminée : le repli « N/D » doit tenir dans les deux
     # modes, la parallaxe pouvant être incalculable où que soit la croix.
     libelle = "altitude indéterminée : repli « N/D »"
     app = ApplicationBouchon(altitude=None)

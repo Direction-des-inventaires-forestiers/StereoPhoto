@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """Accès aux rasters : ouverture, et chargement d'une fenêtre de MNT.
 
-Les deux fonctions sont ici parce qu'elles servent les mêmes appelants — la
+Les deux fonctions sont ici parce qu'elles servent les mêmes appelants (la
 lecture du MNT par le panneau d'options et par le thread de calcul des
-géométries — et qu'aucune ne dépend de QGIS ni de Qt, deux de ces appelants
+géométries) et qu'aucune ne dépend de QGIS ni de Qt, deux de ces appelants
 étant des threads.
 
 ## Ouverture d'un raster par GDAL, sous les deux conventions d'erreur.
@@ -11,16 +11,16 @@ géométries — et qu'aucune ne dépend de QGIS ni de Qt, deux de ces appelants
 `gdal.Open()` signale un fichier illisible de deux façons, selon l'état de
 `gdal.UseExceptions()` :
 
-- exceptions désactivées — il retourne `None` ;
-- exceptions activées — il lève `RuntimeError`, et rien n'est retourné.
+- exceptions désactivées : il retourne `None` ;
+- exceptions activées : il lève `RuntimeError`, et rien n'est retourné.
 
 QGIS 3.44 les active, l'exécution hors de QGIS ne les active pas, et GDAL 4.0
 les activera partout par défaut. Le même code tournant dans les deux contextes,
 une garde posée sur une seule des deux conventions est inerte dans l'autre.
 C'est ce qui laissait, en session QGIS, un dossier contenant une seule image
 corrompue sans aucune paire, et un MNT illisible interrompre le chargement
-d'une paire — sans trace au journal dans les deux cas, l'exception partant vers
-la fenêtre d'erreur Python de QGIS.
+d'une paire, sans trace au journal dans les deux cas, l'exception partant
+vers la fenêtre d'erreur Python de QGIS.
 
 `ouvrir_raster()` ramène les deux cas à un seul retour `None`, après avoir
 journalisé le fichier en cause. Les appelants gardent leur `if ... is None`,
@@ -58,8 +58,8 @@ def ouvrir_raster(chemin, mode=gdal.GA_ReadOnly):
     l'erreur d'ouverture de GDAL est interceptée ; toute autre exception
     remonte à l'appelant.
 
-    L'appelant décide de la suite — écarter la donnée et poursuivre, revenir au
-    calcul stéréoscopique, ou refuser la paire — et c'est à lui qu'il revient
+    L'appelant décide de la suite (écarter la donnée et poursuivre, revenir au
+    calcul stéréoscopique, ou refuser la paire) et c'est à lui qu'il revient
     d'avertir l'utilisateur si la condition demande une action de sa part.
     """
 
@@ -67,7 +67,9 @@ def ouvrir_raster(chemin, mode=gdal.GA_ReadOnly):
         jeu = gdal.Open(chemin, mode)
     except RuntimeError as erreur:
         _journal.warning(
-            "Raster illisible, écarté : %s — %s", chemin, motif_echec(erreur)
+            "Raster illisible, écarté : %s ; motif : %s",
+            chemin,
+            motif_echec(erreur),
         )
         return None
 
@@ -88,9 +90,9 @@ def fenetre_mnt(bande, geo, taille, emprise, nodata, chemin=""):
     Retourne `(None, 0, 0)` quand l'emprise ne recoupe pas le raster.
 
     **Le bornage précède l'allocation**, et non l'inverse. Calculée sur un MNT
-    dont le pas n'est pas dans l'unité de l'emprise — un MNT en degrés contre
+    dont le pas n'est pas dans l'unité de l'emprise (un MNT en degrés contre
     des coordonnées de canevas en mètres, cas du MNT 1/20 000 du MERN chargé
-    sans reprojection — la fenêtre demandée atteint des dizaines de millions de
+    sans reprojection), la fenêtre demandée atteint des dizaines de millions de
     cellules par axe, et l'allocation épuise la mémoire avant qu'aucune
     vérification ait lieu : 9,9 Pio demandés, mesurés en session. Bornée
     d'abord, la fenêtre ne peut pas excéder la taille du raster, et le cas se
