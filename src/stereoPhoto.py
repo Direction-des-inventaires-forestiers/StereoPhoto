@@ -432,6 +432,7 @@ class stereoPhoto(object):
         self.optWindow.ui.pushButtonFindBestPair.clicked.connect(
             self.findPairWithPosition
         )
+        self.optWindow.couchesAffichageChangees.connect(self.rafraichirGeometries)
         self.optWindow.closeWindow.connect(self.optWindowClose)
         self.optWindow.ui.pushButtonCloseWindow.clicked.connect(
             self.closeAllSideWindows

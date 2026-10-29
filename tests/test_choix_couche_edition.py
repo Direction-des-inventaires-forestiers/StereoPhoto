@@ -582,6 +582,89 @@ def casCouleurSansIndiceCapture(chemin_fenetre, chemin_widget, chemin_app):
     return echecs, "ligne retrouvée par le bouton émetteur"
 
 
+def casChoixAtteintLAffichage(chemin_fenetre, chemin_widget, chemin_app):
+    """Choisir des couches doit relancer le dessin des vues photo.
+
+    Les vues photo affichent le résultat du dernier calcul du fil, et rien ne
+    le relançait au seul choix des couches : désigner une couche en cours de
+    navigation ne faisait rien paraître, et les entités déjà tracées
+    n'apparaissaient qu'au geste d'édition suivant, d'un coup.
+    """
+    echecs = []
+    source = lire(chemin_widget)
+    arbre = ast.parse(source)
+
+    classe = next(
+        (
+            n
+            for n in ast.walk(arbre)
+            if isinstance(n, ast.ClassDef) and n.name == "optionWindow"
+        ),
+        None,
+    )
+    if classe is None:
+        echecs.append("classe optionWindow introuvable dans %s" % chemin_widget)
+        return echecs, "classe absente"
+
+    signaux = {
+        cible.id
+        for noeud in classe.body
+        if isinstance(noeud, ast.Assign)
+        for cible in noeud.targets
+        if isinstance(cible, ast.Name)
+    }
+    if "couchesAffichageChangees" not in signaux:
+        echecs.append("optionWindow n'annonce pas le changement des couches affichées")
+
+    accepte = next(
+        (
+            n
+            for n in ast.walk(classe)
+            if isinstance(n, ast.FunctionDef) and n.name == "importVectorAccept"
+        ),
+        None,
+    )
+    extrait = ast.get_source_segment(source, accepte) or "" if accepte else ""
+    if "couchesAffichageChangees.emit()" not in extrait:
+        echecs.append(
+            "importVectorAccept n'annonce rien : les vues photo garderaient "
+            "leur dessin précédent"
+        )
+    else:
+        lignes = extrait.splitlines()
+        rang_annonce = next(
+            i for i, ligne in enumerate(lignes) if "couchesAffichageChangees" in ligne
+        )
+        rang_couche = next(
+            (i for i, ligne in enumerate(lignes) if "importLineVectorLayer" in ligne),
+            None,
+        )
+        if rang_couche is not None and rang_annonce < rang_couche:
+            echecs.append(
+                "l'annonce précède la pose de la couche d'édition : le dessin "
+                "partirait d'un état incomplet"
+            )
+
+    source_app = lire(chemin_app)
+    arbre_app = ast.parse(source_app)
+    connexions = next(
+        (
+            n
+            for n in ast.walk(arbre_app)
+            if isinstance(n, ast.FunctionDef) and n.name == "setConnection"
+        ),
+        None,
+    )
+    extrait_app = (
+        ast.get_source_segment(source_app, connexions) or "" if connexions else ""
+    )
+    if "couchesAffichageChangees.connect" not in extrait_app:
+        echecs.append("setConnection n'écoute pas le changement des couches affichées")
+    elif "rafraichirGeometries" not in extrait_app:
+        echecs.append("l'annonce des couches ne relance pas le calcul des géométries")
+    return echecs, "annonce émise, écoutée, et le dessin relancé"
+
+
 def casFenetreAccordeeAuContenu(chemin_fenetre, chemin_widget, chemin_app):
     """La fenêtre doit s'accorder au tableau, sans barre de défilement.
 
@@ -673,6 +756,7 @@ CAS = (
     ("sortie pour la couche précédente", casSortiePourLaCouchePrecedente),
     ("couleur sans indice capturé", casCouleurSansIndiceCapture),
     ("fenêtre accordée au contenu", casFenetreAccordeeAuContenu),
+    ("le choix atteint l'affichage", casChoixAtteintLAffichage),
 )
 
 

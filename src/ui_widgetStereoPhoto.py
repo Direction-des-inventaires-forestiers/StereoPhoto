@@ -482,6 +482,11 @@ class dropedit(QtWidgets.QGroupBox):
 class optionWindow(QtWidgets.QDockWidget):
     closeWindow = pyqtSignal()
 
+    # Le jeu de couches à dessiner, ou leurs couleurs, viennent de changer.
+    # Les vues photo n'en savent rien autrement : elles affichent le résultat
+    # du dernier calcul, et rien ne le relançait au seul choix des couches.
+    couchesAffichageChangees = pyqtSignal()
+
     def __init__(self, iface):
         QtWidgets.QMainWindow.__init__(self, iface.mainWindow())
         self.ui = Ui_StereoDockWidget()
@@ -567,6 +572,13 @@ class optionWindow(QtWidgets.QDockWidget):
             self.vLayer = self.dictLayerName[self.vLayerName]
             self.ui.importLineVectorLayer.setText(self.vLayerName)
         self.vectorWindow.close()
+
+        # Après la pose de la couche d'édition : `setText` ci-dessus déclenche
+        # déjà mNewVectorLayer, et le dessin doit partir d'un état complet.
+        # L'annonce vaut aussi quand le nom de la couche d'édition ne change
+        # pas, l'utilisateur ayant pu n'ajouter qu'une couche à l'affichage ou
+        # ne changer qu'une couleur.
+        self.couchesAffichageChangees.emit()
 
     def importVectorCancel(self):
         self.vectorWindow.close()
