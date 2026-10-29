@@ -69,6 +69,20 @@ NAVIGATION_ARRET_THREAD_DELAI_MAX_MS = 5000
 NAVIGATION_TRACE_RECENTRAGE_INTERVALLE_S = 2.0
 NAVIGATION_TRACE_RECENTRAGE_SEUIL_PAR_S = 10.0
 
+# Écart maximal (mètres) toléré entre l'altitude du curseur et le MNT sous la
+# paire, au chargement d'un modèle. Au-delà, l'altitude du curseur est ramenée
+# à celle du MNT.
+# La croix est projetée dans les vues photo à l'altitude du curseur, alors que
+# les géométries le sont à celle du MNT : tout écart les sépare à l'écran du
+# déplacement dû au relief, qui vaut la distance au nadir multipliée par
+# l'écart et divisée par la hauteur de vol. Sur les photos du mandat, 5000 m
+# de hauteur de vol et 2000 m de distance au nadir au bord de l'image, un
+# écart de 50 m vaut déjà 20 m au sol.
+# Le seuil n'est pas nul : la marque flottante se pose volontairement au-dessus
+# du sol sous couvert, la cime pouvant dépasser le terrain de plusieurs
+# dizaines de mètres, et cet écart-là est un choix du photo-interprète.
+NAVIGATION_ECART_ALTITUDE_MNT_MAX_M = 50.0
+
 # Système de référence des coordonnées (stereoPhoto.py, gestionDossier.py)
 
 # SCR des données photogrammétriques du mandat : NAD83(CSRS) / MTM zone 6.

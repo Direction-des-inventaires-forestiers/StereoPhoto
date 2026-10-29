@@ -105,6 +105,7 @@ from .config import (
     EDITION_SELECTION_TOLERANCE_PX,
     NAVIGATION_ARRET_THREAD_DELAI_MAX_MS,
     NAVIGATION_CURSEUR_LIBRE_PAR_DEFAUT,
+    NAVIGATION_ECART_ALTITUDE_MNT_MAX_M,
     PAR_CAMERA_ORIENTATION_TOLERANCE_DEG,
     DRAW_LINE_PEN_WIDTH_PX,
     GEOMETRY_PEN_WIDTH_PX,
@@ -1736,7 +1737,55 @@ class stereoPhoto(object):
             if altitude is not None:
                 self.cursorAltitude = altitude
 
+        self.accorderAltitudeAuTerrain(midLPix)
         self.afficherAltitude()
+
+    def accorderAltitudeAuTerrain(self, pixelCentreGauche):
+        """Ramène l'altitude du curseur au MNT quand elle s'en écarte trop.
+
+        La vue mémorisée a priorité sur le MNT dans la cascade ci-dessus, et
+        cette position est restaurée du fichier de paramètres à l'ouverture du
+        dossier : une altitude héritée d'une autre session, ou d'une lecture
+        fautive, revenait à chaque ouverture sans que rien ne la confronte au
+        terrain sous la paire.
+
+        Ce n'est pas qu'un défaut d'affichage. La croix est projetée dans les
+        vues à l'altitude du curseur, les géométries à celle du MNT : un écart
+        les sépare à l'écran du déplacement dû au relief. Le photo-interprète
+        qui vise une entité dans la photo saisit alors une position fausse
+        d'autant, et rien ne le lui signale.
+
+        Sans MNT, il n'y a rien à confronter : l'altitude reste celle que la
+        cascade a retenue, et la mesure de parallaxe sur les centres des
+        découpes garde le dernier mot.
+        """
+        if self.optWindow.mntArr is None or self.cursorAltitude is None:
+            return
+
+        if self.lastCurrentView:
+            position = self.lastCurrentView[:2]
+        else:
+            position = self.leftPictureManager.pixelToCoord(
+                pixelCentreGauche, self.cursorAltitude
+            )
+
+        altitudeSol = self.optWindow.readMNTWithCoord(position)
+        if altitudeSol is None or altitudeSol == self.optWindow.mntNodata:
+            return
+
+        ecart = abs(self.cursorAltitude - altitudeSol)
+        if ecart <= NAVIGATION_ECART_ALTITUDE_MNT_MAX_M:
+            return
+
+        self.journal.warning(
+            "Altitude du curseur ramenée de %.1f m à %.1f m : %.0f m d'écart "
+            "avec le MNT sous la paire %s",
+            self.cursorAltitude,
+            altitudeSol,
+            ecart,
+            getattr(self, "leftParID", None),
+        )
+        self.cursorAltitude = altitudeSol
 
     def openMNT(self):
         pass
