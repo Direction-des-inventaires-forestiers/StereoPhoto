@@ -2563,6 +2563,7 @@ class stereoPhoto(object):
         couche.editingStopped.connect(self.majEtatActionsEdition)
         couche.layerModified.connect(self.majEtatActionsEdition)
         couche.selectionChanged.connect(self.selectionCoucheChangee)
+        couche.afterRollBack.connect(self.retourArriereCouche)
         couche.undoStack().canUndoChanged.connect(self.majEtatActionsEdition)
 
         self.coucheRaccordee = couche
@@ -2579,6 +2580,7 @@ class stereoPhoto(object):
             ("editingStopped", self.majEtatActionsEdition),
             ("layerModified", self.majEtatActionsEdition),
             ("selectionChanged", self.selectionCoucheChangee),
+            ("afterRollBack", self.retourArriereCouche),
         ):
             try:
                 getattr(couche, nomSignal).disconnect(recepteur)
@@ -2604,6 +2606,26 @@ class stereoPhoto(object):
             except RuntimeError:
                 peutAnnuler = False
         self.actionAnnulerEdition.setEnabled(bool(peutAnnuler))
+
+    def retourArriereCouche(self):
+        """La couche a été ramenée à son dernier état enregistré, hors d'ici.
+
+        Fermer le mode édition dans QGIS en refusant les modifications vide le
+        tampon de la couche. Les vues photo ne lisent pas la couche : elles
+        affichent le résultat du dernier calcul du fil, qui n'est relancé que
+        par les gestes d'édition faits ici. Sans cette relance, les entités
+        abandonnées restaient dessinées dans les deux vues alors qu'elles
+        n'existaient plus nulle part.
+        """
+        self.journal.info(
+            "Retour en arrière sur la couche %s : les vues sont redessinées",
+            self.vectorLayerName,
+        )
+        # Les sommets accumulés appartenaient à la session qui vient d'être
+        # abandonnée : les garder ferait enjamber deux sessions au geste suivant.
+        self.annulerTraceEnCours()
+        self.rafraichirGeometries()
+        self.majEtatActionsEdition()
 
     def selectionCoucheChangee(self, *_args):
         """La sélection a changé, ici ou dans QGIS : la surbrillance suit.

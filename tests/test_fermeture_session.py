@@ -29,6 +29,7 @@ du dépôt. Sortie 0 si tout passe, 1 sinon.
 import ast
 import io
 import os
+import re
 import sys
 
 RACINE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -463,6 +464,60 @@ def executer(dossier_source):
         "Modifications en attente : question avant la démolition",
         echecs,
         question_avant_demolition,
+    )
+
+    # --- Raccordements de couche : tout ce qui est posé doit être rompu -----
+    def raccordements_symetriques():
+        """Chaque signal raccordé à la couche doit avoir sa rupture.
+
+        La couche change au fil de la session et survit à l'extension : un
+        signal raccordé sans rupture empile les connexions à chaque changement
+        de couche, puis appelle une méthode d'une session démolie. Le contrôle
+        est sur la forme, les deux méthodes étant de pures listes de signaux.
+        """
+        source = io.open(chemin_app, encoding="utf-8").read()
+        arbre = ast.parse(source)
+        segments = {}
+        for noeud in ast.walk(arbre):
+            if isinstance(noeud, ast.FunctionDef) and noeud.name in (
+                "raccorderCoucheEditable",
+                "rompreRaccordementCouche",
+            ):
+                segments[noeud.name] = ast.get_source_segment(source, noeud) or ""
+
+        manquantes = {"raccorderCoucheEditable", "rompreRaccordementCouche"} - set(
+            segments
+        )
+        assert not manquantes, "méthode(s) introuvable(s) : %s" % ", ".join(
+            sorted(manquantes)
+        )
+
+        pose = segments["raccorderCoucheEditable"]
+        rompu = segments["rompreRaccordementCouche"]
+
+        raccordes = set(re.findall(r"couche\.(\w+)\.connect\(", pose))
+        nommes = set(re.findall(r'\("(\w+)",', rompu))
+        oublies = sorted(raccordes - nommes)
+        assert not oublies, "signal(s) raccordé(s) sans rupture : %s" % ", ".join(
+            oublies
+        )
+
+        if "undoStack().canUndoChanged.connect(" in pose:
+            assert "undoStack().canUndoChanged.disconnect(" in rompu, (
+                "la pile d'annulation est raccordée sans rupture"
+            )
+
+        # Le signal du retour en arrière doit être au nombre : sans lui, les
+        # entités abandonnées restent dessinées dans les deux vues photo.
+        assert "afterRollBack" in raccordes, (
+            "le retour en arrière de la couche n'est pas suivi : les vues "
+            "garderaient des entités qui n'existent plus"
+        )
+
+    verifier(
+        "Raccordements de couche : chaque pose a sa rupture",
+        echecs,
+        raccordements_symetriques,
     )
 
     return echecs
