@@ -1237,6 +1237,13 @@ class stereoPhoto(object):
             )
             return
 
+        # La couche d'édition change en cours de session : le tampon de la
+        # précédente lui reste attaché dans QGIS, mais la barre StereoPhoto ne
+        # le commandera plus. Sans la question ici, l'utilisateur perd de vue
+        # des modifications qu'il croit enregistrées.
+        if self.vectorLayer is not None and self.vectorLayer is not couche:
+            self.demanderSortEditions()
+
         self.enableDraw = True
         self.vectorLayer = couche
         self.vectorLayerName = self.optWindow.vLayerName
@@ -2629,7 +2636,10 @@ class stereoPhoto(object):
         self.majEtatActionsEdition()
 
     def demanderSortEditions(self):
-        """Propose d'enregistrer les modifications en attente, à la fermeture.
+        """Propose d'enregistrer les modifications en attente de la couche.
+
+        Appelée à la fermeture de session et au changement de couche d'édition,
+        les deux moments où la barre StereoPhoto cesse de commander le tampon.
 
         Rien n'est perdu si l'utilisateur décline : le tampon d'édition
         appartient à la couche, qui survit à la session StereoPhoto, et QGIS le

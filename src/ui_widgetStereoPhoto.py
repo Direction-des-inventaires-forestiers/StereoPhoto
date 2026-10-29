@@ -23,7 +23,13 @@ from qgis.core import (
     QgsWkbTypes,
 )
 from . import resources  # noqa: F401  (enregistre les icônes auprès de Qt)
-from .ui_getVectorLayer import getVectorLayerCustomList
+from .ui_getVectorLayer import (
+    COLONNE_AFFICHER,
+    COLONNE_ALTITUDE,
+    COLONNE_COULEUR,
+    COLONNE_NOM,
+    getVectorLayerCustomList,
+)
 from .ui_graphicsWindow import Ui_graphicsWindow
 from .journal import avertir_utilisateur, obtenir_journal
 
@@ -538,28 +544,26 @@ class optionWindow(QtWidgets.QDockWidget):
 
     # Création de l'objet qui réprésente la couche vectorielle
     def importVectorAccept(self):
+        tableau = self.vectorWindow.ui.tableWidget
         self.vectorToShow = {}
-        for i in range(self.vectorWindow.ui.tableWidget.rowCount()):
-            afficher = self.vectorWindow.ui.tableWidget.cellWidget(i, 0)
-            nomCouche = self.vectorWindow.ui.tableWidget.item(i, 1).text()
-            couleur = self.vectorWindow.ui.tableWidget.cellWidget(i, 2).property(
-                "color"
-            )
-            utiliser3D = self.vectorWindow.ui.tableWidget.cellWidget(i, 3).isChecked()
+        for i in range(tableau.rowCount()):
+            afficher = tableau.cellWidget(i, COLONNE_AFFICHER)
+            nomCouche = tableau.item(i, COLONNE_NOM).text()
+            couleur = tableau.cellWidget(i, COLONNE_COULEUR).property("color")
+            utiliser3D = tableau.cellWidget(i, COLONNE_ALTITUDE).isChecked()
             if afficher.isChecked():
                 self.vectorToShow[nomCouche] = [couleur, utiliser3D]
 
-        currentRow = self.vectorWindow.ui.tableWidget.currentRow()
+        # L'affichage et l'édition sont deux choix distincts : les cases
+        # Afficher commandent ce qui se dessine, la colonne Édition commande la
+        # couche qui reçoit la sélection et les gestes. Le repli ne sert plus
+        # qu'à un tableau incohérent, la fenêtre garantissant une désignation.
+        coucheEdition = self.vectorWindow.nomCoucheEdition()
         currentVectors = list(self.vectorToShow.keys())
         if len(currentVectors) > 0:
-            if currentRow == -1:
-                editLayer = ""
-            else:
-                editLayer = self.vectorWindow.ui.tableWidget.item(currentRow, 1).text()
             self.vLayerName = (
-                editLayer if editLayer in currentVectors else currentVectors[0]
+                coucheEdition if coucheEdition in currentVectors else currentVectors[0]
             )
-            # self.vLayerName = self.vectorWindow.ui.tableWidget.itemWidget(self.vectorWindow.ui.listWidget.selectedItems()[0]).label.text()
             self.vLayer = self.dictLayerName[self.vLayerName]
             self.ui.importLineVectorLayer.setText(self.vLayerName)
         self.vectorWindow.close()
