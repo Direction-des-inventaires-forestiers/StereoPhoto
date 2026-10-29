@@ -16,8 +16,9 @@ from qgis.core import *
 COLONNE_AFFICHER = 0
 COLONNE_NOM = 1
 COLONNE_COULEUR = 2
-COLONNE_ALTITUDE = 3
-COLONNE_EDITION = 4
+COLONNE_SYMBOLOGIE = 3
+COLONNE_ALTITUDE = 4
+COLONNE_EDITION = 5
 
 # Hauteur sous laquelle le tableau ne descend plus quand la fenêtre est
 # réduite : en deçà, il n'affiche plus une ligne entière.
@@ -28,6 +29,7 @@ HAUTEUR_TABLEAU_MINIMALE = 160
 COLONNES_A_MESURER = (
     COLONNE_AFFICHER,
     COLONNE_COULEUR,
+    COLONNE_SYMBOLOGIE,
     COLONNE_ALTITUDE,
     COLONNE_EDITION,
 )
@@ -47,6 +49,29 @@ def styleBoutonCouleur(couleur):
     return "background-color: %s; color: %s;" % (couleur.name(), texte)
 
 
+def couleurSymbologie(couche):
+    """Couleur du premier symbole de la couche dans QGIS, ou None.
+
+    Les vues photo dessinent chaque couche d'un seul trait : une symbologie
+    par catégories ou par classes n'y est pas représentable, et c'est alors la
+    couleur du premier symbole qui est reprise. Le nombre de symboles est
+    rendu avec elle, pour que l'appelant puisse le dire.
+    """
+    try:
+        rendu = couche.renderer()
+        if rendu is None:
+            return None, 0
+        symboles = rendu.symbols(QgsRenderContext())
+    except Exception:
+        # Une symbologie que le rendu ne sait pas énumérer ne doit pas empêcher
+        # de choisir une couleur à la main.
+        return None, 0
+
+    if not symboles:
+        return None, 0
+    return QtGui.QColor(symboles[0].color()), len(symboles)
+
+
 class Ui_getVectorList(object):
     def setupUi(self, getVectorList):
         getVectorList.setObjectName("getVectorList")
@@ -58,8 +83,8 @@ class Ui_getVectorList(object):
         self.label.setAlignment(QtCore.Qt.AlignCenter)
         self.label.setObjectName("label")
 
-        self.tableWidget = QtWidgets.QTableWidget(0, 5,getVectorList)
-        self.tableWidget.setHorizontalHeaderLabels(["Afficher", "Nom de la couche", "Couleur", "Altitude 3D", "Édition"])
+        self.tableWidget = QtWidgets.QTableWidget(0, 6,getVectorList)
+        self.tableWidget.setHorizontalHeaderLabels(["Afficher", "Nom de la couche", "Couleur", "Symbologie", "Altitude 3D", "Édition"])
         self.tableWidget.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
         # Le surlignage de ligne ne désigne plus la couche d'édition, la colonne
         # Édition le fait. Laisser plusieurs lignes surlignées suggérerait un
@@ -106,6 +131,10 @@ class getVectorLayerCustomList(QtWidgets.QDialog):
         self.ui.setupUi(self)
         self.currentItemNames = []
 
+        # Les couches par nom, pour que la reprise de couleur retrouve la
+        # couche de sa ligne. Le tableau ne porte que des noms.
+        self.couchesParNom = {}
+
         # Groupe exclusif : une seule couche reçoit les gestes d'édition et la
         # sélection. Le tableau porte le choix, au lieu de le déduire de la
         # ligne surlignée comme avant, ce que rien n'annonçait à l'écran.
@@ -114,6 +143,7 @@ class getVectorLayerCustomList(QtWidgets.QDialog):
 
     def setItem(self,vectorLayers) :
         # Adding custom items to the list widget
+        self.couchesParNom = dict(vectorLayers)
         currentVectorNames = []
         for cle in vectorLayers:
             currentVectorNames.append(cle)
@@ -132,11 +162,28 @@ class getVectorLayerCustomList(QtWidgets.QDialog):
                 self.ui.tableWidget.setItem(row_position, COLONNE_NOM, name_item)
 
                 # Column 2: color button
+                # La couleur de départ est celle de la symbologie de QGIS : le
+                # noir d'origine n'était celui d'aucune couche, et obligeait à
+                # choisir une couleur pour chaque ligne avant toute chose.
+                couleurDepart, _ = couleurSymbologie(vectorLayers[cle])
+                if couleurDepart is None:
+                    couleurDepart = QtGui.QColor(0,0,0)
                 color_button = QtWidgets.QPushButton("Choisir Couleur")
-                color_button.setStyleSheet(styleBoutonCouleur(QtGui.QColor(0,0,0)))
-                color_button.setProperty("color", QtGui.QColor(0,0,0))
+                color_button.setStyleSheet(styleBoutonCouleur(couleurDepart))
+                color_button.setProperty("color", couleurDepart)
                 color_button.clicked.connect(self.choose_color)
                 self.ui.tableWidget.setCellWidget(row_position, COLONNE_COULEUR, color_button)
+
+                # Column 3: reprise de la couleur de la symbologie de QGIS
+                bouton_symbologie = QtWidgets.QPushButton("Reprendre")
+                bouton_symbologie.setToolTip(
+                    "Reprendre la couleur de la symbologie de cette couche "
+                    "dans QGIS, telle qu'elle est maintenant."
+                )
+                bouton_symbologie.clicked.connect(self.reprendreCouleurSymbologie)
+                self.ui.tableWidget.setCellWidget(
+                    row_position, COLONNE_SYMBOLOGIE, bouton_symbologie
+                )
 
                 # Column 3: altitude checkbox
                 checkbox_3d = QtWidgets.QCheckBox()
@@ -369,20 +416,16 @@ class getVectorLayerCustomList(QtWidgets.QDialog):
         bouton.setProperty("color", couleur)
 
     def choose_color(self):
-        # La ligne est retrouvée par le bouton qui a émis le signal. Un indice
-        # capturé à la construction désignerait la mauvaise couche dès qu'une
-        # ligne au-dessus a été retirée.
         bouton = self.sender()
-        for ligne in range(self.ui.tableWidget.rowCount()):
-            if self.ui.tableWidget.cellWidget(ligne, COLONNE_COULEUR) is bouton:
-                break
-        else:
+        ligne = self.ligneDuControle(bouton, COLONNE_COULEUR)
+        if ligne is None:
             return
 
-        color = QtWidgets.QColorDialog.getColor()
+        color = QtWidgets.QColorDialog.getColor(
+            bouton.property("color") or QtGui.QColor(0, 0, 0), self
+        )
         if color.isValid():
-            bouton.setStyleSheet(styleBoutonCouleur(color))
-            bouton.setProperty("color", color)
+            self.poserCouleur(ligne, color)
 
     def reprendreCouleurSymbologie(self):
         """Reprend la couleur de la symbologie de QGIS pour cette couche.

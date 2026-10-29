@@ -49,8 +49,9 @@ METHODES = ("majColonneEdition", "nomCoucheEdition")
 COLONNE_AFFICHER = 0
 COLONNE_NOM = 1
 COLONNE_COULEUR = 2
-COLONNE_ALTITUDE = 3
-COLONNE_EDITION = 4
+COLONNE_SYMBOLOGIE = 3
+COLONNE_ALTITUDE = 4
+COLONNE_EDITION = 5
 
 
 def lire(chemin):
@@ -473,6 +474,7 @@ def casLaLigneSurligneeNeDesignePlus(chemin_fenetre, chemin_widget, chemin_app):
         "COLONNE_AFFICHER": COLONNE_AFFICHER,
         "COLONNE_NOM": COLONNE_NOM,
         "COLONNE_COULEUR": COLONNE_COULEUR,
+        "COLONNE_SYMBOLOGIE": COLONNE_SYMBOLOGIE,
         "COLONNE_ALTITUDE": COLONNE_ALTITUDE,
         "COLONNE_EDITION": COLONNE_EDITION,
     }
@@ -485,11 +487,11 @@ def casLaLigneSurligneeNeDesignePlus(chemin_fenetre, chemin_widget, chemin_app):
                 "ce fichier sont bâtis sur l'ordre des colonnes"
                 % (nom, declarees[nom], valeur)
             )
-        if nom not in extrait and nom != "COLONNE_EDITION":
+        if nom not in extrait and nom not in ("COLONNE_EDITION", "COLONNE_SYMBOLOGIE"):
             echecs.append("importVectorAccept n'emploie pas %s" % nom)
 
-    if "QTableWidget(0, 5," not in fenetre_source:
-        echecs.append("le tableau n'est pas construit avec cinq colonnes")
+    if "QTableWidget(0, 6," not in fenetre_source:
+        echecs.append("le tableau n'est pas construit avec six colonnes")
     if '"Édition"' not in fenetre_source:
         echecs.append("en-tête « Édition » absent du tableau")
     if "SingleSelection" not in fenetre_source:
@@ -580,6 +582,78 @@ def casCouleurSansIndiceCapture(chemin_fenetre, chemin_widget, chemin_app):
     if "r=row_position" in source:
         echecs.append("un indice de ligne est encore capturé dans une lambda")
     return echecs, "ligne retrouvée par le bouton émetteur"
+
+
+def casCouleurDeLaSymbologie(chemin_fenetre, chemin_widget, chemin_app):
+    """La couleur d'affichage doit pouvoir venir de la symbologie de QGIS.
+
+    La couleur de départ était le noir, qui n'est celle d'aucune couche : il
+    fallait la choisir ligne par ligne avant de voir quoi que ce soit, et rien
+    ne la rapprochait de ce que QGIS dessine sur le canevas.
+    """
+    echecs = []
+    source = lire(chemin_fenetre)
+    arbre = ast.parse(source)
+
+    noms = {
+        n.name
+        for n in ast.walk(arbre)
+        if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
+    }
+    for attendu in ("couleurSymbologie", "reprendreCouleurSymbologie", "poserCouleur"):
+        if attendu not in noms:
+            echecs.append("%s absente" % attendu)
+
+    set_item = next(
+        (
+            n
+            for n in ast.walk(arbre)
+            if isinstance(n, ast.FunctionDef) and n.name == "setItem"
+        ),
+        None,
+    )
+    extrait = ast.get_source_segment(source, set_item) or "" if set_item else ""
+    if "couleurSymbologie(" not in extrait:
+        echecs.append(
+            "la couleur de départ ne vient pas de la symbologie : elle resterait "
+            "le noir, qui n'est la couleur d'aucune couche"
+        )
+    if "reprendreCouleurSymbologie" not in extrait:
+        echecs.append("aucun bouton ne reprend la couleur de la symbologie")
+    if "couchesParNom" not in source:
+        echecs.append(
+            "les couches ne sont pas retenues par nom : la reprise ne pourrait "
+            "pas retrouver la couche de sa ligne, le tableau ne portant que des noms"
+        )
+
+    reprise = next(
+        (
+            n
+            for n in ast.walk(arbre)
+            if isinstance(n, ast.FunctionDef) and n.name == "reprendreCouleurSymbologie"
+        ),
+        None,
+    )
+    if reprise is not None:
+        corps = ast.get_source_segment(source, reprise) or ""
+        if "COLONNE_SYMBOLOGIE" not in corps:
+            echecs.append("la reprise ne retrouve pas sa ligne par sa propre colonne")
+        arguments = [a.arg for a in reprise.args.args if a.arg != "self"]
+        if arguments:
+            echecs.append(
+                "reprendreCouleurSymbologie reçoit %s : un indice capturé à la "
+                "construction désignerait la mauvaise couche après un retrait"
+                % ", ".join(arguments)
+            )
+
+    # Une symbologie sans couleur, ou à plusieurs symboles, ne doit pas être
+    # traitée en silence : les vues photo dessinent d'un seul trait.
+    if "nombre > 1" not in source:
+        echecs.append(
+            "une symbologie à plusieurs symboles est reprise sans le dire : "
+            "seule la couleur du premier est retenue"
+        )
+    return echecs, "couleur de départ et reprise depuis QGIS"
 
 
 def casChoixAtteintLAffichage(chemin_fenetre, chemin_widget, chemin_app):
@@ -757,6 +831,7 @@ CAS = (
     ("couleur sans indice capturé", casCouleurSansIndiceCapture),
     ("fenêtre accordée au contenu", casFenetreAccordeeAuContenu),
     ("le choix atteint l'affichage", casChoixAtteintLAffichage),
+    ("couleur reprise de la symbologie", casCouleurDeLaSymbologie),
 )
 
 
