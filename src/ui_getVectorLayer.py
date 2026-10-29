@@ -37,6 +37,17 @@ COLONNES_A_MESURER = (
 # Marge laissée autour d'un contrôle dans sa colonne, en pixels.
 MARGE_COLONNE = 10
 
+# Fond des lignes dont la couche n'est pas affichée. Assez léger pour ne pas
+# se confondre avec le surlignage de la ligne courante.
+FOND_LIGNE_MASQUEE = "#ededed"
+
+# Pictogramme de la reprise de couleur, pris au thème de QGIS. Le repli sur un
+# libellé vaut pour un thème qui ne le porterait pas : un bouton vide ne dirait
+# rien du tout.
+PICTO_REPRISE = "mActionRefresh.svg"
+LIBELLE_REPRISE = "Reprendre"
+TAILLE_PICTO = 16
+
 
 def styleBoutonCouleur(couleur):
     """Feuille de style d'un bouton de couleur, texte compris.
@@ -84,7 +95,9 @@ class Ui_getVectorList(object):
         self.label.setObjectName("label")
 
         self.tableWidget = QtWidgets.QTableWidget(0, 6,getVectorList)
-        self.tableWidget.setHorizontalHeaderLabels(["Afficher", "Nom de la couche", "Couleur", "Symbologie", "Altitude 3D", "Édition"])
+        # « Style » plutôt que « Symbologie » : l'en-tête commande la largeur de
+        # la colonne, et le bouton qu'elle porte n'est qu'un pictogramme.
+        self.tableWidget.setHorizontalHeaderLabels(["Afficher", "Nom de la couche", "Couleur", "Style", "Altitude 3D", "Édition"])
         self.tableWidget.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
         # Le surlignage de ligne ne désigne plus la couche d'édition, la colonne
         # Édition le fait. Laisser plusieurs lignes surlignées suggérerait un
@@ -175,7 +188,15 @@ class getVectorLayerCustomList(QtWidgets.QDialog):
                 self.ui.tableWidget.setCellWidget(row_position, COLONNE_COULEUR, color_button)
 
                 # Column 3: reprise de la couleur de la symbologie de QGIS
-                bouton_symbologie = QtWidgets.QPushButton("Reprendre")
+                bouton_symbologie = QtWidgets.QPushButton()
+                picto = QgsApplication.getThemeIcon(PICTO_REPRISE)
+                if picto.isNull():
+                    bouton_symbologie.setText(LIBELLE_REPRISE)
+                else:
+                    bouton_symbologie.setIcon(picto)
+                    bouton_symbologie.setIconSize(
+                        QtCore.QSize(TAILLE_PICTO, TAILLE_PICTO)
+                    )
                 bouton_symbologie.setToolTip(
                     "Reprendre la couleur de la symbologie de cette couche "
                     "dans QGIS, telle qu'elle est maintenant."
@@ -353,6 +374,7 @@ class getVectorLayerCustomList(QtWidgets.QDialog):
         if dejaDesignee is None and premierePossible is not None:
             premierePossible.setChecked(True)
 
+        self.majFondDesLignes()
 
     def majFondDesLignes(self):
         """Teinte les lignes dont la couche n'est pas affichée.

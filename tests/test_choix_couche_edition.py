@@ -44,7 +44,7 @@ RACINE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SOURCE_DEFAUT = os.path.join(RACINE, "src")
 
 CLASSE = "getVectorLayerCustomList"
-METHODES = ("majColonneEdition", "nomCoucheEdition")
+METHODES = ("majColonneEdition", "nomCoucheEdition", "majFondDesLignes")
 
 COLONNE_AFFICHER = 0
 COLONNE_NOM = 1
@@ -584,6 +584,56 @@ def casCouleurSansIndiceCapture(chemin_fenetre, chemin_widget, chemin_app):
     return echecs, "ligne retrouvée par le bouton émetteur"
 
 
+def casFondDesLignesMasquees(chemin_fenetre, chemin_widget, chemin_app):
+    """Une couche non affichée doit se voir à sa ligne entière.
+
+    L'indicateur d'une case fait quatorze pixels dans un tableau de seize
+    lignes : savoir d'un coup d'oeil ce qui sera dessiné demandait de lire
+    seize cases une à une.
+    """
+    echecs = []
+    f = fenetre(chemin_fenetre)
+    tableau = f.ui.tableWidget
+    teinte = constantes_du_source(chemin_fenetre).get("FOND_LIGNE_MASQUEE")
+
+    if teinte is None:
+        echecs.append("FOND_LIGNE_MASQUEE non déclarée")
+        return echecs, "constante absente"
+
+    f.afficher(1)
+    f.afficher(3)
+
+    for ligne in (1, 3):
+        fonds = tableau.fondsDeLaLigne(ligne)
+        if any(fond is not None for fond in fonds):
+            echecs.append("ligne %d affichée mais teintée : fonds %r" % (ligne, fonds))
+    for ligne in (0, 2, 4):
+        fonds = tableau.fondsDeLaLigne(ligne)
+        if not fonds or any(fond != teinte for fond in fonds):
+            echecs.append(
+                "ligne %d masquée sans fond uniforme %r : fonds %r"
+                % (ligne, teinte, fonds)
+            )
+
+    # Toutes les colonnes doivent porter le fond, pas seulement celle du nom :
+    # les cellules à contrôle n'ont pas d'article tant qu'on ne leur en pose un.
+    couvertes = len(tableau.fondsDeLaLigne(0))
+    if couvertes != tableau.columnCount():
+        echecs.append(
+            "%d colonne(s) teintée(s) sur %d : la ligne paraîtrait teintée "
+            "par moitié" % (couvertes, tableau.columnCount())
+        )
+
+    # Le fond suit le changement d'état, dans les deux sens.
+    f.afficher(0)
+    if any(fond is not None for fond in tableau.fondsDeLaLigne(0)):
+        echecs.append("la teinte survit à l'affichage de la couche")
+    f.afficher(1, False)
+    if any(fond != teinte for fond in tableau.fondsDeLaLigne(1)):
+        echecs.append("la teinte ne vient pas au masquage de la couche")
+    return echecs, "lignes masquées teintées, sur toute leur largeur"
+
+
 def casCouleurDeLaSymbologie(chemin_fenetre, chemin_widget, chemin_app):
     """La couleur d'affichage doit pouvoir venir de la symbologie de QGIS.
 
@@ -648,6 +698,16 @@ def casCouleurDeLaSymbologie(chemin_fenetre, chemin_widget, chemin_app):
 
     # Une symbologie sans couleur, ou à plusieurs symboles, ne doit pas être
     # traitée en silence : les vues photo dessinent d'un seul trait.
+    if "PICTO_REPRISE" not in source or "getThemeIcon" not in source:
+        echecs.append(
+            "la reprise ne porte pas de pictogramme : un libellé élargit la "
+            "colonne sans rien dire de plus"
+        )
+    if "LIBELLE_REPRISE" not in source:
+        echecs.append(
+            "aucun repli en libellé : un thème sans ce pictogramme laisserait "
+            "un bouton vide"
+        )
     if "nombre > 1" not in source:
         echecs.append(
             "une symbologie à plusieurs symboles est reprise sans le dire : "
@@ -832,6 +892,7 @@ CAS = (
     ("fenêtre accordée au contenu", casFenetreAccordeeAuContenu),
     ("le choix atteint l'affichage", casChoixAtteintLAffichage),
     ("couleur reprise de la symbologie", casCouleurDeLaSymbologie),
+    ("fond des lignes masquées", casFondDesLignesMasquees),
 )
 
 
