@@ -203,7 +203,8 @@ class stereoPhoto(object):
             ),
             (
                 editionOutils.OUTIL_AJOUTER,
-                "Ajouter une entité ; clic droit : clore le tracé",
+                "Ajouter une entité ; clic droit : clore le tracé ;"
+                " touche 1 : alterne avec Découper",
                 "/mActionCapturePolygon.svg",
             ),
             (
@@ -438,12 +439,6 @@ class stereoPhoto(object):
         self.optWindow.ui.pushButtonCloseWindow.clicked.connect(
             self.closeAllSideWindows
         )
-
-        # Les radios Dessiner et Découper remontent vers l'outil actif ; la
-        # synchronisation descendante passe par synchroniserRadiosTrace(), qui
-        # bloque leurs signaux le temps de les accorder.
-        self.optWindow.ui.radioButtonDraw.toggled.connect(self.radioTraceBasculee)
-        self.optWindow.ui.radioButtonCut.toggled.connect(self.radioTraceBasculee)
 
         self.navigMapTool.mouseClicked.connect(self.mousePressEvent)
         self.navigMapTool.wheelActivate.connect(self.wheelActionEvent)
@@ -1256,7 +1251,6 @@ class stereoPhoto(object):
         self.raccorderCoucheEditable(self.vectorLayer)
         self.annulerTraceEnCours()
         self.majActivationTrace()
-        self.synchroniserRadiosTrace()
 
     # Fonction qui détermine la région approximative des photos
     # Retourne le rectangle de coordonnée
@@ -1298,7 +1292,6 @@ class stereoPhoto(object):
 
         self.majEtatActionsEdition()
         self.majActivationTrace()
-        self.synchroniserRadiosTrace()
 
         self.optWindow.ui.importLineVectorLayer.blockSignals(True)
         self.optWindow.ui.importLineVectorLayer.setText("")
@@ -2509,7 +2502,6 @@ class stereoPhoto(object):
         # Un tracé commencé avec l'outil précédent n'a plus de sens.
         self.annulerTraceEnCours()
         self.majActivationTrace()
-        self.synchroniserRadiosTrace()
         self.journal.info("Outil d'édition : %s", self.outilActif)
 
     def basculerOutilTrace(self):
@@ -2532,22 +2524,6 @@ class stereoPhoto(object):
         self.actionsOutil[voulu].setChecked(True)
         self.changerOutilActif(self.actionsOutil[voulu])
 
-    def radioTraceBasculee(self):
-        """Suit le choix fait sur les radios Dessiner et Découper du panneau."""
-        if not hasattr(self, "optWindow"):
-            return
-
-        voulu = (
-            editionOutils.OUTIL_DECOUPER
-            if self.optWindow.ui.radioButtonCut.isChecked()
-            else editionOutils.OUTIL_AJOUTER
-        )
-        if voulu == self.outilActif:
-            return
-
-        self.actionsOutil[voulu].setChecked(True)
-        self.changerOutilActif(self.actionsOutil[voulu])
-
     def majActivationTrace(self):
         """Accorde la bande élastique du canevas à l'outil et à la couche.
 
@@ -2565,37 +2541,6 @@ class stereoPhoto(object):
             and self.typeGeometrieCouche()
             in (editionOutils.TYPE_LIGNE, editionOutils.TYPE_POLYGONE)
         )
-
-    def synchroniserRadiosTrace(self):
-        """Accorde les radios Dessiner et Découper à l'outil actif.
-
-        Les deux radios gardent le sens qu'elles avaient : quel tracé
-        s'appliquerait. Elles sont grisées quand l'outil actif n'est pas un
-        outil de tracé, où leur état coché est sans portée. Un couple de radios
-        exclusives ne saurait pas représenter quatre outils, et le panneau ne
-        doit pas recevoir de nouveau contrôle.
-        """
-        if not hasattr(self, "optWindow"):
-            return
-
-        radios = (self.optWindow.ui.radioButtonDraw, self.optWindow.ui.radioButtonCut)
-        actif = bool(self.enableDraw and self.outilDeTraceActif())
-        for radio in radios:
-            radio.setEnabled(actif)
-
-        if not actif:
-            return
-
-        for radio in radios:
-            radio.blockSignals(True)
-        try:
-            if self.outilActif == editionOutils.OUTIL_DECOUPER:
-                radios[1].setChecked(True)
-            else:
-                radios[0].setChecked(True)
-        finally:
-            for radio in radios:
-                radio.blockSignals(False)
 
     # --- Session d'édition --------------------------------------------------
 

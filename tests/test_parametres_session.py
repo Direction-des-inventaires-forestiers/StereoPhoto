@@ -184,8 +184,6 @@ class UiBouchon:
         self.spinBoxUpScreen = SpinBoxBouchon()
         self.spinBoxDownScreen = SpinBoxBouchon()
         self.checkBoxFlip = CaseBouchon()
-        self.radioButtonCut = CaseBouchon()
-        self.radioButtonDraw = CaseBouchon()
         self.pushButtonRemoveMNT = CaseBouchon()
         self.importLineProject = ChampBouchon()
         self.importLineMNT = ChampBouchon()

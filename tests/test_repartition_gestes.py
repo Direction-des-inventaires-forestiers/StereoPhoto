@@ -477,12 +477,62 @@ def casGardesDesTouches(chemin_app):
     return echecs, "relâchements, Z et S sans Ctrl, touche sans branche"
 
 
+def casOutilSansDoublon(chemin_app):
+    """L'outil actif n'a qu'une représentation : les actions de la barre.
+
+    Le panneau portait deux radios, Dessiner et Découper, qui ne disaient que
+    la moitié de l'état : un couple exclusif ne représente pas quatre outils,
+    et il fallait les accorder dans les deux sens à chaque changement d'outil,
+    de couche et de session. La barre les a remplacées.
+
+    L'alternance de la touche 1 était annoncée par leurs infobulles. Les deux
+    outils qu'elle alterne doivent donc la porter, sans quoi le raccourci
+    disparaît de l'interface avec les radios.
+    """
+    echecs = []
+    dossier = os.path.dirname(chemin_app)
+    for nom in sorted(os.listdir(dossier)):
+        if not nom.endswith((".py", ".ui")):
+            continue
+        source = io.open(os.path.join(dossier, nom), encoding="utf-8").read()
+        for radio in ("radioButtonDraw", "radioButtonCut"):
+            if radio in source:
+                echecs.append("%s renvoie encore à %s" % (nom, radio))
+
+    arbre = ast.parse(io.open(chemin_app, encoding="utf-8").read())
+    initGui = next(
+        (
+            n
+            for n in ast.walk(arbre)
+            if isinstance(n, ast.FunctionDef) and n.name == "initGui"
+        ),
+        None,
+    )
+    if initGui is None:
+        echecs.append("initGui introuvable")
+        return echecs, "fonction absente"
+
+    libelles = [
+        n.value
+        for n in ast.walk(initGui)
+        if isinstance(n, ast.Constant) and isinstance(n.value, str)
+    ]
+    annonces = [libelle for libelle in libelles if "touche 1" in libelle]
+    if len(annonces) < 2:
+        echecs.append(
+            "%d libellé(s) annonçant la touche 1 : les deux outils qu'elle "
+            "alterne doivent la porter" % len(annonces)
+        )
+    return echecs, "une seule représentation, alternance annoncée"
+
+
 CAS = (
     ("routage des clics", casRoutageDuClic),
     ("gardes du clic", casGardesDuClic),
     ("tables de traduction de la classe", casTablesDeTraduction),
     ("routage des touches", casRoutageDesTouches),
     ("gardes du clavier", casGardesDesTouches),
+    ("outil sans doublon", casOutilSansDoublon),
 )
 
 

@@ -277,16 +277,6 @@ class Ui_StereoDockWidget(object):
         self.importToolMNT.setFont(font)
         self.importToolMNT.setObjectName("importToolMNT")
         self.gridLayout_2.addWidget(self.importToolMNT, 0, 2, 1, 1)
-        self.radioButtonDraw = QtWidgets.QRadioButton(self.groupBoxMNT)
-        self.radioButtonDraw.setEnabled(False)
-        font = QtGui.QFont()
-        font.setPointSize(8)
-        font.setBold(False)
-        font.setWeight(50)
-        self.radioButtonDraw.setFont(font)
-        self.radioButtonDraw.setChecked(True)
-        self.radioButtonDraw.setObjectName("radioButtonDraw")
-        self.gridLayout_2.addWidget(self.radioButtonDraw, 1, 0, 1, 1)
         self.pushButtonRemoveMNT = QtWidgets.QPushButton(self.groupBoxMNT)
         self.pushButtonRemoveMNT.setEnabled(False)
         font = QtGui.QFont()
@@ -295,16 +285,7 @@ class Ui_StereoDockWidget(object):
         font.setWeight(50)
         self.pushButtonRemoveMNT.setFont(font)
         self.pushButtonRemoveMNT.setObjectName("pushButtonRemoveMNT")
-        self.gridLayout_2.addWidget(self.pushButtonRemoveMNT, 1, 1, 2, 2)
-        self.radioButtonCut = QtWidgets.QRadioButton(self.groupBoxMNT)
-        self.radioButtonCut.setEnabled(False)
-        font = QtGui.QFont()
-        font.setPointSize(8)
-        font.setBold(False)
-        font.setWeight(50)
-        self.radioButtonCut.setFont(font)
-        self.radioButtonCut.setObjectName("radioButtonCut")
-        self.gridLayout_2.addWidget(self.radioButtonCut, 2, 0, 1, 1)
+        self.gridLayout_2.addWidget(self.pushButtonRemoveMNT, 1, 0, 1, 3)
         self.verticalLayout_2.addWidget(self.groupBoxMNT)
         self.label_5 = QtWidgets.QLabel(self.dockWidgetContents)
         font = QtGui.QFont()
@@ -368,27 +349,11 @@ class Ui_StereoDockWidget(object):
         )
         self.label_11.setText(_translate("StereoDockWidget", "Couche en édition"))
         self.groupBoxMNT.setTitle(
-            _translate("StereoDockWidget", "Modèle numérique de terrrain")
+            _translate("StereoDockWidget", "Modèle numérique de terrain")
         )
         self.importToolMNT.setText(_translate("StereoDockWidget", "..."))
-        self.radioButtonDraw.setText(_translate("StereoDockWidget", "Dessiner"))
-        self.radioButtonDraw.setToolTip(
-            _translate(
-                "StereoDockWidget",
-                "Dessiner la ligne de travail\n"
-                "Touche 1 : alterne entre Dessiner et Découper",
-            )
-        )
         self.pushButtonRemoveMNT.setText(
             _translate("StereoDockWidget", "Retirer le modèle")
-        )
-        self.radioButtonCut.setText(_translate("StereoDockWidget", "Découper"))
-        self.radioButtonCut.setToolTip(
-            _translate(
-                "StereoDockWidget",
-                "Découper avec la ligne de travail\n"
-                "Touche 1 : alterne entre Dessiner et Découper",
-            )
         )
         self.label_5.setText(_translate("StereoDockWidget", "Altitude du curseur"))
         self.labelAltitude.setText(_translate("StereoDockWidget", "100.000000000"))

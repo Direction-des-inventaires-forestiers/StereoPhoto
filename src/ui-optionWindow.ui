@@ -414,7 +414,7 @@ color: rgb(220, 147, 0);</string>
        </font>
       </property>
       <property name="title">
-       <string>Modèle numérique de terrrain</string>
+       <string>Modèle numérique de terrain</string>
       </property>
       <layout class="QGridLayout" name="gridLayout_2">
        <item row="0" column="0" colspan="2">
@@ -448,30 +448,7 @@ color: rgb(220, 147, 0);</string>
          </property>
         </widget>
        </item>
-       <item row="1" column="0">
-        <widget class="QRadioButton" name="radioButtonDraw">
-         <property name="toolTip">
-          <string>Dessiner la ligne de travail&#10;Touche 1 : alterne entre Dessiner et Découper</string>
-         </property>
-         <property name="enabled">
-          <bool>false</bool>
-         </property>
-         <property name="font">
-          <font>
-           <pointsize>8</pointsize>
-           <weight>50</weight>
-           <bold>false</bold>
-          </font>
-         </property>
-         <property name="text">
-          <string>Dessiner</string>
-         </property>
-         <property name="checked">
-          <bool>true</bool>
-         </property>
-        </widget>
-       </item>
-       <item row="1" column="1" rowspan="2" colspan="2">
+       <item row="1" column="0" colspan="3">
         <widget class="QPushButton" name="pushButtonRemoveMNT">
          <property name="enabled">
           <bool>false</bool>
@@ -485,26 +462,6 @@ color: rgb(220, 147, 0);</string>
          </property>
          <property name="text">
           <string>Retirer le modèle</string>
-         </property>
-        </widget>
-       </item>
-       <item row="2" column="0">
-        <widget class="QRadioButton" name="radioButtonCut">
-         <property name="toolTip">
-          <string>Découper avec la ligne de travail&#10;Touche 1 : alterne entre Dessiner et Découper</string>
-         </property>
-         <property name="enabled">
-          <bool>false</bool>
-         </property>
-         <property name="font">
-          <font>
-           <pointsize>8</pointsize>
-           <weight>50</weight>
-           <bold>false</bold>
-          </font>
-         </property>
-         <property name="text">
-          <string>Découper</string>
          </property>
         </widget>
        </item>
