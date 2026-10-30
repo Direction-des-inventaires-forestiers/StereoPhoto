@@ -1,46 +1,60 @@
-import os, math
-from osgeo import gdal, ogr, osr
-import numpy as np
+import os
+import math
+from osgeo import ogr, osr
 from qgis.core import QgsApplication
-from .config import PAR_CAMERA_ORIENTATION_TOLERANCE_DEG, PAR_PAIR_PROXIMITY_BUFFER_M, PAR_DIRECTION_BUFFER_M, PAR_MIN_OVERLAP_RATIO
+from .config import (
+    DONNEES_SCR_EPSG,
+    PAR_CAMERA_ORIENTATION_TOLERANCE_DEG,
+    PAR_PAIR_PROXIMITY_BUFFER_M,
+    PAR_DIRECTION_BUFFER_M,
+    PAR_MIN_OVERLAP_RATIO,
+)
 from .parFile import parse_par_file, PAR_REQUIRED_KEYWORDS
+from .lectureRaster import ouvrir_raster
 from .journal import obtenir_journal
 
 _journal = obtenir_journal(__name__)
 
-def getParDict(dossierImages) :
-    
+
+def getParDict(dossierImages):
+
     listpath = os.listdir(dossierImages)
     parDict = {}
-    
-    for i in listpath : 
-        #On traite seulement les fichiers PAR du dossier
-        if not i.endswith('.par') : continue
-        QgsApplication.processEvents()
-        
-        pathPAR = os.path.join(dossierImages,i)
 
-        pathImg = os.path.join(dossierImages,i[:-4]+'.tif')
-        #L'image associée n'existe pas, on rejète le PAR
-        if not os.path.exists(pathImg) : continue
-        else : 
-            imgDS = gdal.Open(pathImg,gdal.GA_ReadOnly)
-            #gdal.Open() retourne None sur une image illisible ou corrompue. On rejète
-            #le PAR comme lorsque l'image est absente, plutôt que de laisser un
-            #AttributeError interrompre la lecture de tout le dossier.
-            if imgDS is None : continue
+    for i in listpath:
+        # On traite seulement les fichiers PAR du dossier
+        if not i.endswith(".par"):
+            continue
+        QgsApplication.processEvents()
+
+        pathPAR = os.path.join(dossierImages, i)
+
+        pathImg = os.path.join(dossierImages, i[:-4] + ".tif")
+        # L'image associée n'existe pas, on rejète le PAR
+        if not os.path.exists(pathImg):
+            continue
+        else:
+            # ouvrir_raster() ramène à None les deux façons dont GDAL signale une
+            # image illisible : retour None, ou RuntimeError selon l'état de
+            # gdal.UseExceptions(), que QGIS active. On rejète alors le PAR comme
+            # lorsque l'image est absente, plutôt que de laisser l'échec d'une
+            # seule image interrompre la lecture de tout le dossier.
+            imgDS = ouvrir_raster(pathImg)
+            if imgDS is None:
+                continue
             sizeImg = (imgDS.RasterXSize, imgDS.RasterYSize)
             imgDS = None
-        #info = gdal.Info(pathImg, format='json')
+        # info = gdal.Info(pathImg, format='json')
 
-        #with Image.open(pathImg) as img:
-        #    sizeImg = img.size 
-        #sizeImg = (info['size'][0], info['size'][1])
+        # with Image.open(pathImg) as img:
+        #    sizeImg = img.size
+        # sizeImg = (info['size'][0], info['size'][1])
         values = parse_par_file(pathPAR)
-        
-        #Vérification des paramètres obligatoires, le fichier PAR sera ignoré si un paramètre est absent
-        if not all(key in values for key in PAR_REQUIRED_KEYWORDS) : continue
-        
+
+        # Vérification des paramètres obligatoires, le fichier PAR sera ignoré si un paramètre est absent
+        if not all(key in values for key in PAR_REQUIRED_KEYWORDS):
+            continue
+
         affine = [float(val) for val in values["$PARAFFINE00"][-6:]]
         AffineA, AffineB, AffineC, AffineD, AffineE, AffineF = affine
 
@@ -51,31 +65,39 @@ def getParDict(dossierImages) :
 
         if "$PIXELSIZE" in values:
             pixelSize = float(values["$PIXELSIZE"][-1]) * 1e-3
-        else :
-            pixelSize = AffineA 
+        else:
+            pixelSize = AffineA
 
-        if "$FSCALE00" in values:   
+        if "$FSCALE00" in values:
             fscale = float(values["$FSCALE00"][-1]) * 1e-3
-        else : 
-            fscale = Z0/Focal
-        
+        else:
+            fscale = Z0 / Focal
+
         threshold_deg = PAR_CAMERA_ORIENTATION_TOLERANCE_DEG
         if (abs(kappa - 90) < threshold_deg) or (abs(kappa + 90) < threshold_deg):
             longSensor = abs(sizeImg[1] * pixelSize)
             hautSensor = abs(sizeImg[0] * pixelSize)
-        else : 
+        else:
             longSensor = abs(sizeImg[0] * pixelSize)
             hautSensor = abs(sizeImg[1] * pixelSize)
-        
-        longGroundFscale = (longSensor * fscale)
-        hautGroundFscale = (hautSensor * fscale)
-        
-        bbox = (X0,Y0,X0-longGroundFscale/2,Y0-hautGroundFscale/2,X0+longGroundFscale/2,Y0+hautGroundFscale/2)# xmin, ymin, xmax, ymax 
-        #save_bbox_to_gpkg(bbox,dossierImages+'/'+i[:-4]+'.gpkg')
+
+        longGroundFscale = longSensor * fscale
+        hautGroundFscale = hautSensor * fscale
+
+        bbox = (
+            X0,
+            Y0,
+            X0 - longGroundFscale / 2,
+            Y0 - hautGroundFscale / 2,
+            X0 + longGroundFscale / 2,
+            Y0 + hautGroundFscale / 2,
+        )  # xmin, ymin, xmax, ymax
+        # save_bbox_to_gpkg(bbox,dossierImages+'/'+i[:-4]+'.gpkg')
         parDict[i[:-4]] = bbox
     return parDict
 
-def numeroPhoto(identifiant) :
+
+def numeroPhoto(identifiant):
     """Retourne le numéro de l'identifiant <ligne>_<numero>, ou None s'il n'en a pas.
 
     C'est le seul endroit du plugin qui dépend de la convention de nommage des
@@ -83,55 +105,63 @@ def numeroPhoto(identifiant) :
     interrompre la recherche : il est écarté du calcul des voisins.
     """
 
-    champs = identifiant.split('_')
-    if len(champs) < 2 or not champs[1].isdigit() :
-        _journal.debug("Identifiant hors convention <ligne>_<numero>, "
-                       "voisins non calculés : %s", identifiant)
+    champs = identifiant.split("_")
+    if len(champs) < 2 or not champs[1].isdigit():
+        _journal.debug(
+            "Identifiant hors convention <ligne>_<numero>, voisins non calculés : %s",
+            identifiant,
+        )
         return None
     return int(champs[1])
 
-def findPairWithCoord(parDict,centerCoord) : 
+
+def findPairWithCoord(parDict, centerCoord):
     distDict = {}
-    #math.inf plutôt qu'une sentinelle numérique : 9999999 agissait en seuil de
-    #recherche, et laissait minID vide dès que la vue s'éloignait de plus de
-    #10 000 km des photos. L'appelant écarte déjà le cas trop éloigné.
+    # math.inf plutôt qu'une sentinelle numérique : 9999999 agissait en seuil de
+    # recherche, et laissait minID vide dès que la vue s'éloignait de plus de
+    # 10 000 km des photos. L'appelant écarte déjà le cas trop éloigné.
     minDist = math.inf
-    minID = ''
-    for key, val in parDict.items() :
-        dist = math.sqrt((centerCoord[0]-val[0])**2 + (centerCoord[1]-val[1])**2)
+    minID = ""
+    for key, val in parDict.items():
+        dist = math.sqrt(
+            (centerCoord[0] - val[0]) ** 2 + (centerCoord[1] - val[1]) ** 2
+        )
         distDict[key] = dist
-        if dist < minDist : 
+        if dist < minDist:
             minID = key
             minDist = dist
 
-    #Aucune photo retenue : dictionnaire vide, ou distances toutes indéfinies
-    #(toute comparaison avec NaN étant fausse). L'appelant traite la distance
-    #infinie comme un échec de recherche.
-    if not minID : return ('', math.inf)
+    # Aucune photo retenue : dictionnaire vide, ou distances toutes indéfinies
+    # (toute comparaison avec NaN étant fausse). L'appelant traite la distance
+    # infinie comme un échec de recherche.
+    if not minID:
+        return ("", math.inf)
 
     buffer = PAR_PAIR_PROXIMITY_BUFFER_M
     nbPic = numeroPhoto(minID)
-    #Photo la plus proche hors convention : elle reste le meilleur candidat,
-    #mais ses voisins ne peuvent pas être départagés par numéro.
-    if nbPic is None : return (minID,minDist)
+    # Photo la plus proche hors convention : elle reste le meilleur candidat,
+    # mais ses voisins ne peuvent pas être départagés par numéro.
+    if nbPic is None:
+        return (minID, minDist)
     leftDist = 9999999
-    leftName = ''
+    leftName = ""
     rightDist = 9999998
-    
-    for key in distDict.keys() : 
-        if key != minID and abs(parDict[minID][1] - parDict[key][1]) < buffer :  
+
+    for key in distDict.keys():
+        if key != minID and abs(parDict[minID][1] - parDict[key][1]) < buffer:
             idNb = numeroPhoto(key)
-            if idNb is None : continue
-            if idNb + 1 == nbPic or idNb - 1 == nbPic :  
-                if parDict[key][0] < parDict[minID][0] :
+            if idNb is None:
+                continue
+            if idNb + 1 == nbPic or idNb - 1 == nbPic:
+                if parDict[key][0] < parDict[minID][0]:
                     leftDist = distDict[key]
                     leftName = key
-                elif parDict[key][0] > parDict[minID][0] :    
+                elif parDict[key][0] > parDict[minID][0]:
                     rightDist = distDict[key]
 
-    if leftDist < rightDist : minID = leftName
-    return (minID,minDist)
-
+    if leftDist < rightDist:
+        minID = leftName
+    return (minID, minDist)
 
 
 def compute_overlap(bbox1, bbox2):
@@ -160,24 +190,25 @@ def compute_overlap(bbox1, bbox2):
 
 
 def get_neighbors_and_pairs(parID, parDict, direction_buffer=PAR_DIRECTION_BUFFER_M):
-    
+
     bbox_ref = parDict[parID]
-    x0 = bbox_ref[0] 
+    x0 = bbox_ref[0]
     y0 = bbox_ref[1]
 
-    best_horizontal_pair = {"leftPic": (None,0), "rightPic": (None,0)}
+    best_horizontal_pair = {"leftPic": (None, 0), "rightPic": (None, 0)}
 
-    best_left = (None, 0, float('inf'))
-    best_right = (None, 0, float('inf'))
+    best_left = (None, 0, float("inf"))
+    best_right = (None, 0, float("inf"))
 
     up_candidates = []
     down_candidates = []
 
     for key, bbox in parDict.items():
-        if key == parID: continue
-        
-        x1 = bbox[0] 
-        y1 = bbox[1] 
+        if key == parID:
+            continue
+
+        x1 = bbox[0]
+        y1 = bbox[1]
 
         dx = x1 - x0
         dy = y1 - y0
@@ -186,16 +217,16 @@ def get_neighbors_and_pairs(parID, parDict, direction_buffer=PAR_DIRECTION_BUFFE
 
         overlap_ratio, overlap_bbox = compute_overlap(bbox_ref, bbox)
 
-        if abs(dy) < direction_buffer :
-            if dx < 0 :
+        if abs(dy) < direction_buffer:
+            if dx < 0:
                 if overlap_ratio > best_left[1]:
                     best_left = (key, overlap_ratio, dist)
-                elif overlap_ratio == 0 and dist < best_left[2] :  
-                 best_left = (key, overlap_ratio, dist)
-            elif dx > 0 :
+                elif overlap_ratio == 0 and dist < best_left[2]:
+                    best_left = (key, overlap_ratio, dist)
+            elif dx > 0:
                 if overlap_ratio > best_right[1]:
                     best_right = (key, overlap_ratio, dist)
-                elif overlap_ratio == 0 and dist < best_right[2] :  
+                elif overlap_ratio == 0 and dist < best_right[2]:
                     best_right = (key, overlap_ratio, dist)
 
         if overlap_ratio > PAR_MIN_OVERLAP_RATIO:
@@ -203,13 +234,22 @@ def get_neighbors_and_pairs(parID, parDict, direction_buffer=PAR_DIRECTION_BUFFE
                 up_candidates.append((key, overlap_ratio, dy))
             elif dy < -direction_buffer:  # down
                 down_candidates.append((key, overlap_ratio, dy))
-        
-        if overlap_ratio == 0: continue
 
-        if dx < 0 and overlap_ratio > best_horizontal_pair["leftPic"][1] and abs(dy) < direction_buffer:
+        if overlap_ratio == 0:
+            continue
+
+        if (
+            dx < 0
+            and overlap_ratio > best_horizontal_pair["leftPic"][1]
+            and abs(dy) < direction_buffer
+        ):
             best_horizontal_pair["leftPic"] = (key, overlap_ratio)
 
-        elif dx > 0 and overlap_ratio > best_horizontal_pair["rightPic"][1] and abs(dy) < direction_buffer:
+        elif (
+            dx > 0
+            and overlap_ratio > best_horizontal_pair["rightPic"][1]
+            and abs(dy) < direction_buffer
+        ):
             best_horizontal_pair["rightPic"] = (key, overlap_ratio)
 
     # Sort up/down candidates by descending overlap, then closest in dy
@@ -222,16 +262,15 @@ def get_neighbors_and_pairs(parID, parDict, direction_buffer=PAR_DIRECTION_BUFFE
         "left": best_left,
         "right": best_right,
         "up": up_sorted,
-        "down": down_sorted
+        "down": down_sorted,
     }
 
 
-
-def save_bbox_to_gpkg(bbox, gpkg_path, layer_name="bbox", crs_epsg=2948):
+def save_bbox_to_gpkg(bbox, gpkg_path, layer_name="bbox", crs_epsg=DONNEES_SCR_EPSG):
 
     if os.path.exists(gpkg_path):
         os.remove(gpkg_path)
-    
+
     driver = ogr.GetDriverByName("GPKG")
     datasource = driver.CreateDataSource(gpkg_path)
 
@@ -243,7 +282,7 @@ def save_bbox_to_gpkg(bbox, gpkg_path, layer_name="bbox", crs_epsg=2948):
     field = ogr.FieldDefn("id", ogr.OFTInteger)
     layer.CreateField(field)
 
-    _,_,xmin, ymin, xmax, ymax = bbox
+    _, _, xmin, ymin, xmax, ymax = bbox
     ring = ogr.Geometry(ogr.wkbLinearRing)
     ring.AddPoint(xmin, ymin)
     ring.AddPoint(xmax, ymin)
@@ -265,7 +304,7 @@ def save_bbox_to_gpkg(bbox, gpkg_path, layer_name="bbox", crs_epsg=2948):
     _journal.info("Emprise enregistrée dans %s, couche « %s »", gpkg_path, layer_name)
 
 
-'''    
+"""    
 import time
 t = time.time()
 a= getParDict('E:/c24104/modeles_photos/rgb/Photo20rvb2023_20cm_Rvb/Mtm8/Tiff_Par')
@@ -313,4 +352,4 @@ xEndR   = int((bboxOverlap[2] - rightBbox[2]) / gpz)
 yEndR   = int((rightBbox[5] - bboxOverlap[1]) / gpz)
 
 exit()
-'''
+"""

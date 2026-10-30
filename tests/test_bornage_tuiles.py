@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Test du bornage des rectangles de chargement de tuiles (registre P1-I).
+"""Test du bornage des rectangles de chargement de tuiles.
 
 Rejoue le scénario du journal du 2026-09-29 : la vue de la fenêtre d'affichage
 se retrouve entièrement hors de l'image, `calculate_load_rects()` produit des
@@ -38,16 +38,27 @@ FONCTIONS_TESTEES = ("calculate_load_rects", "load_tiled_rect")
 def extraire_fonctions(chemin):
     """Retourne les fonctions voulues de threadShow, isolées de leur module."""
     arbre = ast.parse(io.open(chemin, encoding="utf-8").read())
-    classe = next((n for n in ast.walk(arbre)
-                   if isinstance(n, ast.ClassDef) and n.name == "threadShow"), None)
+    classe = next(
+        (
+            n
+            for n in ast.walk(arbre)
+            if isinstance(n, ast.ClassDef) and n.name == "threadShow"
+        ),
+        None,
+    )
     if classe is None:
         raise AssertionError("classe threadShow introuvable dans %s" % chemin)
 
-    corps = [n for n in classe.body
-             if isinstance(n, ast.FunctionDef) and n.name in FONCTIONS_TESTEES]
+    corps = [
+        n
+        for n in classe.body
+        if isinstance(n, ast.FunctionDef) and n.name in FONCTIONS_TESTEES
+    ]
     manquantes = set(FONCTIONS_TESTEES) - {n.name for n in corps}
     if manquantes:
-        raise AssertionError("fonctions introuvables : %s" % ", ".join(sorted(manquantes)))
+        raise AssertionError(
+            "fonctions introuvables : %s" % ", ".join(sorted(manquantes))
+        )
 
     espace = {
         "ceil": ceil,
@@ -151,19 +162,24 @@ class ThreadBouchon:
         assert x >= 0 and y >= 0, "offset négatif : %r" % ((x, y, w, h, ovr_index),)
         assert w > 0 and h > 0, "taille nulle ou négative : %r" % ((x, y, w, h),)
         assert x + w <= maxX and y + h <= maxY, (
-            "hors raster : (%d,%d) de %dx%d sur %dx%d" % (x, y, w, h, maxX, maxY))
+            "hors raster : (%d,%d) de %dx%d sur %dx%d" % (x, y, w, h, maxX, maxY)
+        )
         return TuileBouchon()
 
     def applyEnhancements(self, tuile, params):
         return tuile
 
 
-#Rognage plausible du recouvrement pour q16033_053 (calculé : X 4538 -> 11310).
+# Rognage plausible du recouvrement pour q16033_053 (calculé : X 4538 -> 11310).
 ROGNAGE = (0, 0, 6772, 17310)
 
-#Chaque cas : libellé, vue en pixels image, avertissement « hors zone » attendu.
+# Chaque cas : libellé, vue en pixels image, avertissement « hors zone » attendu.
 CAS = (
-    ("vue très à gauche de l'image (cas du journal)", RectBouchon(-99500, 0, -98224, 1000), True),
+    (
+        "vue très à gauche de l'image (cas du journal)",
+        RectBouchon(-99500, 0, -98224, 1000),
+        True,
+    ),
     ("vue très en dessous de l'image", RectBouchon(1000, 98000, 2000, 99000), True),
     ("vue très à droite de l'image", RectBouchon(98000, 100, 99000, 900), True),
     ("vue normale, centre de l'image", RectBouchon(3000, 8000, 4000, 9000), False),
@@ -187,15 +203,19 @@ def executer(chemin):
             for rect in rects:
                 assert rect[0] >= 0 and rect[1] >= 0, "rectangle négatif %r" % (rect,)
                 assert rect[2] <= ROGNAGE[2] and rect[3] <= ROGNAGE[3], (
-                    "rectangle hors rognage %r" % (rect,))
+                    "rectangle hors rognage %r" % (rect,)
+                )
             for indice in range(5):
                 for apercu in (1, 0, -1):
                     objet.load_tiled_rect(rects[indice], ovr_index=apercu, groupId=0)
 
-            alertes = [l for l in journal.lignes if l.startswith("Vue hors")]
+            alertes = [
+                ligne for ligne in journal.lignes if ligne.startswith("Vue hors")
+            ]
             assert bool(alertes) == alerte_attendue, (
                 "avertissement « hors zone » %s"
-                % ("attendu mais absent" if alerte_attendue else "émis à tort"))
+                % ("attendu mais absent" if alerte_attendue else "émis à tort")
+            )
         except AssertionError as erreur:
             echecs.append((libelle, erreur))
             print("ECHEC  %-45s %s" % (libelle, erreur))

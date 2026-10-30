@@ -16,5 +16,19 @@
         "user_image":""
     },
 
-    "rehaussement": [0, 0, 0, 0, 0, 0, 0, false, false, []]
+    "rehaussement": [0, 0, 0, 0, 0, 0, 0, false, false, []],
+
+    "raccourcis": {
+        "bascule_fenetre": "Échap",
+        "zoom": ["F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12"],
+        "outil_selectionner": "1",
+        "outil_ajouter": "2",
+        "outil_combiner": "3",
+        "outil_decouper": "4",
+        "bascule_trace": "",
+        "suivi_mnt": "M",
+        "curseur_libre": "C",
+        "annuler": "Ctrl+Z",
+        "enregistrer": "Ctrl+S"
+    }
 }

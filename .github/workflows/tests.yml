@@ -1,0 +1,29 @@
+# Exécution du banc de tests sur chaque demande de tirage.
+# Même raison que pour le contrôle du style : le banc s'exécutait à la main sur
+# le poste de développement, donc rien ne garantissait qu'une demande de tirage
+# le laisse vert. Combinée à la protection de la branche principale, cette
+# vérification le garantit.
+#
+# Le banc n'exige ni QGIS ni Qt : chaque test extrait la fonction visée de son
+# module par analyse syntaxique et l'exécute avec des bouchons. Seul
+# tests/test_altitude_mnt.py demande numpy, la lecture d'altitude étant éprouvée
+# sur un vrai tableau. La dépendance est installée ici plutôt que déclarée dans
+# un fichier de dépendances, le dépôt de la DIF n'en portant pas.
+name: Tests
+
+on:
+  pull_request:
+
+jobs:
+  banc:
+    name: banc de tests (sans QGIS)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          # Version de l'environnement Python de QGIS 3.44 LTR, où l'extension
+          # s'exécute, et celle du contrôle de style.
+          python-version: "3.12"
+      - run: pip install numpy
+      - run: python tests/executer_tous.py
