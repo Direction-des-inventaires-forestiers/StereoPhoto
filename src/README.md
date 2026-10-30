@@ -23,11 +23,13 @@
 
 **editionOutils.py** : Décide ce qu’un clic déclenche, selon l’outil d’édition actif, le type de géométrie de la couche, le bouton de la souris et la présence d’un tracé en cours. Il décide aussi quelle entité un clic désigne et quelle altitude part dans la géométrie. Le module ne dépend ni de QGIS ni de Qt, ce qui le rend directement testable.
 
+**raccourcisClavier.py** : La table « action vers touche » des raccourcis clavier, sa lecture depuis le fichier de paramètres et sa résolution : quelle touche commande quelle action, comment un nom de touche s’écrit, et ce qu’il advient d’un fichier mal écrit, qui ne doit jamais empêcher une session de s’ouvrir. Pendant la navigation, l’extension intercepte tout le clavier et ces raccourcis sont le seul accès aux outils. Le module ne dépend ni de QGIS ni de Qt, ce qui le rend directement testable ; la traduction vers les constantes de Qt est dans stereoPhoto.py.
+
 **editionVecteur.py** : Toutes les écritures dans les couches vectorielles : ajout, combinaison, découpage, enregistrement et annulation. Elles passent par l’API de la couche et son tampon d’édition, de sorte que chaque geste soit annulable et que l’enregistrement reste une décision de l’utilisateur.
 
 **enhanceManager.py** : Fichier pour l’interface graphique de rehaussement et pour les fonctions de rehaussement. La classe imageEnhancing fait le rehaussement. Le dossier Rehaussement contient l’application de rehaussement qui peut être utiliser de manière indépendante. Dans le passé, j’ai développé l’application de rehaussement qui permettait de rehausser des images et de les enregistrer. J’ai par la suite ajouté le module de rehaussement directement dans l’application. Ui_enhancement.py contient le code pour l’interface graphique
 
-**paramStoring.json** : Fichier pour conserver de l’information entre les utilisations
+**paramStoring.json** : Fichier pour conserver de l’information entre les utilisations. Il porte la position et l’échelle de la dernière vue, les écrans du stéréoscope, les derniers fichiers ouverts, les réglages de rehaussement, et la section `raccourcis`, seule à être écrite à la main par l’utilisateur.
 
 **resources.py, resources.qrc**: fichier pour permettre d’afficher des petites icônes pour l’interface graphique. Les icônes sont dans le dossier Icons. Lorsque que tu installes QT, le script pyrcc5 va s’installer. Il permet de transformer le fichier QRC en fichier PY
 
@@ -55,4 +57,4 @@
 
 **navigationQgsMapTool.py** : Outil MapTool compatible avec QGIS qui permet d'envoyer les signals de clavier et de souris ainsi que d'emprisonner la souris à l'intérieur du canvas QGIS
 
-**horsSyncQgsMapTool.py** : Second outil MapTool, posé sur le canevas par la touche Échap. Les deux vues photo restent liées au canevas de QGIS, mais sans piège à souris ni interception du clavier : la roulette zoome, le bouton du milieu déplace la vue, et les raccourcis de QGIS répondent de nouveau. Échap ramène à la navigation synchronisée.
+**horsSyncQgsMapTool.py** : Second outil MapTool, posé sur le canevas par le raccourci de bascule entre QGIS et les photos. Les deux vues photo restent liées au canevas de QGIS, mais sans piège à souris ni interception du clavier : la roulette zoome, le bouton du milieu déplace la vue, et les raccourcis de QGIS répondent de nouveau. Le même raccourci ramène à la navigation synchronisée.

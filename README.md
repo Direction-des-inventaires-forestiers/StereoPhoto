@@ -19,6 +19,59 @@ Sans avoir recours au guide d'utilisation voici les éléments importants à con
 - Pour faire l'affichage de couches vectorielles lors de la navigation, elles doivent être ajoutées et être actives dans QGIS
 - L'importation d'un modèle numérique de terrain permet d'afficher et d'éditer les couches avec une plus grande précision
 
+# Raccourcis clavier
+
+Pendant la navigation stéréo, l'extension intercepte tout le clavier : les
+raccourcis de QGIS ne répondent pas, et ceux du tableau ci-dessous sont le seul
+accès clavier aux outils.
+
+| Touche | Action |
+|---|---|
+| `Échap` | Basculer entre QGIS et les photos, dans les deux sens |
+| `F5` à `F12` | Les huit niveaux de zoom, du plus fort (`F5`) à l'image entière (`F12`) |
+| `1` | Outil Sélectionner |
+| `2` | Outil Ajouter |
+| `3` | Outil Combiner |
+| `4` | Outil Découper |
+| `M` | Suivre le modèle numérique de terrain |
+| `C` | Débarrer le curseur |
+| `Ctrl+Z` | Annuler le dernier geste d'édition |
+| `Ctrl+S` | Enregistrer les modifications de la couche |
+
+Chaque bouton de la barre d'outils annonce sa touche dans son infobulle, et
+celle du bouton **Naviguer** rappelle les raccourcis de la navigation. Les
+infobulles suivent le tableau : si une touche est changée, elles l'annoncent.
+
+## Changer une touche
+
+Les touches se modifient dans la section `raccourcis` du fichier
+`paramStoring.json`, qui se trouve dans le dossier de l'extension, sous le
+profil QGIS. Une touche s'écrit par son nom : une lettre, un chiffre, `Échap`,
+`F1` à `F12`, une flèche (`Gauche`, `Droite`, `Haut`, `Bas`), `Espace`, `Tab`,
+`Retour`, `Retour arrière`, `Suppr`, `Inser`, `Début`, `Fin`, `PgHaut`,
+`PgBas`, `+` ou `-`. La casse et les accents sont sans importance, et `Ctrl`
+ou `Alt` peuvent précéder le nom, par exemple `Ctrl+M`.
+
+Le changement prend effet à l'ouverture de la session suivante ; il n'est pas
+nécessaire de recharger l'extension. Une valeur laissée vide retire la touche
+de l'action, qui reste accessible par son bouton.
+
+Une touche mal orthographiée, ou affectée à deux actions, n'empêche jamais une
+session de s'ouvrir : la valeur par défaut s'applique, un message paraît dans
+le bandeau de QGIS et le détail est inscrit dans l'onglet **StereoPhoto** du
+panneau des journaux. Le fichier n'est pas corrigé automatiquement, afin que la
+ligne fautive reste visible et puisse être relue.
+
+Deux mises en garde. Le zoom est un groupe de huit touches, à donner en entier :
+une liste d'une autre longueur est ignorée et les huit touches par défaut
+s'appliquent. Et le déploiement de l'extension, qui recopie le dossier des
+sources dans le profil QGIS, écrase ce fichier comme il écrase les autres
+paramètres : conserver une copie des touches personnalisées avant une mise à
+jour.
+
+Une interface de configuration de ces touches est prévue ; d'ici là, le fichier
+de paramètres est le seul moyen de les changer.
+
 # Faire un signalement
 
 Si vous rencontrez un problème ou avez une question concernant le logiciel, il est possible de créer un nouveau billet dans la section **Issues**. Quatre types de billets sont disponibles : 
