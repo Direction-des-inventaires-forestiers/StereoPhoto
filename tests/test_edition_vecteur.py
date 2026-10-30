@@ -340,10 +340,57 @@ def casTablesCorrespondantes(dossier):
     return echecs, "%d clés de traitement" % len(declarees)
 
 
+def casCommandesDefaitesSurException(dossier):
+    """Aucun chemin d'erreur ne laisse une commande d'édition ouverte.
+
+    `casCommandesAppairees()` ci-dessus vérifie que les deux noms figurent dans
+    la fonction, ce qu'une fonction satisfait sans que son `except` les
+    atteigne. Relevé à la revue du Sprint A : les trois fonctions d'écriture
+    journalisaient et sortaient de leur `except` sans défaire la commande
+    ouverte dans le `try`.
+
+    Ce que ça coûte : `QUndoStack::canUndo()` rend False tant qu'une macro est
+    en cours. Une commande laissée ouverte grise donc le bouton Annuler et
+    éteint `Ctrl+Z` pour le reste de la session, alors que l'enregistrement
+    continue de fonctionner, et rien ne le dit à l'utilisateur.
+
+    La garde porte sur chaque gestionnaire d'exception des fonctions qui
+    ouvrent une commande. Elle n'exige pas que l'appel soit inconditionnel : le
+    défaire sous un drapeau est la bonne façon, l'exception pouvant survenir
+    avant l'ouverture.
+    """
+    echecs = []
+    arbre = arbre_de(os.path.join(dossier, "editionVecteur.py"))
+
+    gestionnaires = 0
+    for fonction in ast.walk(arbre):
+        if not isinstance(fonction, ast.FunctionDef):
+            continue
+        if not appels_nommes(fonction, "beginEditCommand"):
+            continue
+
+        for gestionnaire in ast.walk(fonction):
+            if not isinstance(gestionnaire, ast.ExceptHandler):
+                continue
+            gestionnaires += 1
+            if not appels_nommes(gestionnaire, "destroyEditCommand"):
+                echecs.append(
+                    "%s() : le gestionnaire d'exception de la ligne %d sort "
+                    "sans destroyEditCommand()" % (fonction.name, gestionnaire.lineno)
+                )
+
+    if not gestionnaires:
+        echecs.append(
+            "aucun gestionnaire d'exception sur un chemin d'écriture : garde sans objet"
+        )
+    return echecs, "%d gestionnaire(s) d'exception" % gestionnaires
+
+
 CAS = (
     ("aucune écriture par le fournisseur", casAucuneEcritureFournisseur),
     ("un seul point d'enregistrement", casAppelsReserves),
     ("commandes d'édition appairées", casCommandesAppairees),
+    ("commandes défaites sur exception", casCommandesDefaitesSurException),
     ("édition ouverte après les contrôles", casEditionOuverteEnDernier),
     ("cascade de mousePressEvent retirée", casCascadeRetiree),
     ("tables de traitement correspondantes", casTablesCorrespondantes),
