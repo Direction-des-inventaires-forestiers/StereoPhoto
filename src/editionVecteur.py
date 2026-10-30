@@ -17,9 +17,17 @@ Ici, la session d'édition s'ouvre au premier geste d'écriture et reste ouverte
 Chaque geste est une commande d'édition nommée, donc une frappe d'annulation,
 et l'enregistrement est un geste explicite de l'utilisateur.
 
-Deux conséquences de forme, que le banc de tests garde :
-aucun `dataProvider()` d'écriture dans le dépôt, et aucun `commitChanges()`
-ailleurs que dans `enregistrer()`.
+Trois conséquences de forme, que le banc de tests garde :
+aucun `dataProvider()` d'écriture dans le dépôt, aucun `commitChanges()`
+ailleurs que dans `enregistrer()`, et aucune sortie de fonction qui laisse une
+commande d'édition ouverte. Cette dernière compte autant que les deux autres :
+`QUndoStack::canUndo()` rend False tant qu'une macro est en cours, de sorte
+qu'une commande oubliée sur un chemin d'erreur désactive l'annulation de la
+couche pour le reste de la session, sans que rien ne le signale. Le drapeau
+`commandeOuverte` des trois fonctions d'écriture sert à cela, et à ne pas
+défaire une commande qui n'a pas été ouverte : l'exception peut survenir avant
+le `beginEditCommand()`, et `destroyEditCommand()` défait alors le geste
+précédent.
 
 Le module ne porte que ce que les outils d'édition appellent. La suppression
 d'entités et l'abandon d'un tampon entier n'en font pas partie : les écrire
@@ -174,18 +182,24 @@ def ajouterEntite(couche, geometrie, ouvrirFormulaire=False):
     if not ouvrirEdition(couche):
         return None
 
+    commandeOuverte = False
     try:
         entite = QgsVectorLayerUtils.createFeature(couche, geometrie)
         couche.beginEditCommand("StereoPhoto : ajout d'une entité")
+        commandeOuverte = True
         if not couche.addFeature(entite):
             couche.destroyEditCommand()
+            commandeOuverte = False
             avertir_utilisateur(
                 "L'entité n'a pas pu être ajoutée à la couche « %s »." % couche.name()
             )
             _journal.warning("addFeature() refusé sur la couche %s", couche.name())
             return None
         couche.endEditCommand()
+        commandeOuverte = False
     except Exception:
+        if commandeOuverte:
+            couche.destroyEditCommand()
         _journal.exception(
             "Échec de l'ajout d'une entité à la couche %s", couche.name()
         )
@@ -235,6 +249,7 @@ def fusionnerSelection(couche):
         )
         return False
 
+    commandeOuverte = False
     try:
         entites = {f.id(): f for f in couche.getFeatures(identifiants)}
         manquants = [fid for fid in identifiants if fid not in entites]
@@ -268,13 +283,16 @@ def fusionnerSelection(couche):
         couche.beginEditCommand(
             "StereoPhoto : fusion de %d entités" % len(identifiants)
         )
+        commandeOuverte = True
         if not couche.changeGeometry(identifiants[0], geometrie):
             couche.destroyEditCommand()
+            commandeOuverte = False
             avertir_utilisateur("La géométrie fusionnée n'a pas pu être écrite.")
             _journal.warning("changeGeometry() refusé sur %s", couche.name())
             return False
         if not couche.deleteFeatures(identifiants[1:]):
             couche.destroyEditCommand()
+            commandeOuverte = False
             avertir_utilisateur(
                 "Les entités absorbées n'ont pas pu être supprimées : la "
                 "fusion est abandonnée."
@@ -282,7 +300,10 @@ def fusionnerSelection(couche):
             _journal.warning("deleteFeatures() refusé sur %s", couche.name())
             return False
         couche.endEditCommand()
+        commandeOuverte = False
     except Exception:
+        if commandeOuverte:
+            couche.destroyEditCommand()
         _journal.exception("Échec de la fusion sur la couche %s", couche.name())
         avertir_utilisateur("La fusion a échoué. Voir le journal de l'extension.")
         return False
@@ -323,9 +344,11 @@ def decouper(couche, sommets):
     if not ouvrirEdition(couche):
         return False
 
+    commandeOuverte = False
     try:
         couche.removeSelection()
         couche.beginEditCommand("StereoPhoto : découpage")
+        commandeOuverte = True
         utils = QgsVectorLayerEditUtils(couche)
         resultat = utils.splitFeatures(QgsLineString(sommets), False, False)
         # La variante courbe rend un couple (résultat, points de topologie).
@@ -334,6 +357,7 @@ def decouper(couche, sommets):
 
         if resultat != Qgis.GeometryOperationResult.Success:
             couche.destroyEditCommand()
+            commandeOuverte = False
             # Le code d'origine ne laissait aucune trace de cet échec : ni
             # enregistrement, ni retour en arrière, ni message.
             avertir_utilisateur(
@@ -344,7 +368,10 @@ def decouper(couche, sommets):
             return False
 
         couche.endEditCommand()
+        commandeOuverte = False
     except Exception:
+        if commandeOuverte:
+            couche.destroyEditCommand()
         _journal.exception("Échec du découpage sur la couche %s", couche.name())
         avertir_utilisateur("Le découpage a échoué. Voir le journal de l'extension.")
         return False
