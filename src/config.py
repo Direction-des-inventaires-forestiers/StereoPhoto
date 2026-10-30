@@ -29,7 +29,8 @@ PAR_MIN_OVERLAP_RATIO = 0.05
 #   False : les photos se déplacent sous un curseur immobile au centre de la vue
 #   True  : le curseur se déplace sur les photos, qui restent fixes
 # Le photo-interprète bascule d'un comportement à l'autre en cours de session,
-# par le bouton « Débarrer le curseur » de la barre d'outils ou par la touche C.
+# par le bouton « Débarrer le curseur » de la barre d'outils ou par le raccourci
+# clavier que la table des raccourcis affecte à cette action.
 NAVIGATION_CURSEUR_LIBRE_PAR_DEFAUT = False
 
 # Zone sûre du piège à souris, en mode synchronisé : tant que le curseur y
@@ -68,6 +69,14 @@ NAVIGATION_ARRET_THREAD_DELAI_MAX_MS = 5000
 # trace passe d'un message de mise au point à un message d'information.
 NAVIGATION_TRACE_RECENTRAGE_INTERVALLE_S = 2.0
 NAVIGATION_TRACE_RECENTRAGE_SEUIL_PAR_S = 10.0
+
+# Niveaux de zoom du clavier, du plus fort au plus faible. Chaque valeur est le
+# diviseur appliqué à la dimension de la photo : 128 cadre un cent-vingt-huitième
+# de l'image, 1 l'image entière. Le groupe de touches qui les commande est une
+# seule entrée de la table des raccourcis, et sa longueur se valide contre cette
+# liste : huit touches pour huit niveaux, sans quoi des niveaux resteraient
+# inatteignables.
+NAVIGATION_ZOOM_NIVEAUX = (128, 64, 32, 16, 8, 4, 2, 1)
 
 # Écart maximal (mètres) toléré entre l'altitude du curseur et le MNT sous la
 # paire, au chargement d'un modèle. Au-delà, l'altitude du curseur est ramenée

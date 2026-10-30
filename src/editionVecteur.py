@@ -420,9 +420,9 @@ def annulerDernier(couche):
 
     L'intercepteur clavier de la navigation avale tout `KeyPress` et tout
     `ShortcutOverride` : aucun raccourci natif de QGIS ne répond pendant la
-    navigation synchronisée, `Ctrl+Z` compris. L'annulation passe
-    donc par cette fonction, appelée par le bouton de la barre d'outils et par
-    `keyboardHandler()`.
+    navigation synchronisée, y compris celui de l'annulation. Elle passe donc
+    par cette fonction, appelée par le bouton de la barre d'outils et par
+    `keyboardHandler()`, qui résout la touche par la table des raccourcis.
     """
     if couche is None or not couche.isEditable():
         return False

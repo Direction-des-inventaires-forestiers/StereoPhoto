@@ -11,7 +11,9 @@ L'application permet de :
     - Réaliser un effet miroir sur l'horizontal et la verticale
     - Afficher les deux images importées
     - Superposer automatiquement les images en fonction d'un pourcentage choisi par l'utilisateur
-    - Offrir une interface de navigation qui permet le déplacement, le zoom (CTRL+Roulette) et le traçage (Click & 1,2,3,ESC)
+    - Offrir une interface de navigation qui permet le déplacement, le zoom
+      à la roulette et le traçage, à la souris et aux raccourcis clavier de la
+      table de raccourcisClavier
     - Offrir un déplacement de l'image de droite pour ajuster l'altitude (Roulette)
     - Rehausser les couleurs des images via une nouvelle fenêtre intéractive
     - Traçage de forme géolocalisée
@@ -85,10 +87,11 @@ from .worldManager import pictureManager, dualManager
 from .enhanceManager import enhanceManager, threadShow
 from .drawFunction import calculatePolygon
 from . import editionOutils
+from . import raccourcisClavier
 from . import editionVecteur
 from .navigationQgsMapTool import navigationMapTool
 from .horsSyncQgsMapTool import horsSyncMapTool
-from .ui_widgetStereoPhoto import optionWindow
+from .ui_widgetStereoPhoto import CHEMIN_PARAMETRES, optionWindow
 
 from .gestionDossier import (
     getParDict,
@@ -106,6 +109,7 @@ from .config import (
     NAVIGATION_ARRET_THREAD_DELAI_MAX_MS,
     NAVIGATION_CURSEUR_LIBRE_PAR_DEFAUT,
     NAVIGATION_ECART_ALTITUDE_MNT_MAX_M,
+    NAVIGATION_ZOOM_NIVEAUX,
     PAR_CAMERA_ORIENTATION_TOLERANCE_DEG,
     DRAW_LINE_PEN_WIDTH_PX,
     GEOMETRY_PEN_WIDTH_PX,
@@ -138,6 +142,97 @@ class stereoPhoto(object):
         QgsWkbTypes.PolygonGeometry: editionOutils.TYPE_POLYGONE,
     }
 
+    # Traduction des touches de Qt vers les noms de raccourcisClavier, qui
+    # ne connaît pas Qt. Même frontière que les deux tables ci-dessus, et
+    # même raison de l'écrire en entier plutôt qu'en compréhension : le banc
+    # la relit par analyse syntaxique et la croise avec le vocabulaire du
+    # module. Une touche sans nom, ou un nom sans touche, serait un
+    # raccourci que personne ne peut déclencher et que rien ne signalerait.
+    #
+    # Qt.Key_Enter, la touche Entrée du pavé numérique, est volontairement
+    # absente : elle porterait le même nom que Qt.Key_Return et ferait un
+    # doublon dans la table.
+    TOUCHES_QT = {
+        Qt.Key_Escape: "Échap",
+        Qt.Key_F1: "F1",
+        Qt.Key_F2: "F2",
+        Qt.Key_F3: "F3",
+        Qt.Key_F4: "F4",
+        Qt.Key_F5: "F5",
+        Qt.Key_F6: "F6",
+        Qt.Key_F7: "F7",
+        Qt.Key_F8: "F8",
+        Qt.Key_F9: "F9",
+        Qt.Key_F10: "F10",
+        Qt.Key_F11: "F11",
+        Qt.Key_F12: "F12",
+        Qt.Key_0: "0",
+        Qt.Key_1: "1",
+        Qt.Key_2: "2",
+        Qt.Key_3: "3",
+        Qt.Key_4: "4",
+        Qt.Key_5: "5",
+        Qt.Key_6: "6",
+        Qt.Key_7: "7",
+        Qt.Key_8: "8",
+        Qt.Key_9: "9",
+        Qt.Key_A: "A",
+        Qt.Key_B: "B",
+        Qt.Key_C: "C",
+        Qt.Key_D: "D",
+        Qt.Key_E: "E",
+        Qt.Key_F: "F",
+        Qt.Key_G: "G",
+        Qt.Key_H: "H",
+        Qt.Key_I: "I",
+        Qt.Key_J: "J",
+        Qt.Key_K: "K",
+        Qt.Key_L: "L",
+        Qt.Key_M: "M",
+        Qt.Key_N: "N",
+        Qt.Key_O: "O",
+        Qt.Key_P: "P",
+        Qt.Key_Q: "Q",
+        Qt.Key_R: "R",
+        Qt.Key_S: "S",
+        Qt.Key_T: "T",
+        Qt.Key_U: "U",
+        Qt.Key_V: "V",
+        Qt.Key_W: "W",
+        Qt.Key_X: "X",
+        Qt.Key_Y: "Y",
+        Qt.Key_Z: "Z",
+        Qt.Key_Left: "Gauche",
+        Qt.Key_Right: "Droite",
+        Qt.Key_Up: "Haut",
+        Qt.Key_Down: "Bas",
+        Qt.Key_PageUp: "PgHaut",
+        Qt.Key_PageDown: "PgBas",
+        Qt.Key_Home: "Début",
+        Qt.Key_End: "Fin",
+        Qt.Key_Space: "Espace",
+        Qt.Key_Tab: "Tab",
+        Qt.Key_Return: "Retour",
+        Qt.Key_Backspace: "Retour arrière",
+        Qt.Key_Delete: "Suppr",
+        Qt.Key_Insert: "Inser",
+        Qt.Key_Plus: "+",
+        Qt.Key_Minus: "-",
+    }
+
+    # Modificateurs qui entrent dans le nom d'une touche, dans l'ordre
+    # canonique de raccourcisClavier.MODIFICATEURS.
+    #
+    # Maj, Meta et le pavé numérique en sont absents, et c'est le pavé qui
+    # commande : le « 1 » du pavé arrive avec Qt.KeypadModifier et doit
+    # désigner le même raccourci que celui de la rangée des chiffres. Sans
+    # cet écart au masque, les touches des outils deviendraient inertes au
+    # pavé sans que rien n'échoue.
+    MODIFICATEURS_QT = (
+        (Qt.ControlModifier, raccourcisClavier.MODIFICATEUR_CTRL),
+        (Qt.AltModifier, raccourcisClavier.MODIFICATEUR_ALT),
+    )
+
     # Fonction d'initilisation
     def __init__(self, iface):
         self.iface = iface
@@ -151,6 +246,11 @@ class stereoPhoto(object):
 
     # Place le bouton de l'application dans QGIS
     def initGui(self):
+
+        # Lue avant tout libellé : les boutons de la barre annoncent leur
+        # touche, et la barre existe dès le chargement de l'extension, bien
+        # avant qu'une session soit ouverte.
+        self.chargerRaccourcis()
 
         self.toolbarST = self.iface.addToolBar("StereoPhoto Toolbar")
         self.toolbarST.setObjectName("StereoPhotoToolbar")
@@ -166,7 +266,7 @@ class stereoPhoto(object):
         iconSuivreMNT = ":/Anaglyph/Icons/SuivreMNT.png"
         self.actionSuivreMNT = QAction(
             QIcon(iconSuivreMNT),
-            "Suivre le MNT (touche M)",
+            "Suivre le MNT",
             self.iface.mainWindow(),
         )
 
@@ -175,7 +275,7 @@ class stereoPhoto(object):
         iconUnlockCursor = ":/Anaglyph/Icons/UnlockCursor.png"
         self.actionUnlockCursor = QAction(
             QIcon(iconUnlockCursor),
-            "Débarrer le curseur (touche C)",
+            "Débarrer le curseur",
             self.iface.mainWindow(),
         )
 
@@ -203,8 +303,7 @@ class stereoPhoto(object):
             ),
             (
                 editionOutils.OUTIL_AJOUTER,
-                "Ajouter une entité ; clic droit : clore le tracé ;"
-                " touche 1 : alterne avec Découper",
+                "Ajouter une entité ; clic droit : clore le tracé",
                 "/mActionCapturePolygon.svg",
             ),
             (
@@ -214,7 +313,7 @@ class stereoPhoto(object):
             ),
             (
                 editionOutils.OUTIL_DECOUPER,
-                "Découper ; touche 1 : alterne avec Ajouter",
+                "Découper",
                 "/mActionSplitFeatures.svg",
             ),
         ):
@@ -247,7 +346,7 @@ class stereoPhoto(object):
         # de QGIS, ces deux gestes n'ont pas d'autre accès.
         self.actionEnregistrerEdition = QAction(
             QgsApplication.getThemeIcon("/mActionSaveEdits.svg"),
-            "Enregistrer les modifications de la couche (Ctrl+S)",
+            "Enregistrer les modifications de la couche",
             self.iface.mainWindow(),
         )
         self.actionEnregistrerEdition.setObjectName("stereophoto_enregistrer_edition")
@@ -256,12 +355,31 @@ class stereoPhoto(object):
 
         self.actionAnnulerEdition = QAction(
             QgsApplication.getThemeIcon("/mActionUndo.svg"),
-            "Annuler le dernier geste d'édition (Ctrl+Z)",
+            "Annuler le dernier geste d'édition",
             self.iface.mainWindow(),
         )
         self.actionAnnulerEdition.setObjectName("stereophoto_annuler_edition")
         self.actionAnnulerEdition.setEnabled(False)
         self.actionAnnulerEdition.triggered.connect(self.annulerEdition)
+
+        # Libellés de base des actions qui portent un raccourci, relevés sur
+        # les actions elles-mêmes avant toute mention de touche. Ce sont eux que
+        # annoncerRaccourcis() recompose : garder la mention dans le libellé le
+        # rendrait non rejouable, et deux lectures de la table empileraient deux
+        # parenthèses.
+        self.libellesRaccourcis = [
+            (raccourcisClavier.ACTION_SUIVI_MNT, self.actionSuivreMNT),
+            (raccourcisClavier.ACTION_CURSEUR_LIBRE, self.actionUnlockCursor),
+            (raccourcisClavier.ACTION_ENREGISTRER, self.actionEnregistrerEdition),
+            (raccourcisClavier.ACTION_ANNULER, self.actionAnnulerEdition),
+        ] + [
+            (raccourcisClavier.ACTIONS_OUTIL[cle], self.actionsOutil[cle])
+            for cle in editionOutils.OUTILS
+        ]
+        self.libellesDeBase = {
+            action: cible.text() for action, cible in self.libellesRaccourcis
+        }
+        self.annoncerRaccourcis()
 
         self.toolbarST.addAction(self.actionMainMenu)
         self.toolbarST.addAction(self.actionSuivreMNT)
@@ -317,6 +435,10 @@ class stereoPhoto(object):
     def run(self):
 
         if self.actionMainMenu.isChecked():
+            # Relue à chaque ouverture : une touche modifiée dans le fichier de
+            # paramètres prend ainsi effet à la session suivante, sans qu'il
+            # faille recharger l'extension.
+            self.chargerRaccourcis()
             self.initGlobalParam()
 
             self.optWindow = optionWindow(self.iface)
@@ -324,6 +446,12 @@ class stereoPhoto(object):
             # Outil de l'état hors-synchronisation : posé sur le canevas par
             # windowHandler("qgis") là où l'outil était retiré.
             self.horsSyncMapTool = horsSyncMapTool(self.canvas)
+            # L'outil lit le clavier lui-même : pendant le
+            # hors-synchronisation, l'intercepteur de la navigation est retiré
+            # et c'est lui qui reçoit la touche du retour.
+            self.horsSyncMapTool.touchesRetour = self.codesTouches(
+                raccourcisClavier.ACTION_BASCULE_FENETRE
+            )
             # L'outil est neuf à chaque ouverture : il reprend le comportement
             # de navigation que porte le bouton de la barre d'outils.
             self.navigMapTool.curseurLibre = self.actionUnlockCursor.isChecked()
@@ -336,8 +464,23 @@ class stereoPhoto(object):
             # l'utilisateur n'a pas fini de monter, souvent un projet neuf
             # encore en WGS 84 dont les couches arrivent après.
             self.optWindow.loadParamFile()
+            # La section apparaît dans le fichier à la première fermeture de
+            # session : c'est là que l'utilisateur va l'éditer, et un fichier
+            # écrit par une version antérieure ne la porte pas. Posée ici, et
+            # non dans loadParamFile(), dont le banc extrait la méthode avec un
+            # espace de noms fixe où ce module n'existe pas.
+            #
+            # setdefault et non une écriture : une section déjà présente est
+            # laissée telle quelle, fautes de frappe comprises. C'est voulu —
+            # l'utilisateur doit pouvoir relire et corriger ce qu'il a écrit,
+            # alors que l'écraser par les défauts le laisserait sans indice.
+            self.optWindow.ParamDict.setdefault(
+                raccourcisClavier.CLE_SECTION, raccourcisClavier.sectionParDefaut()
+            )
             self.iface.addDockWidget(Qt.RightDockWidgetArea, self.optWindow)
             self.optWindow.raise_()
+            # Le panneau existe : son infobulle peut recevoir ses raccourcis.
+            self.annoncerRaccourcis()
             self.journal.info("Session ouverte")
 
         else:
@@ -385,6 +528,29 @@ class stereoPhoto(object):
             editionOutils.TRAITEMENT_FUSIONNER: self.fusionnerSelection,
         }
 
+        # Table des raccourcis : même forme et même raison que celle des
+        # traitements ci-dessus, des méthodes liées plutôt qu'un getattr,
+        # pour que le contrôle de style et le banc voient les noms. Le banc
+        # vérifie aussi que chaque action déclarée y a bien un récepteur.
+        #
+        # actionUnlockCursor.toggle est la méthode du bouton lui-même,
+        # comme dans la cascade d'origine ; le suivi du MNT passe en
+        # revanche par une méthode, sa garde sur le modèle chargé devant
+        # rester.
+        self.tableRaccourcis = {
+            raccourcisClavier.ACTION_BASCULE_FENETRE: self.basculerFenetre,
+            raccourcisClavier.ACTION_ZOOM: self.keyboardZoom,
+            raccourcisClavier.ACTION_OUTIL_SELECTIONNER: self.choisirOutil,
+            raccourcisClavier.ACTION_OUTIL_AJOUTER: self.choisirOutil,
+            raccourcisClavier.ACTION_OUTIL_COMBINER: self.choisirOutil,
+            raccourcisClavier.ACTION_OUTIL_DECOUPER: self.choisirOutil,
+            raccourcisClavier.ACTION_BASCULE_TRACE: self.basculerOutilTrace,
+            raccourcisClavier.ACTION_SUIVI_MNT: self.basculerSuiviMNT,
+            raccourcisClavier.ACTION_CURSEUR_LIBRE: self.actionUnlockCursor.toggle,
+            raccourcisClavier.ACTION_ANNULER: self.annulerEdition,
+            raccourcisClavier.ACTION_ENREGISTRER: self.enregistrerEdition,
+        }
+
         # Un seul avertissement d'altitude indéterminée par série de clics :
         # sans ce drapeau, dix clics donnaient dix bandeaux. Remis à faux dès
         # que l'altitude redevient déterminée.
@@ -416,8 +582,8 @@ class stereoPhoto(object):
         self.cursorAltitude = None
         self.isLoadingPair = False
 
-        # Vrai entre ESC et le retour aux photos : les vues ne suivent plus le
-        # curseur, elles suivent le canevas de QGIS.
+        # Vrai entre la bascule vers QGIS et le retour aux photos : les vues
+        # ne suivent plus le curseur, elles suivent le canevas de QGIS.
         self.horsSynchronisation = False
 
     def setConnection(self):
@@ -1564,7 +1730,7 @@ class stereoPhoto(object):
             self.iface.mainWindow().activateWindow()
 
             # La vue est mémorisée avant la bascule : c'est elle qu'on
-            # retrouvera au retour par ESC.
+            # retrouvera au retour.
             self.setLastView()
 
             # Le hors-synchronisation est un état porté par un
@@ -1662,42 +1828,194 @@ class stereoPhoto(object):
 
         self.changerModeleSiBordFranchi(pointImageGauche)
 
-    # Fonction appelée lorsque les touches respectives du clavier sont appuyées
-    # Les touches sont utiles lorsque le mode pan est en cours d'utilisation
-    # Possibilité d'ajouter d'autres fonctions plus tard
+    def chargerRaccourcis(self):
+        """Lit la table des raccourcis et la tient prête pour le clavier.
+
+        Appelée deux fois, et les deux sont nécessaires : au chargement de
+        l'extension, parce que les libellés de la barre d'outils nomment leur
+        touche et que la barre existe avant toute session ; et à chaque
+        ouverture de session, pour qu'une modification du fichier de paramètres
+        prenne effet à la session suivante sans recharger l'extension.
+        """
+        self.raccourcis, self.raccourcisInverses, avertissements = (
+            raccourcisClavier.lire(CHEMIN_PARAMETRES)
+        )
+
+        for phrase in avertissements:
+            self.journal.warning("%s", phrase)
+
+        if avertissements:
+            # Le détail va au journal, le bandeau ne reçoit que le compte : un
+            # fichier mal édité peut porter dix fautes, et dix bandeaux
+            # masqueraient le travail en cours. Mais se taire tout à fait
+            # laisserait l'utilisateur sans explication pour une touche qui ne
+            # répond pas, le fichier n'étant pas visible depuis l'interface.
+            avertir_utilisateur(
+                "%d anomalie(s) dans les raccourcis clavier du fichier de "
+                "paramètres ; les valeurs par défaut s'appliquent. Le détail "
+                "est dans l'onglet StereoPhoto du panneau des journaux."
+                % len(avertissements)
+            )
+
+    def nomTouche(self, event):
+        """Nom canonique de la touche d'un événement clavier, ou None.
+
+        Seuls Ctrl et Alt entrent dans le nom. Maj, Meta et le pavé numérique
+        sont effacés du masque : le « 1 » du pavé arrive avec
+        Qt.KeypadModifier et doit désigner le même raccourci que celui de la
+        rangée des chiffres.
+
+        Le comportement d'origine testait la présence de Ctrl sans exclure les
+        autres modificateurs : Ctrl+Maj+Z annulait, et continue de le faire.
+        """
+        nom = self.TOUCHES_QT.get(event.key())
+        if nom is None:
+            return None
+
+        modificateurs = event.modifiers()
+        presents = [
+            etiquette
+            for code, etiquette in self.MODIFICATEURS_QT
+            if modificateurs & code
+        ]
+        return raccourcisClavier.SEPARATEUR.join(presents + [nom])
+
+    def codesTouches(self, action):
+        """Codes de touche de Qt affectés à une action.
+
+        Sert à doter un outil qui lit le clavier lui-même, sans lui donner la
+        table ni la frontière. Le modificateur est perdu au passage : un
+        raccourci qui en porte un y répondra aussi sans lui, et c'est
+        journalisé plutôt que tu.
+        """
+        valeur = self.raccourcis.get(action, "")
+        noms = valeur if isinstance(valeur, tuple) else ([valeur] if valeur else [])
+
+        codes = set()
+        for nom in noms:
+            if raccourcisClavier.SEPARATEUR in nom:
+                self.journal.info(
+                    "Raccourci %s de « %s » : le modificateur n'est pas "
+                    "distingué hors de la navigation synchronisée",
+                    nom,
+                    action,
+                )
+                nom = nom.rsplit(raccourcisClavier.SEPARATEUR, 1)[-1]
+            for code, etiquette in self.TOUCHES_QT.items():
+                if etiquette == nom:
+                    codes.add(code)
+        return frozenset(codes)
+
+    def annoncerRaccourcis(self):
+        """Recompose tous les textes montrés qui nomment une touche.
+
+        Un seul endroit les compose, et ils suivent la table : aucune touche
+        n'est écrite en dur dans un libellé ni dans une infobulle, sans quoi
+        ils mentiraient dès la première personnalisation. Une action sans
+        touche voit simplement sa mention disparaître, ce qui rend la
+        désaffectation visible dans l'interface et pas seulement au journal.
+
+        Rejouable : appelée au chargement de l'extension pour la barre
+        d'outils, puis à chaque ouverture de session, le panneau n'existant
+        pas avant. L'interface de configuration à venir l'appellera de même
+        après chaque changement.
+        """
+        for action, cible in getattr(self, "libellesRaccourcis", []):
+            base = self.libellesDeBase.get(action, cible.text())
+            mention = self.annonceTouche(action)
+            cible.setText("%s (%s)" % (base, mention) if mention else base)
+
+        self.annoncerRaccourcisDuPanneau()
+
+    def annoncerRaccourcisDuPanneau(self):
+        """Porte les raccourcis de la navigation dans l'infobulle du panneau.
+
+        Le bouton Naviguer est l'endroit où l'utilisateur les cherche : c'est
+        lui qui ouvre la navigation, et pendant celle-ci aucun raccourci natif
+        de QGIS ne répond. Les lignes dont la touche a été retirée sont omises
+        plutôt que laissées vides.
+
+        Seuls les raccourcis de la navigation y figurent. Ceux des outils
+        d'édition sont annoncés par les boutons qui les portent, où l'on va
+        chercher un outil ; les répéter ici donnerait une ligne illisible et
+        une mention en double.
+        """
+        panneau = getattr(self, "optWindow", None)
+        if panneau is None:
+            return
+
+        lignes = ["Ouvrir la navigation stéréo"]
+
+        bascule = self.raccourcis.get(raccourcisClavier.ACTION_BASCULE_FENETRE, "")
+        if bascule:
+            lignes.append("%s : basculer entre QGIS et les photos" % bascule)
+
+        zoom = self.raccourcis.get(raccourcisClavier.ACTION_ZOOM, ())
+        if zoom:
+            lignes.append(
+                "%s : niveaux de zoom, du plus fort (%s) à l'image entière (%s)"
+                % (raccourcisClavier.annonceGroupe(zoom), zoom[0], zoom[-1])
+            )
+
+        panneau.ui.pushButtonShowPicture.setToolTip("\n".join(lignes))
+
+    def annonceTouche(self, action):
+        """Fragment de phrase nommant la touche d'une action, ou rien."""
+        return raccourcisClavier.annonce(self.raccourcis.get(action, ""))
+
+    def executerRaccourci(self, action, argument):
+        """Appelle la méthode de l'action, par la table action vers méthode."""
+        recepteur = self.tableRaccourcis.get(action)
+        if recepteur is None:
+            self.journal.warning(
+                "Raccourci « %s » sans récepteur : touche sans effet", action
+            )
+            return
+
+        if argument is None:
+            recepteur()
+        else:
+            recepteur(argument)
+
+    def basculerFenetre(self):
+        """Quitte les photos pour QGIS, ou en revient.
+
+        Branche d'origine de la cascade du clavier. Le même raccourci fait
+        l'aller et le retour, l'état hors-synchronisation décidant du sens.
+        """
+        if self.horsSynchronisation:
+            self.retourNavigationPhoto()
+        else:
+            self.windowHandler("qgis")
+
+    def basculerSuiviMNT(self):
+        """Bascule le suivi du MNT, et seulement si un MNT est chargé.
+
+        Sans cette garde, le bouton se cocherait sur une session sans modèle
+        numérique de terrain et le curseur suivrait une altitude qui n'existe
+        pas.
+        """
+        if self.optWindow.mntArr is not None:
+            self.actionSuivreMNT.toggle()
+
     def keyboardHandler(self, event):
+        """Dirige une touche vers l'action que la table lui affecte.
+
+        C'était une cascade de sept comparaisons littérales. L'intercepteur
+        clavier de la navigation avalant tout KeyPress et tout
+        ShortcutOverride, ces raccourcis sont le seul accès clavier aux outils
+        pendant la navigation : les figer dans le code revenait à le fermer à
+        qui n'a pas le clavier du poste d'origine.
+        """
         if event.type() == QEvent.KeyPress:
-            if event.key() == Qt.Key_Escape:
-                if self.horsSynchronisation:
-                    self.retourNavigationPhoto()
-                else:
-                    self.windowHandler("qgis")
+            nom = self.nomTouche(event)
+            cible = self.raccourcisInverses.get(nom) if nom else None
+            if cible is not None:
+                self.executerRaccourci(cible[0], cible[1])
 
-            elif event.key() in range(Qt.Key_F5, Qt.Key_F13):
-                val = event.key() - Qt.Key_F5
-                self.keyboardZoom(val)
-
-            elif event.key() == Qt.Key_1:
-                self.basculerOutilTrace()
-
-            elif event.key() == Qt.Key_Z and event.modifiers() & Qt.ControlModifier:
-                # L'intercepteur clavier de la navigation avale tout KeyPress
-                # et tout ShortcutOverride : le Ctrl+Z de QGIS ne répond pas
-                # pendant la navigation. L'annulation passe donc par ici, et
-                # deviendra une entrée de la table de raccourcis configurables.
-                self.annulerEdition()
-
-            elif event.key() == Qt.Key_S and event.modifiers() & Qt.ControlModifier:
-                self.enregistrerEdition()
-
-            elif event.key() == Qt.Key_M:
-                if self.optWindow.mntArr is not None:
-                    self.actionSuivreMNT.toggle()
-
-            elif event.key() == Qt.Key_C:
-                # Raccourci annoncé par l'infobulle du bouton de la barre d'outils.
-                self.actionUnlockCursor.toggle()
-
+        # Accepté quelle que soit la suite, touche affectée ou non : c'est
+        # l'interception volontaire de la navigation, et elle ne doit pas
+        # dépendre du contenu de la table.
         event.accept()
 
     def setInitialCursorAltitude(self):
@@ -2220,7 +2538,9 @@ class stereoPhoto(object):
         voyait à l'écran, de plusieurs mètres sous couvert.
         """
         autorise, altitude, motif = editionOutils.altitudeEcriture(
-            self.coucheAUnZ(), self.cursorAltitude
+            self.coucheAUnZ(),
+            self.cursorAltitude,
+            self.annonceTouche(raccourcisClavier.ACTION_SUIVI_MNT),
         )
         if autorise:
             self.altitudeRefusSignalee = False
@@ -2363,7 +2683,11 @@ class stereoPhoto(object):
         # d'altitude pour son géométrie, mais le tracé en a besoin pour se
         # dessiner. Sans cette garde, coordToPixel() recevait None.
         if self.cursorAltitude is None:
-            avertir_utilisateur(editionOutils.MOTIF_ALTITUDE_INDETERMINEE)
+            avertir_utilisateur(
+                editionOutils.motifAltitudeIndeterminee(
+                    self.annonceTouche(raccourcisClavier.ACTION_SUIVI_MNT)
+                )
+            )
             self.journal.warning("Tracé refusé : aucune altitude portée")
             return
 
@@ -2505,11 +2829,13 @@ class stereoPhoto(object):
         self.journal.info("Outil d'édition : %s", self.outilActif)
 
     def basculerOutilTrace(self):
-        """Touche 1 : alterne entre Ajouter et Découper, comme avant.
+        """Alterne entre Ajouter et Découper.
 
-        La touche basculait les deux radios du panneau. Elle commande
-        maintenant l'outil, et la synchronisation redescend vers les radios.
-        Depuis un outil qui ne trace pas, elle ramène au tracé.
+        Geste d'origine, du temps où ces deux outils étaient les seuls et
+        où la bascule portait une touche. Les quatre outils se désignent
+        maintenant directement, et cette action n'a plus de touche par
+        défaut : l'entrée reste dans la table pour qui veut lui en rendre
+        une. Depuis un outil qui ne trace pas, elle ramène au tracé.
         """
         if self.outilActif == editionOutils.OUTIL_AJOUTER:
             voulu = editionOutils.OUTIL_DECOUPER
@@ -2517,12 +2843,27 @@ class stereoPhoto(object):
             voulu = editionOutils.OUTIL_AJOUTER
         else:
             self.journal.info(
-                "Touche 1 depuis l'outil %s : retour au tracé", self.outilActif
+                "Bascule de tracé depuis l'outil %s : retour au tracé",
+                self.outilActif,
             )
             voulu = editionOutils.OUTIL_AJOUTER
 
-        self.actionsOutil[voulu].setChecked(True)
-        self.changerOutilActif(self.actionsOutil[voulu])
+        self.choisirOutil(voulu)
+
+    def choisirOutil(self, cle):
+        """Active un outil d'édition par sa clé, comme un clic sur son bouton.
+
+        Point d'entrée commun au clavier et à la bascule : le groupe
+        d'actions est exclusif, et c'est lui qui porte l'état de l'outil
+        actif depuis que les radios du panneau ont été retirées.
+        """
+        action = self.actionsOutil.get(cle)
+        if action is None:
+            self.journal.warning("Outil %r inconnu : aucun bouton ne le porte", cle)
+            return
+
+        action.setChecked(True)
+        self.changerOutilActif(action)
 
     def majActivationTrace(self):
         """Accorde la bande élastique du canevas à l'outil et à la couche.
@@ -2696,8 +3037,7 @@ class stereoPhoto(object):
             )
 
     def keyboardZoom(self, value):
-        zoomLevels = [128, 64, 32, 16, 8, 4, 2, 1]
-        scaleFactor = zoomLevels[value]
+        scaleFactor = NAVIGATION_ZOOM_NIVEAUX[value]
 
         scaleX = self.leftPicSize[0] / scaleFactor
         scaleY = self.leftPicSize[1] / scaleFactor

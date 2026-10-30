@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Test de la répartition des gestes : clics de souris et touches.
+"""Test de la répartition des clics de souris.
 
 `tests/test_table_outils.py` vérifie la table des gestes toute seule. Ce test
 vérifie la suite : que `stereoPhoto` consulte bien cette table et qu'il appelle
@@ -8,11 +8,11 @@ traduction de la classe, qui font passer des boutons de Qt et des types de
 géométrie de QGIS aux clés de la table, et c'est là qu'une case oubliée
 rendrait un geste inerte sans que la table elle-même soit en cause.
 
-Même chose pour le clavier. Les sept touches traitées sont des littéraux dans
-une cascade de `if`/`elif`, et l'intercepteur de la navigation avale tout le
-clavier : une touche qui n'arrive pas à son traitement ne laisse aucune trace,
-et aucun raccourci de QGIS ne vient compenser. `Ctrl+Z` et `Ctrl+S` sont les
-deux seuls accès à l'annulation et à l'enregistrement pendant la navigation.
+Le clavier était éprouvé ici aussi, du temps où ses sept touches étaient des
+littéraux dans une cascade de `if`/`elif`. Il a sa table et son fichier depuis,
+et son routage est éprouvé par `tests/test_raccourcis_clavier.py` : garder les
+deux aurait fait éprouver le même routage à deux endroits, qui auraient
+divergé.
 
 Quatre familles de cas :
 
@@ -22,13 +22,12 @@ Quatre familles de cas :
    aucune couche choisie.
 3. Les deux tables de traduction de la classe, lues par analyse syntaxique :
    elles doivent couvrir les trois boutons et les trois types.
-4. La touche : chaque touche traitée atteint son traitement, un relâchement de
-   touche ne déclenche rien, et `Ctrl+Z` comme `Ctrl+S` exigent le
-   modificateur.
+4. La représentation de l'outil actif : les actions de la barre, seules, et
+   aucun libellé qui nomme une touche en littéral.
 
-Les deux méthodes sont extraites du fichier source par analyse syntaxique, puis
-exécutées avec des bouchons. `editionOutils` est importé pour de vrai, lui :
-c'est le module sous test de l'autre fichier, et le prendre en bouchon ici ne
+La méthode est extraite du fichier source par analyse syntaxique, puis exécutée
+avec des bouchons. `editionOutils` est importé pour de vrai, lui : c'est le
+module sous test de l'autre fichier, et le prendre en bouchon ici ne
 vérifierait plus le raccordement entre les deux.
 
 Usage :
@@ -40,29 +39,21 @@ Sortie 0 si tout passe, 1 sinon.
 import ast
 import io
 import os
+import re
 import sys
 
 RACINE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SOURCE_DEFAUT = os.path.join(RACINE, "src")
 
-# Valeurs numériques des constantes de Qt employées par keyboardHandler, pour
-# que le test s'exécute sans Qt installé. Elles viennent de Qt::Key et de
-# Qt::KeyboardModifier, et ne changent pas d'une version à l'autre : ce sont
-# les valeurs que l'extension reçoit réellement.
-KEY_ESCAPE = 0x01000000
-KEY_F5 = 0x01000034
-KEY_F13 = 0x0100003C
-KEY_1 = 0x31
-KEY_C = 0x43
-KEY_M = 0x4D
-KEY_S = 0x53
-KEY_Z = 0x5A
-KEY_A = 0x41
+# Valeur numérique du modificateur vide de Qt, pour que le test s'exécute sans
+# Qt installé. Les clics voyagent avec leurs modificateurs depuis que la
+# sélection additive en a besoin.
 NO_MODIFIER = 0x00000000
-CONTROL_MODIFIER = 0x04000000
 
-TYPE_EVENEMENT_PRESSE = 6
-TYPE_EVENEMENT_RELACHE = 7
+# Une touche nommée dans un libellé de la barre d'outils : « touche 1 »,
+# « Ctrl+S ». Plus aucun libellé ne doit en porter, les raccourcis étant
+# configurables et composés par annoncerRaccourcis().
+MOTIF_TOUCHE = re.compile(r"(?i)touche\s+[A-Z0-9]|Ctrl\+[A-Z]|Alt\+[A-Z]")
 
 
 def extraire_methodes(chemin, classe_visee, methodes_visees, espace):
@@ -95,37 +86,9 @@ def extraire_methodes(chemin, classe_visee, methodes_visees, espace):
 
 
 class QtBouchon:
-    """Les constantes de Qt que les deux méthodes lisent, et rien de plus."""
+    """Les constantes de Qt que la méthode lit, et rien de plus."""
 
-    Key_Escape = KEY_ESCAPE
-    Key_F5 = KEY_F5
-    Key_F13 = KEY_F13
-    Key_1 = KEY_1
-    Key_C = KEY_C
-    Key_M = KEY_M
-    Key_S = KEY_S
-    Key_Z = KEY_Z
-    ControlModifier = CONTROL_MODIFIER
     NoModifier = NO_MODIFIER
-
-
-class QEventBouchon:
-    KeyPress = TYPE_EVENEMENT_PRESSE
-    KeyRelease = TYPE_EVENEMENT_RELACHE
-
-
-class EvenementClavierBouchon:
-    def __init__(self, touche, modificateurs=NO_MODIFIER, presse=True):
-        self._touche = touche
-        self._modificateurs = modificateurs
-        self._type = TYPE_EVENEMENT_PRESSE if presse else TYPE_EVENEMENT_RELACHE
-        self.accepte = 0
-
-    def type(self):
-        return self._type
-
-    def key(self):
-        return self._touche
 
     def modifiers(self):
         return self._modificateurs
@@ -216,7 +179,6 @@ def monter(chemin_app, methodes_voulues, alertes):
         "editionOutils": editionOutils,
         "avertir_utilisateur": avertir_utilisateur,
         "Qt": QtBouchon,
-        "QEvent": QEventBouchon,
     }
     methodes = extraire_methodes(chemin_app, "stereoPhoto", methodes_voulues, espace)
     return methodes, editionOutils
@@ -374,109 +336,6 @@ def casTablesDeTraduction(chemin_app):
     return echecs, "%d tables" % len(attendus)
 
 
-def casRoutageDesTouches(chemin_app):
-    """Chaque touche traitée atteint son traitement."""
-    echecs = []
-    alertes = []
-    methodes, _mod = monter(chemin_app, ("keyboardHandler",), alertes)
-    traiter = methodes["keyboardHandler"]
-
-    def verifier(description, touche, modificateurs, attendu, **reglages):
-        app = ApplicationBouchon(**reglages.pop("bouchon", {}))
-        for nom, valeur in reglages.items():
-            setattr(app, nom, valeur)
-        evenement = EvenementClavierBouchon(touche, modificateurs)
-        traiter(app, evenement)
-        if app.appels != attendu:
-            echecs.append("%s : %r au lieu de %r" % (description, app.appels, attendu))
-        if not evenement.accepte:
-            echecs.append("%s : l'événement n'a pas été accepté" % description)
-        return app
-
-    verifier(
-        "Échap en navigation synchronisée",
-        KEY_ESCAPE,
-        NO_MODIFIER,
-        ["windowHandler:qgis"],
-    )
-    verifier(
-        "Échap en hors-synchronisation",
-        KEY_ESCAPE,
-        NO_MODIFIER,
-        ["retourNavigationPhoto"],
-        horsSynchronisation=True,
-    )
-    verifier("F5, premier niveau de zoom", KEY_F5, NO_MODIFIER, ["keyboardZoom:0"])
-    verifier(
-        "F12, dernier niveau de zoom", KEY_F13 - 1, NO_MODIFIER, ["keyboardZoom:7"]
-    )
-    verifier("touche 1, outil de tracé", KEY_1, NO_MODIFIER, ["basculerOutilTrace"])
-    verifier("Ctrl+Z, annulation", KEY_Z, CONTROL_MODIFIER, ["annulerEdition"])
-    verifier("Ctrl+S, enregistrement", KEY_S, CONTROL_MODIFIER, ["enregistrerEdition"])
-
-    # F13 est hors de l'intervalle de zoom : la touche doit rester inerte.
-    verifier("F13, hors des huit niveaux", KEY_F13, NO_MODIFIER, [])
-
-    # M ne bascule le suivi du MNT que si un MNT est chargé.
-    app = ApplicationBouchon(mntArr=None)
-    traiter(app, EvenementClavierBouchon(KEY_M, NO_MODIFIER))
-    if app.actionSuivreMNT.bascules:
-        echecs.append("M sans MNT chargé : le suivi a basculé")
-
-    app = ApplicationBouchon(mntArr=[[0.0]])
-    traiter(app, EvenementClavierBouchon(KEY_M, NO_MODIFIER))
-    if app.actionSuivreMNT.bascules != 1:
-        echecs.append(
-            "M avec MNT chargé : %d bascule(s) au lieu d'une"
-            % app.actionSuivreMNT.bascules
-        )
-
-    app = ApplicationBouchon()
-    traiter(app, EvenementClavierBouchon(KEY_C, NO_MODIFIER))
-    if app.actionUnlockCursor.bascules != 1:
-        echecs.append(
-            "C : %d bascule(s) au lieu d'une" % app.actionUnlockCursor.bascules
-        )
-
-    return echecs, "Échap, F5-F12, 1, Ctrl+Z, Ctrl+S, M, C"
-
-
-def casGardesDesTouches(chemin_app):
-    """Un relâchement ne déclenche rien, et les raccourcis exigent Ctrl."""
-    echecs = []
-    alertes = []
-    methodes, _mod = monter(chemin_app, ("keyboardHandler",), alertes)
-    traiter = methodes["keyboardHandler"]
-
-    # Relâchement de touche : aucune des branches ne doit s'exécuter, sans
-    # quoi un geste serait joué deux fois par frappe.
-    for touche, nom in ((KEY_ESCAPE, "Échap"), (KEY_1, "1"), (KEY_Z, "Z")):
-        app = ApplicationBouchon()
-        traiter(app, EvenementClavierBouchon(touche, CONTROL_MODIFIER, presse=False))
-        if app.appels or app.actionSuivreMNT.bascules:
-            echecs.append("relâchement de %s : %r exécuté" % (nom, app.appels))
-
-    # Z et S sans Ctrl ne sont pas des raccourcis d'édition : une saisie de
-    # texte ne doit pas annuler le travail.
-    for touche, nom in ((KEY_Z, "Z"), (KEY_S, "S")):
-        app = ApplicationBouchon()
-        traiter(app, EvenementClavierBouchon(touche, NO_MODIFIER))
-        if app.appels:
-            echecs.append("%s sans Ctrl : %r exécuté" % (nom, app.appels))
-
-    # Une touche sans branche reste inerte, et l'événement est accepté quand
-    # même : c'est l'interception volontaire de la navigation.
-    app = ApplicationBouchon()
-    evenement = EvenementClavierBouchon(KEY_A, NO_MODIFIER)
-    traiter(app, evenement)
-    if app.appels:
-        echecs.append("touche A : %r exécuté" % app.appels)
-    if not evenement.accepte:
-        echecs.append("touche A : l'événement n'a pas été accepté")
-
-    return echecs, "relâchements, Z et S sans Ctrl, touche sans branche"
-
-
 def casOutilSansDoublon(chemin_app):
     """L'outil actif n'a qu'une représentation : les actions de la barre.
 
@@ -485,9 +344,13 @@ def casOutilSansDoublon(chemin_app):
     et il fallait les accorder dans les deux sens à chaque changement d'outil,
     de couche et de session. La barre les a remplacées.
 
-    L'alternance de la touche 1 était annoncée par leurs infobulles. Les deux
-    outils qu'elle alterne doivent donc la porter, sans quoi le raccourci
-    disparaît de l'interface avec les radios.
+    L'alternance de la touche 1 était annoncée par leurs infobulles, et ce
+    contrôle exigeait que les deux outils qu'elle alterne la portent. Les
+    raccourcis sont depuis devenus configurables : plus aucun libellé ne peut
+    nommer une touche, sans quoi il mentirait dès la première
+    personnalisation. L'intention est la même — le clavier reste annoncé dans
+    l'interface — mais c'est la table qui le fait, et c'est désormais
+    l'absence de littéral qui est vérifiée.
     """
     echecs = []
     dossier = os.path.dirname(chemin_app)
@@ -517,21 +380,33 @@ def casOutilSansDoublon(chemin_app):
         for n in ast.walk(initGui)
         if isinstance(n, ast.Constant) and isinstance(n.value, str)
     ]
-    annonces = [libelle for libelle in libelles if "touche 1" in libelle]
-    if len(annonces) < 2:
+    for libelle in libelles:
+        if MOTIF_TOUCHE.search(libelle):
+            echecs.append(
+                "libellé d'initGui nommant une touche : %r — la mention vient "
+                "de la table, par annoncerRaccourcis()" % libelle
+            )
+
+    # Les quatre outils doivent être nommés dans la table des raccourcis, sans
+    # quoi ils n'auraient aucun accès clavier pendant la navigation.
+    appels = [
+        n
+        for n in ast.walk(initGui)
+        if isinstance(n, ast.Attribute) and n.attr == "ACTIONS_OUTIL"
+    ]
+    if not appels:
         echecs.append(
-            "%d libellé(s) annonçant la touche 1 : les deux outils qu'elle "
-            "alterne doivent la porter" % len(annonces)
+            "initGui ne consulte pas ACTIONS_OUTIL : les outils n'auraient "
+            "aucune touche annoncée"
         )
-    return echecs, "une seule représentation, alternance annoncée"
+
+    return echecs, "une seule représentation, aucune touche en littéral"
 
 
 CAS = (
     ("routage des clics", casRoutageDuClic),
     ("gardes du clic", casGardesDuClic),
     ("tables de traduction de la classe", casTablesDeTraduction),
-    ("routage des touches", casRoutageDesTouches),
-    ("gardes du clavier", casGardesDesTouches),
     ("outil sans doublon", casOutilSansDoublon),
 )
 

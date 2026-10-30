@@ -388,6 +388,41 @@ def casDepartageEntite(mod):
     return echecs, "vide, égalité, emboîtement, proximité, priorité"
 
 
+def casMotifAltitudeTouche(mod):
+    """Le refus d'écriture nomme la touche du suivi du MNT, ou se taît.
+
+    La touche est configurable : la phrase ne peut pas la porter en dur, sans
+    quoi elle mentirait dès qu'elle est changée. Et quand l'action n'a aucune
+    touche affectée, la phrase ne doit pas annoncer un raccourci inexistant.
+    """
+    echecs = []
+
+    avec = mod.motifAltitudeIndeterminee("touche M")
+    if "(touche M)" not in avec:
+        echecs.append("touche fournie : la phrase ne la nomme pas — %r" % avec)
+
+    sans = mod.motifAltitudeIndeterminee()
+    if "(" in sans.split("altitude (Z)")[-1]:
+        echecs.append("touche absente : parenthèse vide laissée — %r" % sans)
+    if "suivi du MNT," not in sans:
+        echecs.append("touche absente : la phrase devrait enchaîner — %r" % sans)
+
+    # Le gabarit n'est pas une phrase montrable telle quelle : personne ne doit
+    # l'afficher sans passer par la fonction.
+    if "%s" not in mod.GABARIT_ALTITUDE_INDETERMINEE:
+        echecs.append("le gabarit ne porte plus de champ à remplir")
+
+    # L'ancienne constante ne doit pas revenir : elle nommait la touche en dur.
+    if hasattr(mod, "MOTIF_ALTITUDE_INDETERMINEE"):
+        echecs.append("MOTIF_ALTITUDE_INDETERMINEE est de retour, touche en dur")
+
+    _, _, motif = mod.altitudeEcriture(True, None, "Ctrl+M")
+    if "(Ctrl+M)" not in motif:
+        echecs.append("altitudeEcriture ne transmet pas l'annonce — %r" % motif)
+
+    return echecs, "avec touche, sans touche, gabarit"
+
+
 CAS = (
     ("exhaustivité de la table", casTableComplete),
     ("conformité de la table", casTableConforme),
@@ -398,6 +433,7 @@ CAS = (
     ("refus motivés", casRefusMotives),
     ("type de géométrie non pris en charge", casTypeInconnu),
     ("garde d'altitude", casAltitudeEcriture),
+    ("touche annoncée au refus d'altitude", casMotifAltitudeTouche),
     ("départage de l'entité désignée", casDepartageEntite),
 )
 

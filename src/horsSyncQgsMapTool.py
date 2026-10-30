@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Outil de carte de l'état hors-synchronisation.
 
-Avant ce module, la touche ESC retirait l'outil de navigation du canevas
+Avant ce module, le raccourci de bascule retirait l'outil de navigation du canevas
 (`unsetMapTool`) : l'état atteint n'était pas un mode mais une absence d'outil,
 plus aucun code de l'extension ne s'exécutait, et les trois fonctions attendues
 dans cet état (zoom à la roulette, navigation « main », changement automatique
@@ -17,7 +17,8 @@ navigation :
 - pas de tracé : l'édition reste à la navigation synchronisée.
 
 Choisir un outil de QGIS dans sa barre d'outils remplace celui-ci, comme pour
-n'importe quel outil de carte. `ESC` ramène à la navigation synchronisée.
+n'importe quel outil de carte. Le raccourci de bascule ramène à la
+navigation synchronisée.
 """
 
 from qgis.core import QgsPointXY
@@ -26,7 +27,7 @@ from qgis.PyQt.QtCore import Qt, pyqtSignal
 
 
 class horsSyncMapTool(QgsMapTool):
-    """Zoom, pan « main » et retour, dans l'état atteint après ESC."""
+    """Zoom, pan « main » et retour, dans l'état atteint hors synchronisation."""
 
     # Le canevas a déjà bougé quand ces signaux partent : stereoPhoto n'a qu'à
     # réaligner les deux vues photo sur lui.
@@ -40,6 +41,13 @@ class horsSyncMapTool(QgsMapTool):
         # Point de la carte saisi sous le curseur au début du geste de pan.
         # Il reste sous le curseur pendant tout le déplacement.
         self.ancrePan = None
+
+        # Codes de touche de Qt qui ramènent à la navigation synchronisée.
+        # stereoPhoto les remplace depuis la table des raccourcis à l'ouverture
+        # d'une session : ce module ne lit pas le fichier de paramètres et ne
+        # connaît pas la table, il ne reçoit que des codes de touche. La valeur
+        # ci-dessous le laisse utilisable seul, et vaut le défaut de la table.
+        self.touchesRetour = frozenset([Qt.Key_Escape])
 
     def canvasPressEvent(self, event):
         # Bouton du milieu : convention de QGIS et d'ArcGIS, hypothèse à
@@ -88,9 +96,16 @@ class horsSyncMapTool(QgsMapTool):
         event.accept()
 
     def keyPressEvent(self, event):
-        if event.key() == Qt.Key_Escape:
+        if event.key() in self.touchesRetour:
             self.retourSynchronise.emit()
             event.accept()
+            return
+
+        # Toute autre touche est laissée à QGIS. C'est la propriété que cet
+        # état apporte, et la raison de ne pas rediriger le clavier vers le
+        # gestionnaire de la navigation : celui-ci accepte tout, et les
+        # raccourcis natifs cesseraient de répondre ici aussi.
+        super().keyPressEvent(event)
 
     def deactivate(self):
         self.ancrePan = None

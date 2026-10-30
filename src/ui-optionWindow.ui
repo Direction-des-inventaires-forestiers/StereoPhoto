@@ -293,7 +293,7 @@ color: rgb(220, 147, 0);</string>
     <item>
      <widget class="QPushButton" name="pushButtonShowPicture">
       <property name="toolTip">
-       <string>Ouvrir la navigation stéréo&#10;Échap : basculer entre QGIS et les photos&#10;F5 à F12 : niveaux de zoom, du plus fort (F5) à l'image entière (F12)</string>
+       <string>Ouvrir la navigation stéréo</string>
       </property>
       <property name="enabled">
        <bool>false</bool>

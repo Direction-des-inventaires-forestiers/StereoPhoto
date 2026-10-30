@@ -176,10 +176,15 @@ MOTIF_TYPE_INCONNU = (
     "elle ne peut pas être éditée par StereoPhoto."
 )
 
-MOTIF_ALTITUDE_INDETERMINEE = (
+# La touche du suivi du MNT est configurable : le message ne peut donc pas la
+# nommer lui-même, sans quoi il mentirait dès qu'elle est changée. L'appelant la
+# demande à la table des raccourcis et la passe formatée ; ce module ne connaît
+# ni la table ni les noms de touches, comme il ne connaît pas les boutons de la
+# souris.
+GABARIT_ALTITUDE_INDETERMINEE = (
     "Altitude indéterminée : la couche porte une altitude (Z) et aucune "
     "altitude n'est disponible. Régler la parallaxe à la roulette, ou activer "
-    "le suivi du MNT (touche M), avant d'ajouter une géométrie."
+    "le suivi du MNT%s, avant d'ajouter une géométrie."
 )
 
 MOTIF_ALTITUDE_NON_FINIE = (
@@ -187,6 +192,19 @@ MOTIF_ALTITUDE_NON_FINIE = (
     "valeur utilisable. Régler la parallaxe à la roulette avant d'ajouter une "
     "géométrie."
 )
+
+
+def motifAltitudeIndeterminee(annonceSuiviMnt=""):
+    """Phrase de refus, qui nomme la touche du suivi du MNT si elle en a une.
+
+    `annonceSuiviMnt` est un fragment déjà rendu — « touche M », « Ctrl+M » —
+    que l'appelant tire de la table des raccourcis. Vide, la phrase ne parle
+    pas du clavier : c'est le cas quand l'action n'a aucune touche affectée, et
+    annoncer un raccourci inexistant serait pire que de se taire.
+    """
+    return GABARIT_ALTITUDE_INDETERMINEE % (
+        " (%s)" % annonceSuiviMnt if annonceSuiviMnt else ""
+    )
 
 
 def resoudreTraitement(outil, typeGeometrie, bouton, traceEnCours):
@@ -243,7 +261,7 @@ def _rang(candidat):
     )
 
 
-def altitudeEcriture(coucheAUnZ, altitude):
+def altitudeEcriture(coucheAUnZ, altitude, annonceSuiviMnt=""):
     """Dit quelle altitude écrire, ou pourquoi l'écriture est refusée.
 
     Retourne `(autorise, altitude, motif)`. L'altitude écrite est celle que
@@ -261,12 +279,12 @@ def altitudeEcriture(coucheAUnZ, altitude):
         return True, None, ""
 
     if altitude is None:
-        return False, None, MOTIF_ALTITUDE_INDETERMINEE
+        return False, None, motifAltitudeIndeterminee(annonceSuiviMnt)
 
     try:
         valeur = float(altitude)
     except (TypeError, ValueError):
-        return False, None, MOTIF_ALTITUDE_INDETERMINEE
+        return False, None, motifAltitudeIndeterminee(annonceSuiviMnt)
 
     if not math.isfinite(valeur):
         return False, None, MOTIF_ALTITUDE_NON_FINIE

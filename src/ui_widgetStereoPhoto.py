@@ -46,6 +46,13 @@ PARAMETRES_PAR_DEFAUT = {
     "rehaussement": [0, 0, 0, 0, 0, 0, 0, False, False, []],
 }
 
+# Fichier de paramètres, à côté du module dans le profil QGIS. Constante de
+# module et non attribut du panneau : la table des raccourcis s'y lit au
+# chargement de l'extension, quand aucun panneau n'est encore construit.
+CHEMIN_PARAMETRES = os.path.join(
+    os.path.dirname(os.path.realpath(__file__)), "paramStoring.json"
+)
+
 
 class Ui_StereoDockWidget(object):
     def setupUi(self, StereoDockWidget):
@@ -335,13 +342,13 @@ class Ui_StereoDockWidget(object):
         )
         self.enhanceButton.setText(_translate("StereoDockWidget", "Rehausser"))
         self.pushButtonShowPicture.setText(_translate("StereoDockWidget", "Naviguer"))
+        # L'infobulle n'annonce ici que le geste. Les raccourcis qu'elle
+        # énonçait sont configurables : c'est stereoPhoto qui les y ajoute,
+        # depuis la table, à l'ouverture de la session. Les laisser ici les
+        # ferait mentir dès la première touche changée, et les ramènerait à
+        # chaque régénération du module depuis le fichier .ui.
         self.pushButtonShowPicture.setToolTip(
-            _translate(
-                "StereoDockWidget",
-                "Ouvrir la navigation stéréo\n"
-                "Échap : basculer entre QGIS et les photos\n"
-                "F5 à F12 : niveaux de zoom, du plus fort (F5) à l'image entière (F12)",
-            )
+            _translate("StereoDockWidget", "Ouvrir la navigation stéréo")
         )
         self.pushButtonCloseWindow.setText(_translate("StereoDockWidget", "Fermer"))
         self.pushButtonAffVecteur.setText(
@@ -467,9 +474,7 @@ class optionWindow(QtWidgets.QDockWidget):
         self.projectPath = os.path.expanduser("~")
         self.mntLocation = os.path.expanduser("~")
 
-        self.JSONPath = os.path.join(
-            os.path.dirname(os.path.realpath(__file__)), "paramStoring.json"
-        )
+        self.JSONPath = CHEMIN_PARAMETRES
 
         self.listGraphWinObj = []
         self.screenNumberTimer = QtCore.QTimer(self)
