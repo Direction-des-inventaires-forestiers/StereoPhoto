@@ -19,11 +19,17 @@
 
 **init.py, metadata.txt** : obligatoire pour tous les plugins QGIS
 
-**drawFunction.py** : Fichier pour les fonctions lié à la gestion de la couche vectorielle. Les fonctions pour éditer les polygones sont dans ce fichier
+**drawFunction.py** : Projection des couches vectorielles affichées dans les deux vues photo. Le thread calculatePolygon lit les entités visibles et transforme leurs géométries en coordonnées pixel des deux images, en lisant l’altitude dans le modèle numérique de terrain ou en la calculant par stéréoscopie.
+
+**editionOutils.py** : Décide ce qu’un clic déclenche, selon l’outil d’édition actif, le type de géométrie de la couche, le bouton de la souris et la présence d’un tracé en cours. Il décide aussi quelle entité un clic désigne et quelle altitude part dans la géométrie. Le module ne dépend ni de QGIS ni de Qt, ce qui le rend directement testable.
+
+**raccourcisClavier.py** : La table « action vers touche » des raccourcis clavier, sa lecture depuis le fichier de paramètres et sa résolution : quelle touche commande quelle action, comment un nom de touche s’écrit, et ce qu’il advient d’un fichier mal écrit, qui ne doit jamais empêcher une session de s’ouvrir. Pendant la navigation, l’extension intercepte tout le clavier et ces raccourcis sont le seul accès aux outils. Le module ne dépend ni de QGIS ni de Qt, ce qui le rend directement testable ; la traduction vers les constantes de Qt est dans stereoPhoto.py.
+
+**editionVecteur.py** : Toutes les écritures dans les couches vectorielles : ajout, combinaison, découpage, enregistrement et annulation. Elles passent par l’API de la couche et son tampon d’édition, de sorte que chaque geste soit annulable et que l’enregistrement reste une décision de l’utilisateur.
 
 **enhanceManager.py** : Fichier pour l’interface graphique de rehaussement et pour les fonctions de rehaussement. La classe imageEnhancing fait le rehaussement. Le dossier Rehaussement contient l’application de rehaussement qui peut être utiliser de manière indépendante. Dans le passé, j’ai développé l’application de rehaussement qui permettait de rehausser des images et de les enregistrer. J’ai par la suite ajouté le module de rehaussement directement dans l’application. Ui_enhancement.py contient le code pour l’interface graphique
 
-**paramStoring.json** : Fichier pour conserver de l’information entre les utilisations
+**paramStoring.json** : Fichier pour conserver de l’information entre les utilisations. Il porte la position et l’échelle de la dernière vue, les écrans du stéréoscope, les derniers fichiers ouverts, les réglages de rehaussement, et la section `raccourcis`, seule à être écrite à la main par l’utilisateur.
 
 **resources.py, resources.qrc**: fichier pour permettre d’afficher des petites icônes pour l’interface graphique. Les icônes sont dans le dossier Icons. Lorsque que tu installes QT, le script pyrcc5 va s’installer. Il permet de transformer le fichier QRC en fichier PY
 
@@ -31,12 +37,24 @@
 
 **ui_getVectorLayer.py** : Petite fenêtre pour la sélection de la couche vectoriel
 
-**ui_optionWindow.py** : Gestion de l’interface graphique pour le menu principale, quelques fonctions sur dans le ficher comme le drag and drop pour le fichier d’images ou le modèle numérique de terrain.
+**ui_widgetStereoPhoto.py** : Gestion de l’interface graphique pour le menu principal et pour le menu des paramètres, avec les fonctions qui les font fonctionner. On y trouve aussi quelques fonctions comme le drag and drop pour le fichier d’images ou le modèle numérique de terrain. La classe optionWindow est celle que stereoPhoto.py utilise. Ce fichier portait auparavant les noms ui_optionWindow.py et ui_paramWindow.py.
 
-**ui_paramWindow.py** : Interface graphique pour le menu des paramètres ainsi que les fonctions pour le faire fonctionner.  
+**gestionDossier.py** : Fichier pour le parcours d’un dossier de photos : lecture des fichiers PAR, recherche des paires possibles, des quatre voisins de chaque image et de la paire la plus proche d’une coordonnée. Le calcul du chevauchement entre deux photos s’y trouve également.
+
+**parFile.py** : Lecture des fichiers PAR, au même endroit pour tous les modules. Le fichier PAR accompagne chaque photo et décrit la caméra qui l’a prise : transformation affine, focale, position, orientation, taille du pixel. Le module ne dépend ni de QGIS ni de Qt, ce qui le rend directement testable.
+
+**orientationModele.py** : Direction du modèle voisin à charger quand la vue atteint le bord du modèle affiché. La direction dépend de l’orientation de la caméra, que l’angle kappa du fichier PAR donne. Le module ne dépend ni de QGIS ni de Qt, ce qui le rend directement testable.
+
+**lectureRaster.py** : Accès aux rasters, pour les appelants qui en lisent : ouverture par GDAL sous ses deux conventions d’erreur, et chargement de la fenêtre du modèle numérique de terrain couvrant une emprise, bornée au raster. Le module ne dépend ni de QGIS ni de Qt, ce qui permet de l’appeler depuis un thread.
+
+**config.py** : Les valeurs qui influencent l’affichage et la navigation, regroupées en un seul endroit et nommées avec leur rôle et leur unité : tolérance d’orientation de la caméra, tampons de recherche des paires, chevauchement minimal, épaisseurs de trait, rayon des points, réglages du journal.
+
+**journal.py** : Journalisation de l’extension dans des fichiers, sous le profil QGIS de l’utilisateur (`stereophoto/logs`). Un fichier par jour, archivé au changement de journée et conservé 90 jours. Les messages vont aussi dans l’onglet StereoPhoto du panneau des journaux de QGIS. À utiliser à la place de print(), dont la sortie est perdue hors de la console Python.
 
 **worldManager.py** : Fichier qui contient les fonctions liées à la stéréoscopie/photogrammétrie. Il permet de transformer un point en coordonnée et vice-versa. Il permet aussi de calculer l’altitude Z à partir des deux images. 
 
 **ui_graphicsWindow.py** : Fichier qui contient un object QGraphicsView qui permet l'affichage d'un image. Il fait la gestion de l'affichage des différentes pyramides d'images, du curseur et du déplacement lors de la navigation¸
 
 **navigationQgsMapTool.py** : Outil MapTool compatible avec QGIS qui permet d'envoyer les signals de clavier et de souris ainsi que d'emprisonner la souris à l'intérieur du canvas QGIS
+
+**horsSyncQgsMapTool.py** : Second outil MapTool, posé sur le canevas par le raccourci de bascule entre QGIS et les photos. Les deux vues photo restent liées au canevas de QGIS, mais sans piège à souris ni interception du clavier : la roulette zoome, le bouton du milieu déplace la vue, et les raccourcis de QGIS répondent de nouveau. Le même raccourci ramène à la navigation synchronisée.

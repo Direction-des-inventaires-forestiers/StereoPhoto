@@ -1,7 +1,7 @@
-'''
+"""
 L'entièreté du code a été réalisé par Frédérick Pineault (frederick.pineault@mffp.gouv.qc.ca)
 
-Ce dossier contient une classe de type QApplication qui permet l'affichage d'images de grandes tailles sur des 
+Ce dossier contient une classe de type QApplication qui permet l'affichage d'images de grandes tailles sur des
 écrans de type Planar
 
 La classe stereoPhoto gère l'application complète via un interface utilisateur
@@ -11,14 +11,16 @@ L'application permet de :
     - Réaliser un effet miroir sur l'horizontal et la verticale
     - Afficher les deux images importées
     - Superposer automatiquement les images en fonction d'un pourcentage choisi par l'utilisateur
-    - Offrir une interface de navigation qui permet le déplacement, le zoom (CTRL+Roulette) et le traçage (Click & 1,2,3,ESC) 
+    - Offrir une interface de navigation qui permet le déplacement, le zoom
+      à la roulette et le traçage, à la souris et aux raccourcis clavier de la
+      table de raccourcisClavier
     - Offrir un déplacement de l'image de droite pour ajuster l'altitude (Roulette)
-    - Rehausser les couleurs des images via une nouvelle fenêtre intéractive 
+    - Rehausser les couleurs des images via une nouvelle fenêtre intéractive
     - Traçage de forme géolocalisée
     - Communication avec QGIS
     - Utiliser un shapefile 2D déjà importé dans QGIS et afficher la région concernée
     - Afficher le Z du centre de l'image
-    - Afficher les coordonnées XYZ lors d'un clic 
+    - Afficher les coordonnées XYZ lors d'un clic
     - Permettre le choix des écrans
     - Utiliser un shapefile 3D
 
@@ -26,139 +28,537 @@ Le main permet tout simplement de lancer l'application
 
 Plusieurs autres outils seront intégrés à cette application dans le futur :
     - Fonctionnalité de trace supplémentaire
-    - Amélioration des fonctions de photogrammétrie 
+    - Amélioration des fonctions de photogrammétrie
     - Menu de choix de paramètres (curseur, keybinding, couleur des traces)
     - Affichage des zones supersposées seulement
     - Gestion de projet
-    
+
     et bien d'autre
 Dans EFOTO, il semble avoir un décalage de 16 pixels en x et en y pour la photo de droite right/leftcursoroffset -> pourrait s'appliquer pour le curseur
 
 
-'''
-from qgis.gui import *
-from qgis.core import *
-from qgis.PyQt.QtWidgets import *
-from qgis.PyQt.QtCore import *
-from qgis.PyQt.QtGui import *
+"""
 
-import numpy as np
-from . import resources
+from qgis.core import (
+    QgsApplication,
+    QgsCoordinateReferenceSystem,
+    QgsGeometry,
+    QgsLineString,
+    QgsPoint,
+    QgsPointXY,
+    QgsPolygon,
+    QgsProject,
+    QgsRectangle,
+    QgsWkbTypes,
+)
+from qgis.PyQt.QtCore import (
+    QEvent,
+    QLineF,
+    QPointF,
+    QRectF,
+    Qt,
+    QThread,
+)
+from qgis.PyQt.QtGui import (
+    QBrush,
+    QColor,
+    QGuiApplication,
+    QIcon,
+    QPen,
+    QTransform,
+)
+from qgis.PyQt.QtWidgets import (
+    QAction,
+    QActionGroup,
+    QApplication,
+    QGraphicsEllipseItem,
+    QGraphicsLineItem,
+    QGraphicsPathItem,
+    QGraphicsPolygonItem,
+    QGraphicsRectItem,
+    QMessageBox,
+)
+
+from . import resources  # noqa: F401  (enregistre les icônes auprès de Qt)
 
 from .ui_graphicsWindow import graphicsWindow
 from .ui_getVectorLayer import getImageListDialog
-from .worldManager import pictureManager, dualManager, createWKTString
+from .worldManager import pictureManager, dualManager
 from .enhanceManager import enhanceManager, threadShow
-from .drawFunction import *
+from .drawFunction import calculatePolygon
+from . import editionOutils
+from . import raccourcisClavier
+from . import editionVecteur
 from .navigationQgsMapTool import navigationMapTool
-from .ui_widgetStereoPhoto import optionWindow
+from .horsSyncQgsMapTool import horsSyncMapTool
+from .ui_widgetStereoPhoto import CHEMIN_PARAMETRES, optionWindow
 
-from .gestionDossier import getParDict, get_neighbors_and_pairs, findPairWithCoord, compute_overlap
-from .config import PAR_CAMERA_ORIENTATION_TOLERANCE_DEG, DRAW_LINE_PEN_WIDTH_PX, GEOMETRY_PEN_WIDTH_PX, GEOMETRY_POINT_RADIUS_PX
-from .journal import initialiser_journal, fermer_journal, obtenir_journal, avertir_utilisateur
-import sys, os, time, math, gc
-from osgeo import gdal
+from .gestionDossier import (
+    getParDict,
+    get_neighbors_and_pairs,
+    findPairWithCoord,
+    compute_overlap,
+)
+from .orientationModele import directionProchainModele
+from .config import (
+    DONNEES_SCR_EPSG,
+    EDITION_OUTIL_PAR_DEFAUT,
+    EDITION_SELECTION_COULEUR,
+    EDITION_SELECTION_PEN_WIDTH_PX,
+    EDITION_SELECTION_TOLERANCE_PX,
+    NAVIGATION_ARRET_THREAD_DELAI_MAX_MS,
+    NAVIGATION_CURSEUR_LIBRE_PAR_DEFAUT,
+    NAVIGATION_ECART_ALTITUDE_MNT_MAX_M,
+    NAVIGATION_ZOOM_NIVEAUX,
+    PAR_CAMERA_ORIENTATION_TOLERANCE_DEG,
+    DRAW_LINE_PEN_WIDTH_PX,
+    GEOMETRY_PEN_WIDTH_PX,
+    GEOMETRY_POINT_RADIUS_PX,
+)
+from .journal import (
+    initialiser_journal,
+    fermer_journal,
+    obtenir_journal,
+    avertir_utilisateur,
+)
+import logging
+import os
+import math
 
 
 class stereoPhoto(object):
+    # Traduction des boutons de Qt et des types de géométrie de QGIS vers les
+    # clés de editionOutils, qui ne connaît ni l'un ni l'autre. La frontière
+    # est ici, et nulle part ailleurs.
+    BOUTONS_QT = {
+        Qt.LeftButton: editionOutils.BOUTON_GAUCHE,
+        Qt.RightButton: editionOutils.BOUTON_DROIT,
+        Qt.MiddleButton: editionOutils.BOUTON_MILIEU,
+    }
 
-    #Fonction d'initilisation 
+    TYPES_GEOMETRIE_QGIS = {
+        QgsWkbTypes.PointGeometry: editionOutils.TYPE_POINT,
+        QgsWkbTypes.LineGeometry: editionOutils.TYPE_LIGNE,
+        QgsWkbTypes.PolygonGeometry: editionOutils.TYPE_POLYGONE,
+    }
+
+    # Traduction des touches de Qt vers les noms de raccourcisClavier, qui
+    # ne connaît pas Qt. Même frontière que les deux tables ci-dessus, et
+    # même raison de l'écrire en entier plutôt qu'en compréhension : le banc
+    # la relit par analyse syntaxique et la croise avec le vocabulaire du
+    # module. Une touche sans nom, ou un nom sans touche, serait un
+    # raccourci que personne ne peut déclencher et que rien ne signalerait.
+    #
+    # Qt.Key_Enter, la touche Entrée du pavé numérique, est volontairement
+    # absente : elle porterait le même nom que Qt.Key_Return et ferait un
+    # doublon dans la table.
+    TOUCHES_QT = {
+        Qt.Key_Escape: "Échap",
+        Qt.Key_F1: "F1",
+        Qt.Key_F2: "F2",
+        Qt.Key_F3: "F3",
+        Qt.Key_F4: "F4",
+        Qt.Key_F5: "F5",
+        Qt.Key_F6: "F6",
+        Qt.Key_F7: "F7",
+        Qt.Key_F8: "F8",
+        Qt.Key_F9: "F9",
+        Qt.Key_F10: "F10",
+        Qt.Key_F11: "F11",
+        Qt.Key_F12: "F12",
+        Qt.Key_0: "0",
+        Qt.Key_1: "1",
+        Qt.Key_2: "2",
+        Qt.Key_3: "3",
+        Qt.Key_4: "4",
+        Qt.Key_5: "5",
+        Qt.Key_6: "6",
+        Qt.Key_7: "7",
+        Qt.Key_8: "8",
+        Qt.Key_9: "9",
+        Qt.Key_A: "A",
+        Qt.Key_B: "B",
+        Qt.Key_C: "C",
+        Qt.Key_D: "D",
+        Qt.Key_E: "E",
+        Qt.Key_F: "F",
+        Qt.Key_G: "G",
+        Qt.Key_H: "H",
+        Qt.Key_I: "I",
+        Qt.Key_J: "J",
+        Qt.Key_K: "K",
+        Qt.Key_L: "L",
+        Qt.Key_M: "M",
+        Qt.Key_N: "N",
+        Qt.Key_O: "O",
+        Qt.Key_P: "P",
+        Qt.Key_Q: "Q",
+        Qt.Key_R: "R",
+        Qt.Key_S: "S",
+        Qt.Key_T: "T",
+        Qt.Key_U: "U",
+        Qt.Key_V: "V",
+        Qt.Key_W: "W",
+        Qt.Key_X: "X",
+        Qt.Key_Y: "Y",
+        Qt.Key_Z: "Z",
+        Qt.Key_Left: "Gauche",
+        Qt.Key_Right: "Droite",
+        Qt.Key_Up: "Haut",
+        Qt.Key_Down: "Bas",
+        Qt.Key_PageUp: "PgHaut",
+        Qt.Key_PageDown: "PgBas",
+        Qt.Key_Home: "Début",
+        Qt.Key_End: "Fin",
+        Qt.Key_Space: "Espace",
+        Qt.Key_Tab: "Tab",
+        Qt.Key_Return: "Retour",
+        Qt.Key_Backspace: "Retour arrière",
+        Qt.Key_Delete: "Suppr",
+        Qt.Key_Insert: "Inser",
+        Qt.Key_Plus: "+",
+        Qt.Key_Minus: "-",
+    }
+
+    # Modificateurs qui entrent dans le nom d'une touche, dans l'ordre
+    # canonique de raccourcisClavier.MODIFICATEURS.
+    #
+    # Maj, Meta et le pavé numérique en sont absents, et c'est le pavé qui
+    # commande : le « 1 » du pavé arrive avec Qt.KeypadModifier et doit
+    # désigner le même raccourci que celui de la rangée des chiffres. Sans
+    # cet écart au masque, les touches des outils deviendraient inertes au
+    # pavé sans que rien n'échoue.
+    MODIFICATEURS_QT = (
+        (Qt.ControlModifier, raccourcisClavier.MODIFICATEUR_CTRL),
+        (Qt.AltModifier, raccourcisClavier.MODIFICATEUR_ALT),
+    )
+
+    # Fonction d'initilisation
     def __init__(self, iface):
         self.iface = iface
         self.canvas = self.iface.mapCanvas()
 
-        #Journalisation : appelée à chaque construction du plugin, donc aussi à
-        #chaque rechargement. initialiser_journal() retire les handlers déjà
-        #posés, ce qui évite les lignes en double et les fichiers verrouillés.
+        # Journalisation : appelée à chaque construction du plugin, donc aussi à
+        # chaque rechargement. initialiser_journal() retire les handlers déjà
+        # posés, ce qui évite les lignes en double et les fichiers verrouillés.
         initialiser_journal()
         self.journal = obtenir_journal(__name__)
 
-    #Place le bouton de l'application dans QGIS
+    # Place le bouton de l'application dans QGIS
     def initGui(self):
+
+        # Lue avant tout libellé : les boutons de la barre annoncent leur
+        # touche, et la barre existe dès le chargement de l'extension, bien
+        # avant qu'une session soit ouverte.
+        self.chargerRaccourcis()
 
         self.toolbarST = self.iface.addToolBar("StereoPhoto Toolbar")
         self.toolbarST.setObjectName("StereoPhotoToolbar")
 
         iconOuvrirMenu = ":/Anaglyph/Icons/OuvrirMenu.png"
-        self.actionMainMenu = QAction(QIcon(iconOuvrirMenu), "Ouvrir le menu principal", self.iface.mainWindow())
-        
+        self.actionMainMenu = QAction(
+            QIcon(iconOuvrirMenu), "Ouvrir le menu principal", self.iface.mainWindow()
+        )
+
         self.actionMainMenu.setCheckable(True)
         self.actionMainMenu.toggled.connect(self.run)
 
         iconSuivreMNT = ":/Anaglyph/Icons/SuivreMNT.png"
-        self.actionSuivreMNT = QAction(QIcon(iconSuivreMNT), "Suivre le MNT ; Appuyer sur 'M' ", self.iface.mainWindow())
-        
+        self.actionSuivreMNT = QAction(
+            QIcon(iconSuivreMNT),
+            "Suivre le MNT",
+            self.iface.mainWindow(),
+        )
+
         self.actionSuivreMNT.setCheckable(True)
-         
 
         iconUnlockCursor = ":/Anaglyph/Icons/UnlockCursor.png"
-        self.actionUnlockCursor = QAction(QIcon(iconUnlockCursor), "Débarrer le curseur  ; Appuyer sur 'C' ", self.iface.mainWindow())
-        
-        self.actionUnlockCursor.setCheckable(True)
+        self.actionUnlockCursor = QAction(
+            QIcon(iconUnlockCursor),
+            "Débarrer le curseur",
+            self.iface.mainWindow(),
+        )
 
+        self.actionUnlockCursor.setCheckable(True)
+        self.actionUnlockCursor.setChecked(NAVIGATION_CURSEUR_LIBRE_PAR_DEFAUT)
+        # Connexion posée ici, et non dans setConnection() : l'action survit à
+        # la fermeture de la session, alors que setConnection() est rejouée à
+        # chaque ouverture et empilerait les connexions.
+        self.actionUnlockCursor.toggled.connect(self.basculerCurseurLibre)
+
+        # Outils d'édition. Un groupe exclusif : un seul outil
+        # actif à la fois, comme la barre d'édition de QGIS. Les icônes sont
+        # prises au thème de QGIS, le dossier Icons/ n'en portant aucune
+        # d'approchant et toute addition imposant de régénérer resources.py.
+        # Les connexions sont posées ici, et non dans setConnection(), pour la
+        # même raison que celle d'actionUnlockCursor ci-dessus.
+        self.groupeOutils = QActionGroup(self.iface.mainWindow())
+        self.groupeOutils.setExclusive(True)
+        self.actionsOutil = {}
+        for cle, libelle, icone in (
+            (
+                editionOutils.OUTIL_SELECTIONNER,
+                "Sélectionner une entité ; clic droit : vider la sélection",
+                "/mActionSelectRectangle.svg",
+            ),
+            (
+                editionOutils.OUTIL_AJOUTER,
+                "Ajouter une entité ; clic droit : clore le tracé",
+                "/mActionCapturePolygon.svg",
+            ),
+            (
+                editionOutils.OUTIL_COMBINER,
+                "Combiner : clic gauche pour désigner, clic droit pour fusionner",
+                "/mActionMergeFeatures.svg",
+            ),
+            (
+                editionOutils.OUTIL_DECOUPER,
+                "Découper",
+                "/mActionSplitFeatures.svg",
+            ),
+        ):
+            action = QAction(
+                QgsApplication.getThemeIcon(icone), libelle, self.iface.mainWindow()
+            )
+            action.setCheckable(True)
+            action.setData(cle)
+            # Nommée pour qu'une table de raccourcis configurables la désigne.
+            action.setObjectName("stereophoto_outil_" + cle)
+            self.groupeOutils.addAction(action)
+            self.actionsOutil[cle] = action
+
+        self.groupeOutils.triggered.connect(self.changerOutilActif)
+
+        self.outilActif = EDITION_OUTIL_PAR_DEFAUT
+        if self.outilActif not in self.actionsOutil:
+            self.journal.warning(
+                "EDITION_OUTIL_PAR_DEFAUT vaut %r, qui n'est pas un outil connu ;"
+                " repli sur %r",
+                self.outilActif,
+                editionOutils.OUTIL_AJOUTER,
+            )
+            self.outilActif = editionOutils.OUTIL_AJOUTER
+        self.actionsOutil[self.outilActif].setChecked(True)
+
+        # Enregistrement et annulation : la session d'édition reste ouverte
+        # pendant le travail, et c'est l'utilisateur qui décide quand écrire.
+        # L'intercepteur clavier de la navigation avalant les raccourcis natifs
+        # de QGIS, ces deux gestes n'ont pas d'autre accès.
+        self.actionEnregistrerEdition = QAction(
+            QgsApplication.getThemeIcon("/mActionSaveEdits.svg"),
+            "Enregistrer les modifications de la couche",
+            self.iface.mainWindow(),
+        )
+        self.actionEnregistrerEdition.setObjectName("stereophoto_enregistrer_edition")
+        self.actionEnregistrerEdition.setEnabled(False)
+        self.actionEnregistrerEdition.triggered.connect(self.enregistrerEdition)
+
+        self.actionAnnulerEdition = QAction(
+            QgsApplication.getThemeIcon("/mActionUndo.svg"),
+            "Annuler le dernier geste d'édition",
+            self.iface.mainWindow(),
+        )
+        self.actionAnnulerEdition.setObjectName("stereophoto_annuler_edition")
+        self.actionAnnulerEdition.setEnabled(False)
+        self.actionAnnulerEdition.triggered.connect(self.annulerEdition)
+
+        # Libellés de base des actions qui portent un raccourci, relevés sur
+        # les actions elles-mêmes avant toute mention de touche. Ce sont eux que
+        # annoncerRaccourcis() recompose : garder la mention dans le libellé le
+        # rendrait non rejouable, et deux lectures de la table empileraient deux
+        # parenthèses.
+        self.libellesRaccourcis = [
+            (raccourcisClavier.ACTION_SUIVI_MNT, self.actionSuivreMNT),
+            (raccourcisClavier.ACTION_CURSEUR_LIBRE, self.actionUnlockCursor),
+            (raccourcisClavier.ACTION_ENREGISTRER, self.actionEnregistrerEdition),
+            (raccourcisClavier.ACTION_ANNULER, self.actionAnnulerEdition),
+        ] + [
+            (raccourcisClavier.ACTIONS_OUTIL[cle], self.actionsOutil[cle])
+            for cle in editionOutils.OUTILS
+        ]
+        self.libellesDeBase = {
+            action: cible.text() for action, cible in self.libellesRaccourcis
+        }
+        self.annoncerRaccourcis()
 
         self.toolbarST.addAction(self.actionMainMenu)
         self.toolbarST.addAction(self.actionSuivreMNT)
         self.toolbarST.addAction(self.actionUnlockCursor)
-
+        self.toolbarST.addSeparator()
+        for cle in editionOutils.OUTILS:
+            self.toolbarST.addAction(self.actionsOutil[cle])
+        self.toolbarST.addSeparator()
+        self.toolbarST.addAction(self.actionEnregistrerEdition)
+        self.toolbarST.addAction(self.actionAnnulerEdition)
 
         self.iface.addPluginToMenu("&StereoPhoto", self.actionMainMenu)
 
-    #Retire le bouton de l'application dans QGIS
-    def unload(self):
-        self.iface.removePluginMenu("&StereoPhoto", self.actionMainMenu)
-        #self.iface.removeToolBarIcon(self.actionMainMenu)
+        # Raccordement au projet posé ici, et non dans setConnection() : le
+        # projet est un singleton qui survit aux sessions, et setConnection()
+        # étant rejouée à chaque ouverture, les connexions s'y empileraient.
+        QgsProject.instance().cleared.connect(self.projetChange)
 
-        if hasattr(self, 'toolbarST'):
+    # Retire le bouton de l'application dans QGIS
+    def unload(self):
+        try:
+            QgsProject.instance().cleared.disconnect(self.projetChange)
+        except TypeError:
+            # Connexion déjà rompue : cas normal si initGui() n'a pas tourné.
+            self.journal.debug("Aucun raccordement au projet à rompre")
+
+        self.iface.removePluginMenu("&StereoPhoto", self.actionMainMenu)
+        # self.iface.removeToolBarIcon(self.actionMainMenu)
+
+        if hasattr(self, "toolbarST"):
             self.iface.mainWindow().removeToolBar(self.toolbarST)
             self.toolbarST.deleteLater()
+
+        # L'extension se décharge, la couche reste : son tampon d'édition
+        # survit dans QGIS. Rien n'est enregistré ici, mais la trace évite de
+        # chercher des modifications perdues qui ne le sont pas.
+        enAttente, nombre = editionVecteur.modificationsEnAttente(
+            getattr(self, "vectorLayer", None)
+        )
+        if enAttente:
+            self.journal.info(
+                "%d modification(s) laissée(s) en attente dans QGIS au "
+                "déchargement de l'extension",
+                nombre,
+            )
 
         self.journal.info("Extension déchargée")
         fermer_journal()
 
-    #Initialisation de l'application et des variables
-    #Connection entre les boutons du menu d'options (mOpt) et leurs fonctions attitrées
-    #Ouverture du menu d'options
+    # Initialisation de l'application et des variables
+    # Connection entre les boutons du menu d'options (mOpt) et leurs fonctions attitrées
+    # Ouverture du menu d'options
     def run(self):
 
-        if self.actionMainMenu.isChecked() :
-
-            self.initGlobalParam()           
+        if self.actionMainMenu.isChecked():
+            # Relue à chaque ouverture : une touche modifiée dans le fichier de
+            # paramètres prend ainsi effet à la session suivante, sans qu'il
+            # faille recharger l'extension.
+            self.chargerRaccourcis()
+            self.initGlobalParam()
 
             self.optWindow = optionWindow(self.iface)
-            self.navigMapTool= navigationMapTool(self.canvas,self.iface)
-            
-            self.setConnection() 
+            self.navigMapTool = navigationMapTool(self.canvas, self.iface)
+            # Outil de l'état hors-synchronisation : posé sur le canevas par
+            # windowHandler("qgis") là où l'outil était retiré.
+            self.horsSyncMapTool = horsSyncMapTool(self.canvas)
+            # L'outil lit le clavier lui-même : pendant le
+            # hors-synchronisation, l'intercepteur de la navigation est retiré
+            # et c'est lui qui reçoit la touche du retour.
+            self.horsSyncMapTool.touchesRetour = self.codesTouches(
+                raccourcisClavier.ACTION_BASCULE_FENETRE
+            )
+            # L'outil est neuf à chaque ouverture : il reprend le comportement
+            # de navigation que porte le bouton de la barre d'outils.
+            self.navigMapTool.curseurLibre = self.actionUnlockCursor.isChecked()
+
+            self.setConnection()
+            # Le SCR est vérifié à l'affichage des photos, par
+            # createGraphicsWindows(), et non ici. L'ouverture du menu principal
+            # ne transforme aucune coordonnée : vérifier le SCR à cet instant
+            # avertissait, et remplaçait le SCR du projet, sur un projet que
+            # l'utilisateur n'a pas fini de monter, souvent un projet neuf
+            # encore en WGS 84 dont les couches arrivent après.
             self.optWindow.loadParamFile()
+            # La section apparaît dans le fichier à la première fermeture de
+            # session : c'est là que l'utilisateur va l'éditer, et un fichier
+            # écrit par une version antérieure ne la porte pas. Posée ici, et
+            # non dans loadParamFile(), dont le banc extrait la méthode avec un
+            # espace de noms fixe où ce module n'existe pas.
+            #
+            # setdefault et non une écriture : une section déjà présente est
+            # laissée telle quelle, fautes de frappe comprises. C'est voulu —
+            # l'utilisateur doit pouvoir relire et corriger ce qu'il a écrit,
+            # alors que l'écraser par les défauts le laisserait sans indice.
+            self.optWindow.ParamDict.setdefault(
+                raccourcisClavier.CLE_SECTION, raccourcisClavier.sectionParDefaut()
+            )
             self.iface.addDockWidget(Qt.RightDockWidgetArea, self.optWindow)
             self.optWindow.raise_()
+            # Le panneau existe : son infobulle peut recevoir ses raccourcis.
+            self.annoncerRaccourcis()
             self.journal.info("Session ouverte")
 
-        else :
+        else:
             self.iface.removeDockWidget(self.optWindow)
             self.optWindowClose()
             del self.optWindow
-            try : del self.currentParDict
-            except AttributeError :
-                #Aucun dossier de photos n'avait été ouvert : cas normal.
+            try:
+                del self.currentParDict
+            except AttributeError:
+                # Aucun dossier de photos n'avait été ouvert : cas normal.
                 self.journal.debug("Aucun dictionnaire PAR à libérer à la fermeture")
             self.journal.info("Session fermée")
 
     def initGlobalParam(self):
-        
+
         self.enableDraw = False
         self.enableShow = False
         self.ignoreMouseAction = False
+        self.fermetureEnCours = False
+        self.fermetureSessionEnCours = False
 
         self.zoomClick = False
         self.longClick = False
 
-        self.firstDrawClick = True
-        self.listDrawCoord = []
-        self.listCutCoord = []
-
-        self.list2DPoint = []
+        # Vrai dès qu'un sommet est posé et jusqu'à la clôture du tracé.
+        # Remplace firstDrawClick, qui décrivait un clic alors que le reste du
+        # code l'interrogeait comme un état de geste.
+        self.traceEnCours = False
         self.list3DPoint = []
+
+        self.vectorLayer = None
+        self.vectorLayerName = None
+
+        # Table des traitements : un dictionnaire de méthodes liées, et non un
+        # getattr dynamique, pour que le contrôle de style et le test de forme
+        # voient les noms.
+        self.tableTraitements = {
+            editionOutils.TRAITEMENT_SELECTIONNER: self.selectionner,
+            editionOutils.TRAITEMENT_VIDER_SELECTION: self.viderSelection,
+            editionOutils.TRAITEMENT_AJOUTER_POINT: self.ajouterPoint,
+            editionOutils.TRAITEMENT_POSER_SOMMET: self.poserSommet,
+            editionOutils.TRAITEMENT_CLORE_LIGNE: self.cloreLigne,
+            editionOutils.TRAITEMENT_CLORE_POLYGONE: self.clorePolygone,
+            editionOutils.TRAITEMENT_CLORE_DECOUPE: self.cloreDecoupe,
+            editionOutils.TRAITEMENT_FUSIONNER: self.fusionnerSelection,
+        }
+
+        # Table des raccourcis : même forme et même raison que celle des
+        # traitements ci-dessus, des méthodes liées plutôt qu'un getattr,
+        # pour que le contrôle de style et le banc voient les noms. Le banc
+        # vérifie aussi que chaque action déclarée y a bien un récepteur.
+        #
+        # actionUnlockCursor.toggle est la méthode du bouton lui-même,
+        # comme dans la cascade d'origine ; le suivi du MNT passe en
+        # revanche par une méthode, sa garde sur le modèle chargé devant
+        # rester.
+        self.tableRaccourcis = {
+            raccourcisClavier.ACTION_BASCULE_FENETRE: self.basculerFenetre,
+            raccourcisClavier.ACTION_ZOOM: self.keyboardZoom,
+            raccourcisClavier.ACTION_OUTIL_SELECTIONNER: self.choisirOutil,
+            raccourcisClavier.ACTION_OUTIL_AJOUTER: self.choisirOutil,
+            raccourcisClavier.ACTION_OUTIL_COMBINER: self.choisirOutil,
+            raccourcisClavier.ACTION_OUTIL_DECOUPER: self.choisirOutil,
+            raccourcisClavier.ACTION_BASCULE_TRACE: self.basculerOutilTrace,
+            raccourcisClavier.ACTION_SUIVI_MNT: self.basculerSuiviMNT,
+            raccourcisClavier.ACTION_CURSEUR_LIBRE: self.actionUnlockCursor.toggle,
+            raccourcisClavier.ACTION_ANNULER: self.annulerEdition,
+            raccourcisClavier.ACTION_ENREGISTRER: self.enregistrerEdition,
+        }
+
+        # Un seul avertissement d'altitude indéterminée par série de clics :
+        # sans ce drapeau, dix clics donnaient dix bandeaux. Remis à faux dès
+        # que l'altitude redevient déterminée.
+        self.altitudeRefusSignalee = False
+
+        # Couche dont les signaux d'édition sont raccordés, pour les rompre
+        # avant d'en raccorder une autre et ne pas empiler les connexions.
+        self.coucheRaccordee = None
 
         self.listLeftLineObj = []
         self.listRightLineObj = []
@@ -168,266 +568,455 @@ class stereoPhoto(object):
         self.tSeekLeft = None
         self.tSeekRight = None
 
+        # Threads d'affichage dont l'arrêt a dépassé le délai d'attente :
+        # conservés ici le temps qu'ils se terminent, pour que Qt ne détruise
+        # pas un QThread en cours d'exécution (voir arreterThreadAffichage).
+        self.threadsEnArret = []
+
         self.polygonL2Draw = {}
         self.polygonR2Draw = {}
-        
+
         self.buttonPosition = None
-        self.buttonMapUnit  = None
+        self.buttonMapUnit = None
 
         self.cursorAltitude = None
         self.isLoadingPair = False
-    
-    def setConnection(self) : 
+
+        # Vrai entre la bascule vers QGIS et le retour aux photos : les vues
+        # ne suivent plus le curseur, elles suivent le canevas de QGIS.
+        self.horsSynchronisation = False
+
+    def setConnection(self):
 
         self.optWindow.ui.importLineProject.textChanged.connect(self.newPictureFile)
-        self.optWindow.ui.importLineVectorLayer.textChanged.connect(self.mNewVectorLayer)
-        self.optWindow.ui.pushButtonShowPicture.clicked.connect(self.createGraphicsWindows)
+        self.optWindow.ui.importLineVectorLayer.textChanged.connect(
+            self.mNewVectorLayer
+        )
+        self.optWindow.ui.pushButtonShowPicture.clicked.connect(
+            self.createGraphicsWindows
+        )
         self.optWindow.ui.pushButtonShowIDList.clicked.connect(self.showIDList)
         self.optWindow.ui.enhanceButton.clicked.connect(self.enhanceClick)
-        self.optWindow.ui.pushButtonFindBestPair.clicked.connect(self.findPairWithPosition)
+        self.optWindow.ui.pushButtonFindBestPair.clicked.connect(
+            self.findPairWithPosition
+        )
+        self.optWindow.couchesAffichageChangees.connect(self.rafraichirGeometries)
         self.optWindow.closeWindow.connect(self.optWindowClose)
-        self.optWindow.ui.pushButtonCloseWindow.clicked.connect(self.closeAllSideWindows)
+        self.optWindow.ui.pushButtonCloseWindow.clicked.connect(
+            self.closeAllSideWindows
+        )
 
         self.navigMapTool.mouseClicked.connect(self.mousePressEvent)
         self.navigMapTool.wheelActivate.connect(self.wheelActionEvent)
         self.navigMapTool.mouseMoved.connect(self.mouseMoveEvent)
         self.navigMapTool.keybordSignal.connect(self.keyboardHandler)
 
-    #Fonction appelée lors de la fermeture du mOpt
-    #Si l'on ferme le mOpt toutes les autres fenêtres Qt se ferment
-    def closeAllSideWindows(self) :
-        self.enableShow = False
-        self.canvas.unsetMapTool(self.navigMapTool)
-        self.removeCurrentScene()
-        self.deleteOldPolygon()
-        if hasattr(self, "graphWindowLeft"):
-            self.graphWindowLeft.close()
-            del self.graphWindowLeft
-        if hasattr(self, "graphWindowRight"):
-            self.graphWindowRight.close()
-            del self.graphWindowRight
-        if hasattr(self, "enhanceManager"):
-            self.enhanceManager.cancelEnhance()
-            del self.enhanceManager 
-        self.optWindow.ui.pushButtonCloseWindow.setEnabled(False)
-        self.optWindow.saveParamFile()
-    
+        self.horsSyncMapTool.panDemande.connect(self.suivreCanevasHorsSync)
+        self.horsSyncMapTool.zoomDemande.connect(self.zoomerHorsSync)
+        self.horsSyncMapTool.retourSynchronise.connect(self.retourNavigationPhoto)
+
+    # Fonction appelée lors de la fermeture du mOpt
+    # Si l'on ferme le mOpt toutes les autres fenêtres Qt se ferment
+    def closeAllSideWindows(self):
+        # Garde de réentrance : fermer une fenêtre fille fait circuler les
+        # événements Qt, et la fermeture peut revenir ici par un autre chemin
+        # (bouton de fermeture, closeEvent du mOpt, changement de projet).
+        # Au second passage, les attributs étaient déjà retirés, d'où
+        # l'AttributeError sur enhanceManager.
+        if self.fermetureEnCours:
+            return
+        self.fermetureEnCours = True
+        try:
+            self.enableShow = False
+            self.canvas.unsetMapTool(self.navigMapTool)
+            self.canvas.unsetMapTool(self.horsSyncMapTool)
+            self.horsSynchronisation = False
+            # Le tracé est abandonné tant que les scènes existent encore :
+            # après la démolition, ses traits ne seraient plus retirables.
+            self.annulerTraceEnCours()
+            self.removeCurrentScene()
+            self.deleteOldPolygon()
+            # L'attribut est retiré avant l'appel de fermeture : ainsi l'état
+            # reste cohérent même si cet appel redonne la main à Qt.
+            graphWindowLeft = self.__dict__.pop("graphWindowLeft", None)
+            if graphWindowLeft is not None:
+                graphWindowLeft.close()
+            graphWindowRight = self.__dict__.pop("graphWindowRight", None)
+            if graphWindowRight is not None:
+                graphWindowRight.close()
+            gestionRehaussement = self.__dict__.pop("enhanceManager", None)
+            if gestionRehaussement is not None:
+                gestionRehaussement.cancelEnhance()
+            self.optWindow.ui.pushButtonCloseWindow.setEnabled(False)
+            self.optWindow.saveParamFile()
+        finally:
+            self.fermetureEnCours = False
+
+    def projetChange(self):
+        """Ferme la session de navigation quand le projet est vidé ou remplacé.
+
+        QGIS émet `cleared` avant de lire un nouveau projet, comme à la demande
+        d'un projet neuf. Sans ce raccordement, rien ne s'exécutait : les deux
+        vues photo restaient ouvertes en plein écran sur un projet qui n'a plus
+        le SCR des photos ni leurs couches, l'outil de navigation restait posé
+        sur ce canevas, ramenant le symptôme de la navigation figée puisque
+        verifierScrProjet() n'est rejouée qu'à l'affichage des photos, et
+        les paramètres de la session étaient perdus.
+        """
+        if not self.actionMainMenu.isChecked():
+            # Aucune session ouverte : le projet peut changer librement.
+            return
+
+        self.journal.info("Projet vidé ou remplacé : fermeture de la session")
+        # La vue courante est mémorisée avant la démolition, pour que la
+        # position se retrouve à la prochaine ouverture du dossier. L'échec de
+        # cette mémorisation ne doit jamais empêcher la fermeture : cette
+        # méthode répond à un signal, et une exception qui s'en échappe part
+        # vers la fenêtre d'erreur Python de QGIS, dont le dialogue modal
+        # bloque la session, soit l'inverse de ce que le raccordement cherche.
+        if self.enableShow:
+            try:
+                self.setLastView()
+            except Exception:
+                self.journal.exception(
+                    "Vue courante non mémorisée ; la fermeture se poursuit"
+                )
+        # Les modifications en attente sont nommées, sans dialogue : cette
+        # méthode répond à `cleared`, donc s'exécute pendant la démolition du
+        # projet, et un dialogue modal y ramènerait le défaut que le
+        # commentaire ci-dessus décrit. La couche peut d'ailleurs déjà être
+        # invalide. QGIS pose sa propre question sur les couches en édition
+        # avant de vider un projet ; ce message dit ce qui est en jeu.
+        enAttente, nombre = editionVecteur.modificationsEnAttente(self.vectorLayer)
+        nomCouche = ""
+        if enAttente:
+            try:
+                nomCouche = self.vectorLayer.name()
+            except RuntimeError:
+                nomCouche = self.vectorLayerName or "(inconnue)"
+            self.journal.warning(
+                "Changement de projet avec %d modification(s) en attente sur "
+                "la couche %s",
+                nombre,
+                nomCouche,
+            )
+
+        avertir_utilisateur(
+            "Le projet a changé : la session StereoPhoto est fermée et ses "
+            "paramètres enregistrés. Rouvrir le menu principal pour reprendre "
+            "la navigation."
+            + (
+                " La couche « %s » portait %d modification(s) non "
+                "enregistrée(s)." % (nomCouche, nombre)
+                if enAttente
+                else ""
+            )
+        )
+        # Déclenche run(), qui retire le panneau puis appelle optWindowClose(),
+        # lequel écrit le fichier de paramètres par closeAllSideWindows().
+        self.actionMainMenu.setChecked(False)
+
     def optWindowClose(self):
-        self.closeAllSideWindows()
-        self.optWindow.close()
-        self.optWindow.vectorWindow.close()
-        if self.actionMainMenu.isChecked() : self.actionMainMenu.setChecked(False)
+        # Garde de réentrance, comme celle de closeAllSideWindows() un niveau
+        # plus bas. optWindow.close() déclenche son closeEvent, qui réémet
+        # closeWindow et rappelle cette méthode. L'appel imbriqué atteignait
+        # alors setChecked(False), donc le `del self.optWindow` de run(), et
+        # l'appel extérieur trouvait l'attribut disparu à la ligne suivante.
+        if self.fermetureSessionEnCours:
+            return
+        self.fermetureSessionEnCours = True
+        try:
+            # L'enregistrement étant un geste explicite, la question est posée
+            # avant la démolition, pour que le photo-interprète ne s'en aille
+            # pas en croyant son travail écrit.
+            self.demanderSortEditions()
+            # Les signaux de la couche sont rompus ici, et non dans
+            # closeAllSideWindows() qui sert aussi à ne fermer que les vues :
+            # la couche survit à la session, et la session suivante
+            # raccorderait par-dessus, empilant les connexions.
+            self.rompreRaccordementCouche()
+            self.closeAllSideWindows()
+            # Référence locale plutôt que l'attribut : la fermeture fait
+            # circuler les événements Qt, et l'attribut peut disparaître entre
+            # deux lignes.
+            optWindow = getattr(self, "optWindow", None)
+            if optWindow is not None:
+                optWindow.close()
+                optWindow.vectorWindow.close()
+            if self.actionMainMenu.isChecked():
+                self.actionMainMenu.setChecked(False)
+        finally:
+            self.fermetureSessionEnCours = False
 
     def newPictureFile(self):
-        
+
+        # Aucune garde de SCR ici : la lecture du dossier ne fait que dresser la
+        # liste des paires et préparer la paire courante, sans transformer une
+        # coordonnée. Cette méthode répond de plus à `textChanged`, donc au
+        # dossier restauré par loadParamFile() à l'ouverture de la session,
+        # avertir ici revenait à avertir au démarrage, avant que l'utilisateur
+        # ait monté son projet. La garde est posée là où les mètres servent :
+        # createGraphicsWindows() et findPairWithPosition().
         self.currentMainPath = self.optWindow.ui.importLineProject.text()
         self.optWindow.projectPath = os.path.dirname(self.currentMainPath)
         self.currentParDict = getParDict(self.currentMainPath)
-        
-        
-        if len(self.currentParDict) < 2 :
+
+        if len(self.currentParDict) < 2:
             self.optWindow.ui.pushButtonShowIDList.setEnabled(False)
             self.optWindow.ui.enhanceButton.setEnabled(False)
             self.optWindow.ui.pushButtonShowPicture.setEnabled(False)
             self.optWindow.ui.pushButtonFindBestPair.setEnabled(False)
             return
 
-        else : 
+        else:
             self.optWindow.ui.pushButtonShowIDList.setEnabled(True)
             self.optWindow.ui.enhanceButton.setEnabled(True)
             self.optWindow.ui.pushButtonShowPicture.setEnabled(True)
             self.optWindow.ui.pushButtonFindBestPair.setEnabled(True)
-        
-        userImage = self.optWindow.ParamDict['info_raster']['user_image']
-        lastPosition = self.optWindow.ParamDict['position']
-        if userImage in self.currentParDict.keys() : 
+
+        userImage = self.optWindow.ParamDict["info_raster"]["user_image"]
+        lastPosition = self.optWindow.ParamDict["position"]
+        if userImage in self.currentParDict.keys():
             parToUse = userImage
-            if float(lastPosition['longitude']) != 0.0 :
-                x = float(lastPosition['longitude'])
-                y = float(lastPosition['latitude'])
-                z = float(lastPosition['altitude'])
-                scale = float(lastPosition['scale'])
-                self.lastCurrentView = (x,y,z,scale)
-            else : self.lastCurrentView = ()
-        
-        else : 
+            if float(lastPosition["longitude"]) != 0.0:
+                x = float(lastPosition["longitude"])
+                y = float(lastPosition["latitude"])
+                z = float(lastPosition["altitude"])
+                scale = float(lastPosition["scale"])
+                self.lastCurrentView = (x, y, z, scale)
+            else:
+                self.lastCurrentView = ()
+
+        else:
             self.lastCurrentView = ()
-            #self.optWindow.removeImportMNT()
+            # self.optWindow.removeImportMNT()
             self.removePolygonOnScreen()
             parToUse = next(iter(self.currentParDict))
-            
 
-        if self.enableShow : self.closeAllSideWindows()
+        if self.enableShow:
+            self.closeAllSideWindows()
         self.setPairWithPARId(parToUse)
 
-    def showIDList(self) : 
-        self.pictureSelectWindow = getImageListDialog(sorted(self.currentParDict),self.leftParID)
-        self.pictureSelectWindow.ui.buttonBox.accepted.connect(self.pictureSelectionAccept)
-        self.pictureSelectWindow.ui.buttonBox.rejected.connect(lambda : self.pictureSelectWindow.close())
+    def showIDList(self):
+        self.pictureSelectWindow = getImageListDialog(
+            sorted(self.currentParDict), self.leftParID
+        )
+        self.pictureSelectWindow.ui.buttonBox.accepted.connect(
+            self.pictureSelectionAccept
+        )
+        self.pictureSelectWindow.ui.buttonBox.rejected.connect(
+            lambda: self.pictureSelectWindow.close()
+        )
         self.pictureSelectWindow.show()
-    
+
     def pictureSelectionAccept(self):
         pictureID = self.pictureSelectWindow.ui.listWidget.selectedItems()[0].text()
         self.setPairWithPARId(pictureID)
-        
-        if self.enableShow and self.leftParID != '': self.loadNewPair()
+
+        if self.enableShow and self.leftParID != "":
+            self.loadNewPair()
         self.lastCurrentView = ()
         self.pictureSelectWindow.close()
 
-    def setPairWithPARId(self, parID, secondID=None) : 
+    def setPairWithPARId(self, parID, secondID=None):
 
-        #Retourne les paires left et right ainsi que les 4 voisins NOSE
-        #Voisin Est/Ouest peut être une image qui n'est pas une paire
-        #Voisin Nord/Sud peut être une paire pour assurer la continuitée de la vue courante
+        # Retourne les paires left et right ainsi que les 4 voisins NOSE
+        # Voisin Est/Ouest peut être une image qui n'est pas une paire
+        # Voisin Nord/Sud peut être une paire pour assurer la continuitée de la vue courante
         self.infoNeighbors = get_neighbors_and_pairs(parID, self.currentParDict)
 
-        if secondID : 
+        if secondID:
             self.leftParID = parID
             self.rightParID = secondID
-        
-        elif self.infoNeighbors['leftPic'][0] is None and self.infoNeighbors['rightPic'][0] is None : 
-            self.leftParID = ''
+
+        elif (
+            self.infoNeighbors["leftPic"][0] is None
+            and self.infoNeighbors["rightPic"][0] is None
+        ):
+            self.leftParID = ""
             return
-        
-        elif self.infoNeighbors['rightPic'][0] is None : 
-            self.leftParID = self.infoNeighbors['leftPic'][0]
+
+        elif self.infoNeighbors["rightPic"][0] is None:
+            self.leftParID = self.infoNeighbors["leftPic"][0]
             self.rightParID = parID
-                        
-        else : 
+
+        else:
             self.leftParID = parID
-            self.rightParID = self.infoNeighbors['rightPic'][0]
+            self.rightParID = self.infoNeighbors["rightPic"][0]
 
         self.optWindow.ui.labelLeftName.setText(self.leftParID)
         self.optWindow.ui.labelRightName.setText(self.rightParID)
 
-        self.currentLeftTIF = self.currentMainPath + '/' + self.leftParID + '.tif'
-        self.currentLeftPAR = self.currentMainPath  + '/' + self.leftParID + '.par'
-        self.currentRightTIF = self.currentMainPath  + '/' + self.rightParID + '.tif'
-        self.currentRightPAR = self.currentMainPath  + '/' + self.rightParID + '.par'
+        self.currentLeftTIF = self.currentMainPath + "/" + self.leftParID + ".tif"
+        self.currentLeftPAR = self.currentMainPath + "/" + self.leftParID + ".par"
+        self.currentRightTIF = self.currentMainPath + "/" + self.rightParID + ".tif"
+        self.currentRightPAR = self.currentMainPath + "/" + self.rightParID + ".par"
 
         infoNeighborR = get_neighbors_and_pairs(self.rightParID, self.currentParDict)
-        self.infoNeighbors = get_neighbors_and_pairs(self.leftParID, self.currentParDict)
+        self.infoNeighbors = get_neighbors_and_pairs(
+            self.leftParID, self.currentParDict
+        )
 
-        self.currentLeftID = True if self.infoNeighbors['left'][0] else False
-        
-        if infoNeighborR['rightPic'][0] is None and infoNeighborR['right'][0] : 
+        self.currentLeftID = True if self.infoNeighbors["left"][0] else False
+
+        if infoNeighborR["rightPic"][0] is None and infoNeighborR["right"][0]:
             self.currentRightID = True
-            self.infoNeighbors['right'] = infoNeighborR['right']
+            self.infoNeighbors["right"] = infoNeighborR["right"]
 
-        elif infoNeighborR['rightPic'][0] : self.currentRightID = True
-        else : self.currentRightID = False
-        
-        self.currentUpID = True if len(self.infoNeighbors['up']) != 0 else False
-        self.currentDownID = True if len(self.infoNeighbors['down']) != 0 else False
+        elif infoNeighborR["rightPic"][0]:
+            self.currentRightID = True
+        else:
+            self.currentRightID = False
 
-        
-    def setLastView(self) :
-        if not hasattr(self, "graphWindowLeft"): return
+        self.currentUpID = True if len(self.infoNeighbors["up"]) != 0 else False
+        self.currentDownID = True if len(self.infoNeighbors["down"]) != 0 else False
+
+    def setLastView(self):
+        if not hasattr(self, "graphWindowLeft"):
+            return
+
+        if self.cursorAltitude is None:
+            # Sans altitude, pixelToCoord() ne peut pas rendre de coordonnée :
+            # il soustrait l'altitude du curseur à celle de la prise de vue, et
+            # lève un TypeError sur None. L'altitude est indéterminée tant
+            # qu'une paire n'a pas été mesurée, ou quand la mesure a échoué.
+            # Mémoriser la vue n'a alors pas de sens, et la levée partirait
+            # vers la fenêtre d'erreur Python de QGIS, par le signal du
+            # projet, elle bloquait la session derrière un dialogue modal.
+            self.journal.debug("Altitude indéterminée : vue courante non mémorisée")
+            return
 
         LGV = self.graphWindowLeft.ui.graphicsView
-        sceneRect = LGV.mapToScene(LGV.viewport().rect()).boundingRect()  
+        sceneRect = LGV.mapToScene(LGV.viewport().rect()).boundingRect()
         sceneCenter = sceneRect.center()
         centerPixel = self.graphWindowLeft.imageRoot.mapFromScene(sceneCenter)
 
-        currentTransform = LGV.transform()  
+        currentTransform = LGV.transform()
 
-        scaleStore = currentTransform.m11() #self.currentScale
+        scaleStore = currentTransform.m11()  # self.currentScale
 
-        cx, cy = self.leftPictureManager.pixelToCoord((centerPixel.x(), centerPixel.y()), self.cursorAltitude)
-        self.lastCurrentView = (cx,cy,self.cursorAltitude,scaleStore)
+        cx, cy = self.leftPictureManager.pixelToCoord(
+            (centerPixel.x(), centerPixel.y()), self.cursorAltitude
+        )
+        self.lastCurrentView = (cx, cy, self.cursorAltitude, scaleStore)
 
-        self.optWindow.ParamDict['position']['longitude'] = cx
-        self.optWindow.ParamDict['position']['latitude'] = cy
-        self.optWindow.ParamDict['position']['altitude'] = self.cursorAltitude
-        self.optWindow.ParamDict['position']['scale'] = scaleStore
+        # Types natifs pour ce qui part au fichier de paramètres : une valeur
+        # numpy y ferait lever json.dump(), et l'échec détruirait le fichier.
+        # La conversion est faite ici plutôt que laissée à saveParamFile(),
+        # pour que ParamDict ne contienne jamais que du sérialisable.
+        self.optWindow.ParamDict["position"]["longitude"] = float(cx)
+        self.optWindow.ParamDict["position"]["latitude"] = float(cy)
+        self.optWindow.ParamDict["position"]["altitude"] = float(self.cursorAltitude)
+        self.optWindow.ParamDict["position"]["scale"] = float(scaleStore)
 
-    
     def findNextPair(self, ori):
-        self.navigMapTool.deactivateMapTool() 
+        if not self.horsSynchronisation:
+            self.navigMapTool.deactivateMapTool()
         self.setLastView()
-        
+
         secondID = None
         newID = None
-        if ori == 'L': newID = self.infoNeighbors['left'][0]
-        elif ori == 'R': newID = self.infoNeighbors['right'][0]
-        
-        elif ori == 'D': #down/Bas
-            if len(self.infoNeighbors['down']) == 2 :
-                name_1 = self.infoNeighbors['down'][0][0]
-                name_2 = self.infoNeighbors['down'][1][0]
+        if ori == "L":
+            newID = self.infoNeighbors["left"][0]
+        elif ori == "R":
+            newID = self.infoNeighbors["right"][0]
+
+        elif ori == "D":  # down/Bas
+            if len(self.infoNeighbors["down"]) == 2:
+                name_1 = self.infoNeighbors["down"][0][0]
+                name_2 = self.infoNeighbors["down"][1][0]
                 x0_1 = self.currentParDict[name_1][0]
                 x0_2 = self.currentParDict[name_2][0]
-                if x0_1 < x0_2 : 
+                if x0_1 < x0_2:
                     newID = name_1
                     secondID = name_2
-                else : 
+                else:
                     newID = name_2
                     secondID = name_1
 
-            else : newID = self.infoNeighbors['down'][0][0]
-        
-        elif ori == 'U': #up/Haut
-            if len(self.infoNeighbors['up']) == 2 :
-                name_1 = self.infoNeighbors['up'][0][0]
-                name_2 = self.infoNeighbors['up'][1][0]
+            else:
+                newID = self.infoNeighbors["down"][0][0]
+
+        elif ori == "U":  # up/Haut
+            if len(self.infoNeighbors["up"]) == 2:
+                name_1 = self.infoNeighbors["up"][0][0]
+                name_2 = self.infoNeighbors["up"][1][0]
                 x0_1 = self.currentParDict[name_1][0]
                 x0_2 = self.currentParDict[name_2][0]
-                if x0_1 < x0_2 : 
+                if x0_1 < x0_2:
                     newID = name_1
                     secondID = name_2
-                else : 
+                else:
                     newID = name_2
                     secondID = name_1
 
-            else : newID = self.infoNeighbors['up'][0][0]
+            else:
+                newID = self.infoNeighbors["up"][0][0]
 
-        #Orientation inconnue ou voisin absent : aucune paire à charger
-        if newID is None : return
-        
-        self.setPairWithPARId(newID,secondID)
-        
+        # Orientation inconnue ou voisin absent : aucune paire à charger
+        if newID is None:
+            return
+
+        self.setPairWithPARId(newID, secondID)
+
         self.loadNewPair(ignoreMapTool=True)
 
-    def findPairWithPosition(self) :
+    def findPairWithPosition(self):
+
+        # La vue du canevas est lue en mètres pour la comparer aux coordonnées
+        # des photos : même garde qu'à l'affichage, et même moment choisi par
+        # l'utilisateur.
+        if not self.verifierScrProjet():
+            return
 
         qgisExtent = self.canvas.extent()
-        centerCoord = (qgisExtent.xMinimum()+qgisExtent.width()/2,qgisExtent.yMinimum()+qgisExtent.height()/2)
-        bestFit = findPairWithCoord(self.currentParDict,centerCoord)
+        centerCoord = (
+            qgisExtent.xMinimum() + qgisExtent.width() / 2,
+            qgisExtent.yMinimum() + qgisExtent.height() / 2,
+        )
+        bestFit = findPairWithCoord(self.currentParDict, centerCoord)
 
         width = qgisExtent.width()
         height = qgisExtent.height()
-        imageID = bestFit[0] 
+        imageID = bestFit[0]
         distance = bestFit[1]
 
-        #Zone de 7.5 km pour être proche de la photo le plus possible
-        if max(width,height,distance) < 7500 : 
+        # Zone de 7.5 km pour être proche de la photo le plus possible
+        if max(width, height, distance) < 7500:
             self.buttonPosition = centerCoord
             self.buttonMapUnit = self.canvas.mapUnitsPerPixel()
             self.setPairWithPARId(imageID)
-            if self.enableShow and self.leftParID != '' : self.loadNewPair()
-        else :
+            if self.enableShow and self.leftParID != "":
+                self.loadNewPair()
+        else:
             self.buttonPosition = None
-            #Sans message, le bouton restait sans effet visible : l'utilisateur
-            #ne pouvait pas distinguer une vue mal placée d'une panne.
+            # Sans message, le bouton restait sans effet visible : l'utilisateur
+            # ne pouvait pas distinguer une vue mal placée d'une panne.
             avertir_utilisateur(
                 "Aucune paire trouvée à cet endroit. Rapprochez la vue de la "
-                "zone des photos et zoomez sous 7,5 km avant de réessayer.")
+                "zone des photos et zoomez sous 7,5 km avant de réessayer."
+            )
 
-    
-    def createGraphicsWindows(self) : 
+    def createGraphicsWindows(self):
 
-        if self.enableShow : 
+        # Première opération qui transforme des coordonnées de
+        # photos en position de canevas. Le projet est monté, l'utilisateur
+        # vient de demander l'affichage : c'est ici que l'avertissement de SCR
+        # a un sens, et qu'il précède encore toute navigation.
+        if not self.verifierScrProjet():
+            return
+
+        if self.enableShow:
             self.setExtent2Canvas()
-            self.windowHandler('picture')
-            if self.enableDraw : 
+            self.windowHandler("picture")
+            if self.enableDraw:
                 self.startPolygonThread()
-                if self.optWindow.currentMNTPath and self.vectorLayer.geometryType() == QgsWkbTypes.PolygonGeometry :self.navigMapTool.activateDrawing = True
-                else : self.navigMapTool.activateDrawing = False
+                self.majActivationTrace()
             return
 
         intDownScreen = self.optWindow.ui.spinBoxDownScreen.value()
         intUpSreen = self.optWindow.ui.spinBoxUpScreen.value()
-        
+
         screenLeft = QGuiApplication.screens()[intDownScreen]
         screenRight = QGuiApplication.screens()[intUpSreen]
 
@@ -443,66 +1032,143 @@ class stereoPhoto(object):
         self.graphWindowRight.setWindowFlags(Qt.Window | Qt.FramelessWindowHint)
         self.graphWindowRight.move(screenRight_geom.topLeft())
         self.graphWindowRight.keyPressed.connect(self.keyboardHandler)
-        
+
         width = DRAW_LINE_PEN_WIDTH_PX
-        color = QColor('Cyan')
+        color = QColor("Cyan")
 
         self.my_pen = QPen(color, width, Qt.SolidLine, Qt.SquareCap, Qt.RoundJoin)
         self.my_pen.setCosmetic(True)
+
+        # Pinceau de la surbrillance des entités sélectionnées. Construit une
+        # fois, comme celui du tracé : drawPolygon() est rappelée à chaque
+        # chargement de tuiles.
+        self.selectionPen = QPen(
+            QColor(EDITION_SELECTION_COULEUR),
+            EDITION_SELECTION_PEN_WIDTH_PX,
+            Qt.SolidLine,
+            Qt.SquareCap,
+            Qt.RoundJoin,
+        )
+        self.selectionPen.setCosmetic(True)
 
         self.enableShow = True
         self.optWindow.ui.pushButtonCloseWindow.setEnabled(True)
 
         self.graphWindowRight.showFullScreen()
         self.graphWindowLeft.showFullScreen()
-        self.iface.mainWindow().raise_()       
+        self.iface.mainWindow().raise_()
         self.iface.mainWindow().activateWindow()
         self.canvas.setFocus()
         self.loadNewPair()
 
-    def removeCurrentScene(self) : 
+    def arreterThreadAffichage(self, thread):
+        """Arrête un thread d'affichage et ne rend la main qu'une fois sûr.
 
-        if self.tSeekLeft is not None : 
-            if self.tSeekLeft.showThreadInProcess : 
-                self.tSeekLeft.blockSignals(True)
-                self.tSeekLeft.keepRunning = False
-                self.tSeekLeft.wait()
-            self.tSeekLeft = None
+        La condition d'attente porte sur `isRunning()`, et non sur
+        `showThreadInProcess` : ce drapeau est posé et retiré *dans* `run()`,
+        donc sur le thread de travail. Il est faux entre `start()` et l'entrée
+        dans `run()` (de 24 à 98 ms, mesuré sur quatorze changements de
+        modèle), puis de nouveau entre son retrait dans le `finally` de
+        `run()` et la
+        fin réelle du thread. Dans ces deux fenêtres, la garde précédente
+        laissait relâcher la dernière référence Python d'un QThread en cours
+        d'exécution, et Qt interrompait le processus sans rien journaliser.
+
+        L'attente est bornée : l'interface ne doit pas rester figée sur un
+        thread qui ne se terminerait pas. Mais un thread encore vivant au bout
+        du délai n'est pas relâché pour autant : il est gardé de côté le temps
+        qu'il finisse, car c'est le relâchement qui tue le processus, pas
+        l'attente.
+        """
+        if thread is None:
+            return
+
+        # Signaux coupés avant l'arrêt : le chargement en cours est abandonné,
+        # ses tuiles ne doivent plus rejoindre la scène de la paire suivante.
+        thread.blockSignals(True)
+        thread.keepRunning = False
+
+        if not thread.isRunning():
+            return
+
+        if thread.wait(NAVIGATION_ARRET_THREAD_DELAI_MAX_MS):
+            return
+
+        self.journal.warning(
+            "Thread d'affichage encore en cours après %d ms : conservé le "
+            "temps qu'il se termine, pour ne pas détruire un QThread en "
+            "exécution.",
+            NAVIGATION_ARRET_THREAD_DELAI_MAX_MS,
+        )
+        self.threadsEnArret.append(thread)
+
+    def purgerThreadsEnArret(self):
+        """Relâche les threads gardés de côté qui se sont terminés depuis."""
+
+        if not self.threadsEnArret:
+            return
+
+        restants = [t for t in self.threadsEnArret if t.isRunning()]
+        relaches = len(self.threadsEnArret) - len(restants)
+        if relaches:
+            self.journal.debug(
+                "%d thread(s) d'affichage relâché(s), %d encore en cours",
+                relaches,
+                len(restants),
+            )
+        self.threadsEnArret = restants
+
+    def removeCurrentScene(self):
+
+        self.purgerThreadsEnArret()
+
+        self.arreterThreadAffichage(self.tSeekLeft)
+        self.tSeekLeft = None
 
         if hasattr(self, "graphWindowLeft"):
             self.graphWindowLeft.resetTileGroup()
-        
-        if self.tSeekRight is not None : 
-            if self.tSeekRight.showThreadInProcess : 
-                self.tSeekRight.blockSignals(True)
-                self.tSeekRight.keepRunning = False
-                self.tSeekRight.wait()
-            self.tSeekRight = None
+
+        self.arreterThreadAffichage(self.tSeekRight)
+        self.tSeekRight = None
 
         if hasattr(self, "graphWindowRight"):
             self.graphWindowRight.resetTileGroup()
-        
+
         QApplication.processEvents()
-        
-    def loadNewPair(self,ignoreMapTool=False):
+
+    def loadNewPair(self, ignoreMapTool=False):
+        # Le drapeau n'était jusqu'ici jamais levé, seulement abaissé : la garde
+        # de mouseMoveEvent() et de wheelActionEvent() ne protégeait rien. Un
+        # mouvement reçu pendant le chargement lisait des tuiles et un cadrage
+        # en cours de remplacement.
+        self.isLoadingPair = True
+
         self.removeCurrentScene()
 
         self.graphWindowLeft.ui.graphicsView.resetTransform()
         self.graphWindowRight.ui.graphicsView.resetTransform()
-       
-        self.tSeekLeft = threadShow(self.currentLeftTIF, self.optWindow.rehaussementParam)
+
+        self.tSeekLeft = threadShow(
+            self.currentLeftTIF, self.optWindow.rehaussementParam
+        )
         self.tSeekLeft.newImage.connect(self.graphWindowLeft.addPixmap)
         self.tSeekLeft.finished.connect(self.seekLeftDone)
-        
-        self.tSeekRight = threadShow(self.currentRightTIF, self.optWindow.rehaussementParam)
+
+        self.tSeekRight = threadShow(
+            self.currentRightTIF, self.optWindow.rehaussementParam
+        )
         self.tSeekRight.newImage.connect(self.graphWindowRight.addPixmap)
         self.tSeekRight.finished.connect(self.seekRightDone)
-        
+
         self.fullLeftPicSize = (self.tSeekLeft.width, self.tSeekLeft.height)
         self.fullRightPicSize = (self.tSeekRight.width, self.tSeekRight.height)
-       
-        self.leftPictureManager = pictureManager(self.fullLeftPicSize, self.currentLeftPAR)
-        self.rightPictureManager = pictureManager(self.fullRightPicSize, self.currentRightPAR)
+
+        self.leftPictureManager = pictureManager(
+            self.fullLeftPicSize, self.currentLeftPAR
+        )
+        self.rightPictureManager = pictureManager(
+            self.fullRightPicSize, self.currentRightPAR
+        )
 
         leftBbox = self.currentParDict[self.leftParID]
         rightBbox = self.currentParDict[self.rightParID]
@@ -518,22 +1184,33 @@ class stereoPhoto(object):
         r11R = self.rightPictureManager.r11
         r12R = self.rightPictureManager.r12
 
-        cropValueLeft = self.calculDecoupageAvecRotation(self.fullLeftPicSize,bboxOverlap,leftBbox,gpzL,r11L,r12L)
-        cropValueRight = self.calculDecoupageAvecRotation(self.fullRightPicSize,bboxOverlap,rightBbox,gpzR,r11R,r12R)
-        
-        self.leftPicSize = (cropValueLeft[2]-cropValueLeft[0],cropValueLeft[3]-cropValueLeft[1])
-        self.rightPicSize = (cropValueRight[2]-cropValueRight[0],cropValueRight[3]-cropValueRight[1])
+        cropValueLeft = self.calculDecoupageAvecRotation(
+            self.fullLeftPicSize, bboxOverlap, leftBbox, gpzL, r11L, r12L
+        )
+        cropValueRight = self.calculDecoupageAvecRotation(
+            self.fullRightPicSize, bboxOverlap, rightBbox, gpzR, r11R, r12R
+        )
 
+        self.leftPicSize = (
+            cropValueLeft[2] - cropValueLeft[0],
+            cropValueLeft[3] - cropValueLeft[1],
+        )
+        self.rightPicSize = (
+            cropValueRight[2] - cropValueRight[0],
+            cropValueRight[3] - cropValueRight[1],
+        )
 
-        self.dualManager = dualManager(self.leftPictureManager, self.rightPictureManager)
+        self.dualManager = dualManager(
+            self.leftPictureManager, self.rightPictureManager
+        )
 
         self.tSeekLeft.cropValue = cropValueLeft
         self.tSeekRight.cropValue = cropValueRight
-        
+
         self.realCropValueLeft = cropValueLeft
         self.realCropValueRight = cropValueRight
-        
-        #self.openMNT()
+
+        # self.openMNT()
         coordRect = self.getShowRect()
         self.optWindow.getMNTWithCoord(coordRect)
 
@@ -541,146 +1218,253 @@ class stereoPhoto(object):
         self.setBaseTransform()
         self.setStartingView()
         self.setExtent2Canvas()
-        
-        if ignoreMapTool : self.navigMapTool.activateMapTool() 
-        else : self.windowHandler('picture')
-        
+
+        if ignoreMapTool:
+            # Le chargement vient de la navigation elle-même : on remet l'outil
+            # de l'état courant, sans ramener les fenêtres photo au premier plan.
+            if self.horsSynchronisation:
+                self.canvas.setMapTool(self.horsSyncMapTool)
+            else:
+                self.navigMapTool.activateMapTool()
+        else:
+            self.windowHandler("picture")
+
         self.polygonL2Draw = {}
         self.polygonR2Draw = {}
-        self.firstDrawClick = True
+        # Le tracé appartient au modèle quitté : ses sommets et ses traits sont
+        # abandonnés. Remettre le seul drapeau à vrai, comme avant, laissait
+        # les sommets dans les accumulateurs et les traits cyan dans les
+        # scènes ; la géométrie suivante enjambait deux modèles.
+        self.annulerTraceEnCours()
 
         LGV = self.graphWindowLeft.ui.graphicsView
         vpl = LGV.viewport()
         sceneRectL = LGV.mapToScene(vpl.rect()).boundingRect()
-        realLeftRect = self.graphWindowLeft.imageRoot.mapFromScene(sceneRectL).boundingRect()
+        realLeftRect = self.graphWindowLeft.imageRoot.mapFromScene(
+            sceneRectL
+        ).boundingRect()
         self.tSeekLeft.set_SceneRect(realLeftRect)
         self.tSeekLeft.start(QThread.LowestPriority)
-        
+
         RGV = self.graphWindowRight.ui.graphicsView
         vpr = RGV.viewport()
         sceneRectR = RGV.mapToScene(vpr.rect()).boundingRect()
-        realRigthRect = self.graphWindowRight.imageRoot.mapFromScene(sceneRectR).boundingRect()
+        realRigthRect = self.graphWindowRight.imageRoot.mapFromScene(
+            sceneRectR
+        ).boundingRect()
 
         self.tSeekRight.set_SceneRect(realRigthRect)
         self.tSeekRight.start(QThread.LowestPriority)
-        
-        if self.enableDraw : 
+
+        if self.enableDraw:
             self.startPolygonThread()
-            if self.optWindow.currentMNTPath and self.vectorLayer.geometryType() == QgsWkbTypes.PolygonGeometry :self.navigMapTool.activateDrawing = True
-            else : self.navigMapTool.activateDrawing = False
-        
+            self.majActivationTrace()
+
         self.isLoadingPair = False
 
-    def getQtransform(self, pictureManager : pictureManager):
+    def getQtransform(self, pictureManager: pictureManager):
         r11 = pictureManager.r11
         r12 = pictureManager.r12
         r21 = pictureManager.r21
         r22 = pictureManager.r22
         ppa_x = pictureManager.PPAx
-        ppa_y =  pictureManager.PPAy
-        
-        
+        ppa_y = pictureManager.PPAy
+
         t = QTransform()
         t.translate(ppa_x, ppa_y)
         t *= QTransform(r11, r12, r21, r22, 0, 0)
         t.translate(-ppa_x, -ppa_y)
         return t
-    
-  
-    def calculDecoupageAvecRotation(self, sizeImg, bboxOverlap, bbox, gpz, R11, R12) :
-        threshold = 0.5  
+
+    def calculDecoupageAvecRotation(self, sizeImg, bboxOverlap, bbox, gpz, R11, R12):
+        threshold = 0.5
         width, height = sizeImg
         if gpz <= 0:
             # Use a fallback or log an error
-            return (0, 0, width, height) 
+            return (0, 0, width, height)
 
         if R11 < -threshold:
-            # +180° Rotation : World X → Pixel X (flip), World Y → Pixel Y 
+            # +180° Rotation : World X → Pixel X (flip), World Y → Pixel Y
             xStart = int((bbox[4] - bboxOverlap[2]) / gpz)
             yStart = int((bboxOverlap[1] - bbox[3]) / gpz)
 
-            xEnd   = int((bbox[4] - bboxOverlap[0]) / gpz)
-            yEnd   = int((bboxOverlap[3] - bbox[3]) / gpz)
+            xEnd = int((bbox[4] - bboxOverlap[0]) / gpz)
+            yEnd = int((bboxOverlap[3] - bbox[3]) / gpz)
 
         elif abs(R11) < threshold and R12 > threshold:
-            # +90° Rotation : World X → Pixel Y,  World Y → Pixel X  (flip)           
+            # +90° Rotation : World X → Pixel Y,  World Y → Pixel X  (flip)
             xStart = int((bboxOverlap[1] - bbox[3]) / gpz)
             yStart = int((bbox[4] - bboxOverlap[2]) / gpz)
 
-            xEnd   = int((bboxOverlap[3] - bbox[3]) / gpz)
-            yEnd   = int((bbox[4] - bboxOverlap[0]) / gpz)
+            xEnd = int((bboxOverlap[3] - bbox[3]) / gpz)
+            yEnd = int((bbox[4] - bboxOverlap[0]) / gpz)
 
         elif abs(R11) < threshold and R12 < -threshold:
             # -90° Rotation : World X → Pixel Y (flip), World Y → Pixel X (flip)
-           
+
             xStart = int((bbox[5] - bboxOverlap[3]) / gpz)
             yStart = int((bboxOverlap[0] - bbox[2]) / gpz)
 
-            xEnd   = int((bbox[5] - bboxOverlap[1]) / gpz)
-            yEnd   = int((bboxOverlap[2] - bbox[2]) / gpz)
+            xEnd = int((bbox[5] - bboxOverlap[1]) / gpz)
+            yEnd = int((bboxOverlap[2] - bbox[2]) / gpz)
 
-        else : 
+        else:
             # 0° Rotation : World X → Pixel X,  World Y → Pixel Y (flip)
-            xStart = int((bboxOverlap[0] - bbox[2]) / gpz)  
-            yStart = int((bbox[5] - bboxOverlap[3]) / gpz)  
+            xStart = int((bboxOverlap[0] - bbox[2]) / gpz)
+            yStart = int((bbox[5] - bboxOverlap[3]) / gpz)
 
-            xEnd = int((bboxOverlap[2] - bbox[2]) / gpz) 
-            yEnd = int((bbox[5] - bboxOverlap[1]) / gpz) 
-        
+            xEnd = int((bboxOverlap[2] - bbox[2]) / gpz)
+            yEnd = int((bbox[5] - bboxOverlap[1]) / gpz)
+
         xStart = max(0, min(xStart, width))
-        xEnd   = max(0, min(xEnd, width))
+        xEnd = max(0, min(xEnd, width))
         yStart = max(0, min(yStart, height))
-        yEnd   = max(0, min(yEnd, height))
-        
+        yEnd = max(0, min(yEnd, height))
+
         return (xStart, yStart, xEnd, yEnd)
-                
-    #Fonction qui récupère la couche vectorielle et change le SIG de QGIS 
-    #Si possible appel la fonction pour afficher la couche vectorielle sur les images
+
+    def verifierScrProjet(self):
+        """S'assure que le projet est dans un SCR projeté en mètres.
+
+        Tout le calcul de navigation suppose des mètres. Les
+        fichiers PAR portent des coordonnées projetées, `setExtent2Canvas()`
+        accorde l'échelle du canevas sur celle des vues photo en mètres par
+        pixel, et `coordToPixel()` reçoit la coordonnée du canevas telle quelle.
+
+        Un projet dans un SCR géographique fait donc traiter des degrés comme
+        des mètres : le déplacement image devient d'environ 10⁻⁵ pixel par
+        pixel de souris, et la navigation paraît figée sans qu'aucune erreur ne
+        soit levée. C'est l'état par défaut d'un projet neuf (WGS 84), et celui
+        qu'on obtient dès que les rasters ne déclarent aucun SCR.
+
+        Le SCR est alors posé depuis la configuration plutôt que refusé : la
+        navigation reste possible, et l'utilisateur est averti du changement.
+        Retourne True si la navigation peut se poursuivre.
+
+        La garde est posée aux deux opérations qui consomment des mètres,
+        l'affichage des photos et la recherche de paire par la vue, et non à
+        l'ouverture de la session : un projet neuf y est encore en WGS 84 et
+        ses couches arrivent après, de sorte que l'avertissement tombait au
+        démarrage, sur un projet que l'utilisateur n'avait pas fini de monter.
+        """
+        projet = QgsProject.instance()
+        scr = projet.crs()
+
+        if scr.isValid() and not scr.isGeographic():
+            self.journal.debug("SCR du projet : %s", scr.authid())
+            return True
+
+        scrDonnees = QgsCoordinateReferenceSystem.fromEpsgId(DONNEES_SCR_EPSG)
+        if not scrDonnees.isValid():
+            avertir_utilisateur(
+                f"Le SCR EPSG:{DONNEES_SCR_EPSG} des données est introuvable "
+                "dans cette installation de QGIS : la navigation est "
+                "impossible. Vérifier l'installation de PROJ.",
+                logging.ERROR,
+            )
+            return False
+
+        ancien = scr.authid() if scr.isValid() else "aucun"
+        projet.setCrs(scrDonnees)
+        avertir_utilisateur(
+            f"Le SCR du projet ({ancien}) ne convient pas aux coordonnées des "
+            f"photos, exprimées en mètres. Il est remplacé par "
+            f"{scrDonnees.authid()}. Si les données du secteur sont dans un "
+            "autre SCR projeté, le poser avant d'ouvrir les photos."
+        )
+        return True
+
+    # Fonction qui récupère la couche vectorielle et change le SIG de QGIS
+    # Si possible appel la fonction pour afficher la couche vectorielle sur les images
     def mNewVectorLayer(self):
+        couche = self.optWindow.vLayer
+        if couche is None:
+            return
+
+        # Tout le calcul de navigation suppose des mètres. Cette méthode pose le
+        # SCR de la couche au projet : une couche en coordonnées géographiques
+        # figeait donc la navigation, et sans un mot, la garde
+        # verifierScrProjet() n'étant rejouée qu'à l'affichage.
+        if couche.crs().isGeographic():
+            avertir_utilisateur(
+                "La couche « %s » est en coordonnées géographiques (%s). Elle "
+                "ne peut pas servir à l'édition : la navigation et l'altitude "
+                "supposent des mètres. Reprojeter la couche en EPSG:%s, ou en "
+                "un autre SCR projeté."
+                % (couche.name(), couche.crs().authid(), DONNEES_SCR_EPSG)
+            )
+            self.journal.warning(
+                "Couche %s écartée : SCR géographique %s",
+                couche.name(),
+                couche.crs().authid(),
+            )
+            return
+
+        # La couche d'édition change en cours de session : le tampon de la
+        # précédente lui reste attaché dans QGIS, mais la barre StereoPhoto ne
+        # le commandera plus. Sans la question ici, l'utilisateur perd de vue
+        # des modifications qu'il croit enregistrées.
+        if self.vectorLayer is not None and self.vectorLayer is not couche:
+            self.demanderSortEditions()
 
         self.enableDraw = True
-        self.vectorLayer = self.optWindow.vLayer
+        self.vectorLayer = couche
         self.vectorLayerName = self.optWindow.vLayerName
         QgsProject.instance().setCrs(self.vectorLayer.crs())
 
-    #Fonction qui détermine la région approximative des photos
-    #Retourne le rectangle de coordonnée
-    def getShowRect(self) :
-        try :
+        # La couche porte l'état d'édition : ses signaux commandent les boutons
+        # Enregistrer et Annuler, et sa sélection commande la surbrillance.
+        self.raccorderCoucheEditable(self.vectorLayer)
+        self.annulerTraceEnCours()
+        self.majActivationTrace()
+
+    # Fonction qui détermine la région approximative des photos
+    # Retourne le rectangle de coordonnée
+    def getShowRect(self):
+        try:
             leftBbox = self.currentParDict[self.leftParID]
             rightBbox = self.currentParDict[self.rightParID]
 
-            _, bboxOverlap = compute_overlap(leftBbox, rightBbox) 
+            _, bboxOverlap = compute_overlap(leftBbox, rightBbox)
 
-            rectL = QgsRectangle(QgsPointXY(bboxOverlap[0]-700, bboxOverlap[1]-700), QgsPointXY(bboxOverlap[2]+700, bboxOverlap[3]+700))
+            rectL = QgsRectangle(
+                QgsPointXY(bboxOverlap[0] - 700, bboxOverlap[1] - 700),
+                QgsPointXY(bboxOverlap[2] + 700, bboxOverlap[3] + 700),
+            )
 
             return rectL
-        except Exception :
-            #Rectangle dégénéré retourné à l'appelant : sans trace, la région
-            #d'affichage vide est impossible à expliquer en support.
+        except Exception:
+            # Rectangle dégénéré retourné à l'appelant : sans trace, la région
+            # d'affichage vide est impossible à expliquer en support.
             self.journal.warning(
                 "Région d'affichage indéterminable pour la paire %s / %s",
-                getattr(self, 'leftParID', None), getattr(self, 'rightParID', None),
-                exc_info=True)
+                getattr(self, "leftParID", None),
+                getattr(self, "rightParID", None),
+                exc_info=True,
+            )
             return QgsRectangle(QgsPointXY(0, 0), QgsPointXY(0, 0))
-        
-    def removePolygonOnScreen(self) :
+
+    def removePolygonOnScreen(self):
         self.deleteOldPolygon()
+        self.annulerTraceEnCours()
+        self.rompreRaccordementCouche()
 
         self.polygonL2Draw = {}
         self.polygonR2Draw = {}
-        
 
-        self.vectorLayer = None 
+        self.vectorLayer = None
         self.vectorLayerName = None
         self.enableDraw = False
+
+        self.majEtatActionsEdition()
+        self.majActivationTrace()
 
         self.optWindow.ui.importLineVectorLayer.blockSignals(True)
         self.optWindow.ui.importLineVectorLayer.setText("")
         self.optWindow.ui.importLineVectorLayer.blockSignals(False)
 
-    def startPolygonThread(self) : 
-        if hasattr(self,'tPolygon'): 
+    def startPolygonThread(self):
+        if hasattr(self, "tPolygon"):
             if self.tPolygon.isRunning():
                 self.tPolygon.stop()
                 self.tPolygon.wait()
@@ -690,396 +1474,825 @@ class stereoPhoto(object):
         rmanag = [self.fullRightPicSize, self.currentRightPAR]
         mntPath = self.optWindow.currentMNTPath
         vectorToShow = self.optWindow.vectorToShow
-        self.tPolygon = calculatePolygon(vectorToShow,rectCoord,lmanag,rmanag, self.cursorAltitude, mntPath)
+        self.tPolygon = calculatePolygon(
+            vectorToShow, rectCoord, lmanag, rmanag, self.cursorAltitude, mntPath
+        )
         self.tPolygon.finished.connect(self.storePolygon)
         self.tPolygon.start(QThread.LowestPriority)
-        
+
     def storePolygon(self):
         self.polygonL2Draw = self.tPolygon.dictPolyL
         self.polygonR2Draw = self.tPolygon.dictPolyR
         self.drawPolygon()
-        
-        
-    def deleteOldPolygon(self) :   
 
-        if hasattr(self,'graphWindowLeft'):
-            for item in self.graphWindowLeft.geometryItemGroup.childItems():
-                self.graphWindowLeft.scene.removeItem(item)
-                
-        if hasattr(self,'graphWindowRight'):
-            for item in self.graphWindowRight.geometryItemGroup.childItems():
-                self.graphWindowRight.scene.removeItem(item)
-        
-    def drawPolygon(self) :   
+    def deleteOldPolygon(self):
+        for fenetre in (
+            getattr(self, "graphWindowLeft", None),
+            getattr(self, "graphWindowRight", None),
+        ):
+            if fenetre is None:
+                continue
+            for groupe in (fenetre.geometryItemGroup, fenetre.selectionItemGroup):
+                for item in groupe.childItems():
+                    fenetre.scene.removeItem(item)
+
+    def creerItemGeometrie(self, geoType, forme, imageRoot, rayonSupplementaire=0):
+        """Objet de scène pour une forme déjà projetée, ou None si inconnue.
+
+        Extrait de `drawPolygon()` pour que la surbrillance reprenne exactement
+        la forme de la géométrie qu'elle désigne, et non une seconde
+        projection : la géométrie des vues est projetée sommet par sommet avec
+        l'altitude du MNT, et toute autre projection s'en écarterait à l'œil.
+        """
+        if geoType == QgsWkbTypes.PolygonGeometry:
+            return QGraphicsPolygonItem(forme, imageRoot)
+
+        if geoType == QgsWkbTypes.LineGeometry:
+            return QGraphicsPathItem(forme, imageRoot)
+
+        if geoType == QgsWkbTypes.PointGeometry:
+            rayon = GEOMETRY_POINT_RADIUS_PX + rayonSupplementaire
+            return QGraphicsEllipseItem(
+                forme[0] - rayon,
+                forme[1] - rayon,
+                2 * rayon,
+                2 * rayon,
+                imageRoot,
+            )
+
+        return None
+
+    def drawPolygon(self):
+        """Dessine les géométries projetées, et la surbrillance de la sélection.
+
+        Les formes viennent du fil `calculatePolygon`, qui joint désormais à
+        chacune l'identifiant de l'entité dont elle vient, et à chaque couche
+        son identifiant de couche. C'est ce qui permet de désigner, dans les
+        deux vues photo, la même entité que la sélection de QGIS : les
+        géométries y sont des objets de scène et non des entités, la
+        surbrillance native de QGIS ne les atteint donc pas.
+        """
         self.deleteOldPolygon()
-        if self.polygonL2Draw : 
-            
-            for name, arr in self.polygonL2Draw.items() : 
-                geoType = arr[2]
-                color = arr[1]
-                polyLeft = arr[0]
-                polyRight = self.polygonR2Draw[name][0]
-                width = GEOMETRY_PEN_WIDTH_PX
 
-                layerPen = QPen(color, width, Qt.SolidLine, Qt.SquareCap, Qt.RoundJoin)
-                layerPen.setCosmetic(True)
+        if not self.polygonL2Draw:
+            self.hideOffBoundDrawing()
+            return
 
-                for i in range(len(polyLeft)) : 
+        idCoucheEditable = None
+        selectionnes = set()
+        if self.vectorLayer is not None:
+            try:
+                idCoucheEditable = self.vectorLayer.id()
+                selectionnes = set(self.vectorLayer.selectedFeatureIds())
+            except RuntimeError:
+                # Couche détruite par QGIS entre deux rafraîchissements.
+                self.journal.debug("Couche éditable disparue avant le dessin")
 
-                    leftObj = None
-                    rightObj = None
-                    if geoType == QgsWkbTypes.PolygonGeometry : 
-                        leftObj = QGraphicsPolygonItem(polyLeft[i],self.graphWindowLeft.imageRoot)
-                        rightObj = QGraphicsPolygonItem(polyRight[i],self.graphWindowRight.imageRoot)
+        for name, arr in self.polygonL2Draw.items():
+            geoType = arr[2]
+            color = arr[1]
+            polyLeft = arr[0]
+            polyRight = self.polygonR2Draw[name][0]
+            identifiants = arr[3] if len(arr) > 3 else []
 
-                    elif geoType == QgsWkbTypes.LineGeometry : 
-                        leftObj = QGraphicsPathItem(polyLeft[i],self.graphWindowLeft.imageRoot)
-                        rightObj = QGraphicsPathItem(polyRight[i],self.graphWindowRight.imageRoot)
+            # La surbrillance ne concerne que la couche éditable. Les
+            # dictionnaires d'affichage sont indexés par nom de couche, et deux
+            # couches homonymes du projet partageraient la même entrée :
+            # l'identifiant de couche lève l'ambiguïté.
+            coucheSelectionnable = bool(
+                selectionnes and len(arr) > 4 and arr[4] == idCoucheEditable
+            )
 
-                    elif geoType == QgsWkbTypes.PointGeometry : 
-                        radius = GEOMETRY_POINT_RADIUS_PX  #rayon pour la taille des points 
-                        
-                        leftObj = QGraphicsEllipseItem(polyLeft[i][0] - radius, polyLeft[i][1] - radius, 2*radius, 2*radius,self.graphWindowLeft.imageRoot)
-                        leftObj.setBrush(color)
-                        
-                        rightObj = QGraphicsEllipseItem(polyRight[i][0] - radius, polyRight[i][1] - radius, 2*radius, 2*radius,self.graphWindowRight.imageRoot)
-                        rightObj.setBrush(color)
-                    
-                    #Type de géométrie non pris en charge : rien à dessiner
-                    if leftObj is None : continue
+            layerPen = QPen(
+                color,
+                GEOMETRY_PEN_WIDTH_PX,
+                Qt.SolidLine,
+                Qt.SquareCap,
+                Qt.RoundJoin,
+            )
+            layerPen.setCosmetic(True)
 
-                    leftObj.setPen(layerPen)
-                    rightObj.setPen(layerPen)
-                    self.graphWindowLeft.geometryItemGroup.addToGroup(leftObj)
-                    self.graphWindowRight.geometryItemGroup.addToGroup(rightObj)
-        
+            for i in range(len(polyLeft)):
+                leftObj = self.creerItemGeometrie(
+                    geoType, polyLeft[i], self.graphWindowLeft.imageRoot
+                )
+                rightObj = self.creerItemGeometrie(
+                    geoType, polyRight[i], self.graphWindowRight.imageRoot
+                )
+
+                # Type de géométrie non pris en charge : rien à dessiner
+                if leftObj is None:
+                    continue
+
+                if geoType == QgsWkbTypes.PointGeometry:
+                    leftObj.setBrush(color)
+                    rightObj.setBrush(color)
+
+                leftObj.setPen(layerPen)
+                rightObj.setPen(layerPen)
+                self.graphWindowLeft.geometryItemGroup.addToGroup(leftObj)
+                self.graphWindowRight.geometryItemGroup.addToGroup(rightObj)
+
+                if not coucheSelectionnable or i >= len(identifiants):
+                    continue
+                if identifiants[i] not in selectionnes:
+                    continue
+
+                for fenetre, forme in (
+                    (self.graphWindowLeft, polyLeft[i]),
+                    (self.graphWindowRight, polyRight[i]),
+                ):
+                    surbrillance = self.creerItemGeometrie(
+                        geoType, forme, fenetre.imageRoot, rayonSupplementaire=4
+                    )
+                    surbrillance.setPen(self.selectionPen)
+                    fenetre.selectionItemGroup.addToGroup(surbrillance)
+
         self.hideOffBoundDrawing()
 
-    def hideOffBoundDrawing(self) : 
+    def hideOffBoundDrawing(self):
 
         color = QColor(182, 182, 182)
 
-        if hasattr(self.graphWindowLeft, 'offboundRectGroup'):
+        if hasattr(self.graphWindowLeft, "offboundRectGroup"):
             for item in self.graphWindowLeft.offboundRectGroup.childItems():
                 self.graphWindowLeft.scene.removeItem(item)
-                
-        if hasattr(self.graphWindowRight, 'offboundRectGroup'):
+
+        if hasattr(self.graphWindowRight, "offboundRectGroup"):
             for item in self.graphWindowRight.offboundRectGroup.childItems():
                 self.graphWindowRight.scene.removeItem(item)
 
         # Offsets in the scene
-        offLX, offLY = self.realCropValueLeft[0],  self.realCropValueLeft[1]     
-        offRX, offRY = self.realCropValueRight[0], self.realCropValueRight[1]   
+        offLX, offLY = self.realCropValueLeft[0], self.realCropValueLeft[1]
+        offRX, offRY = self.realCropValueRight[0], self.realCropValueRight[1]
 
         dval = 15000
 
-        # For LEFT screen 
+        # For LEFT screen
         x0 = offLX
         y0 = offLY
         x1 = offLX + self.leftPicSize[0]
         y1 = offLY + self.leftPicSize[1]
 
         # Left side
-        gr1L = QtCore.QRectF(x0 - dval, y0 - dval, dval, (y1 - y0) + 2*dval)
-        rectObj = QGraphicsRectItem(gr1L,self.graphWindowLeft.imageRoot)
+        gr1L = QRectF(x0 - dval, y0 - dval, dval, (y1 - y0) + 2 * dval)
+        rectObj = QGraphicsRectItem(gr1L, self.graphWindowLeft.imageRoot)
         rectObj.setBrush(QBrush(color))
         rectObj.setPen(QPen(color))
         self.graphWindowLeft.offboundRectGroup.addToGroup(rectObj)
 
         # Right side
-        gr2L = QtCore.QRectF(x1, y0 - dval, dval, (y1 - y0) + 2*dval)
-        rectObj = QGraphicsRectItem(gr2L,self.graphWindowLeft.imageRoot)
+        gr2L = QRectF(x1, y0 - dval, dval, (y1 - y0) + 2 * dval)
+        rectObj = QGraphicsRectItem(gr2L, self.graphWindowLeft.imageRoot)
         rectObj.setBrush(QBrush(color))
         rectObj.setPen(QPen(color))
         self.graphWindowLeft.offboundRectGroup.addToGroup(rectObj)
-        
 
         # Top
-        gr3L = QtCore.QRectF(x0, y0 - dval, (x1 - x0), dval)
-        rectObj = QGraphicsRectItem(gr3L,self.graphWindowLeft.imageRoot)
+        gr3L = QRectF(x0, y0 - dval, (x1 - x0), dval)
+        rectObj = QGraphicsRectItem(gr3L, self.graphWindowLeft.imageRoot)
         rectObj.setBrush(QBrush(color))
         rectObj.setPen(QPen(color))
         self.graphWindowLeft.offboundRectGroup.addToGroup(rectObj)
-        
 
         # Bottom
-        gr4L = QtCore.QRectF(x0, y1, (x1 - x0), dval)
-        rectObj = QGraphicsRectItem(gr4L,self.graphWindowLeft.imageRoot)
+        gr4L = QRectF(x0, y1, (x1 - x0), dval)
+        rectObj = QGraphicsRectItem(gr4L, self.graphWindowLeft.imageRoot)
         rectObj.setBrush(QBrush(color))
         rectObj.setPen(QPen(color))
         self.graphWindowLeft.offboundRectGroup.addToGroup(rectObj)
 
-        # For RIGHT screen 
+        # For RIGHT screen
         x0 = offRX
         y0 = offRY
         x1 = offRX + self.rightPicSize[0]
         y1 = offRY + self.rightPicSize[1]
 
         # Left side
-        gr1R = QtCore.QRectF(x0 - dval, y0 - dval, dval, (y1 - y0) + 2*dval)
-        rectObj = QGraphicsRectItem(gr1R,self.graphWindowRight.imageRoot)
+        gr1R = QRectF(x0 - dval, y0 - dval, dval, (y1 - y0) + 2 * dval)
+        rectObj = QGraphicsRectItem(gr1R, self.graphWindowRight.imageRoot)
         rectObj.setBrush(QBrush(color))
         rectObj.setPen(QPen(color))
         self.graphWindowRight.offboundRectGroup.addToGroup(rectObj)
 
         # Right side
-        gr2R = QtCore.QRectF(x1, y0 - dval, dval, (y1 - y0) + 2*dval)
-        rectObj = QGraphicsRectItem(gr2R,self.graphWindowRight.imageRoot)
+        gr2R = QRectF(x1, y0 - dval, dval, (y1 - y0) + 2 * dval)
+        rectObj = QGraphicsRectItem(gr2R, self.graphWindowRight.imageRoot)
         rectObj.setBrush(QBrush(color))
         rectObj.setPen(QPen(color))
         self.graphWindowRight.offboundRectGroup.addToGroup(rectObj)
 
         # Top
-        gr3R = QtCore.QRectF(x0, y0 - dval, (x1 - x0), dval)
-        rectObj = QGraphicsRectItem(gr3R,self.graphWindowRight.imageRoot)
+        gr3R = QRectF(x0, y0 - dval, (x1 - x0), dval)
+        rectObj = QGraphicsRectItem(gr3R, self.graphWindowRight.imageRoot)
         rectObj.setBrush(QBrush(color))
         rectObj.setPen(QPen(color))
         self.graphWindowRight.offboundRectGroup.addToGroup(rectObj)
-
 
         # Bottom
-        gr4R = QtCore.QRectF(x0, y1, (x1 - x0), dval)
-        rectObj = QGraphicsRectItem(gr4R,self.graphWindowRight.imageRoot)
+        gr4R = QRectF(x0, y1, (x1 - x0), dval)
+        rectObj = QGraphicsRectItem(gr4R, self.graphWindowRight.imageRoot)
         rectObj.setBrush(QBrush(color))
         rectObj.setPen(QPen(color))
         self.graphWindowRight.offboundRectGroup.addToGroup(rectObj)
 
+    def seekLeftDone(self):
+        if self.enableDraw and self.enableShow:
+            self.drawPolygon()
+        if hasattr(self, "tSeekLeft"):
+            self.tSeekLeft.showThreadInProcess = False
 
-    def seekLeftDone(self) : 
-        if self.enableDraw and self.enableShow :
+    def seekRightDone(self):
+        if self.enableDraw and self.enableShow:
             self.drawPolygon()
-        if hasattr(self, "tSeekLeft"):  self.tSeekLeft.showThreadInProcess = False 
-    
-    def seekRightDone(self) : 
-        if self.enableDraw and self.enableShow :
-            self.drawPolygon()
-        if hasattr(self, "tSeekRight"):  self.tSeekRight.showThreadInProcess = False
-    
-    #Ouverture de la fenêtre de rehaussement
+        if hasattr(self, "tSeekRight"):
+            self.tSeekRight.showThreadInProcess = False
+
+    # Ouverture de la fenêtre de rehaussement
     def enhanceClick(self):
-        self.enhanceManager = enhanceManager(self.currentLeftTIF, self.currentRightTIF, self.optWindow.rehaussementParam, self.leftParID, self.rightParID)
+        self.enhanceManager = enhanceManager(
+            self.currentLeftTIF,
+            self.currentRightTIF,
+            self.optWindow.rehaussementParam,
+            self.leftParID,
+            self.rightParID,
+        )
         self.enhanceManager.listParamSignal.connect(self.applyEnhance)
 
-    #Permet le lancement du traitement de modification des images
+    # Permet le lancement du traitement de modification des images
     def applyEnhance(self, listParam):
         self.enhanceManager.listParamSignal.disconnect(self.applyEnhance)
         self.optWindow.rehaussementParam = listParam
 
-    
-    def windowHandler(self,window) : 
-        if window == 'qgis' : 
-            self.iface.mainWindow().raise_()       
+    def windowHandler(self, window):
+        if window == "qgis":
+            self.iface.mainWindow().raise_()
             self.iface.mainWindow().activateWindow()
-            self.canvas.unsetMapTool(self.navigMapTool)
 
+            # La vue est mémorisée avant la bascule : c'est elle qu'on
+            # retrouvera au retour.
             self.setLastView()
 
-        if window == 'picture' : 
+            # Le hors-synchronisation est un état porté par un
+            # outil, et non le retrait de l'outil de navigation. Sans outil, le
+            # zoom, le pan et le changement de modèle n'auraient aucun code pour
+            # s'exécuter. setMapTool() remplace l'outil courant de lui-même.
+            self.horsSynchronisation = True
+            self.canvas.setMapTool(self.horsSyncMapTool)
+            self.canvas.setFocus()
+
+        if window == "picture":
             self.graphWindowRight.raise_()
             self.graphWindowRight.activateWindow()
             self.graphWindowLeft.raise_()
             self.graphWindowLeft.activateWindow()
-            self.iface.mainWindow().raise_()       
+            self.iface.mainWindow().raise_()
             self.iface.mainWindow().activateWindow()
+            self.horsSynchronisation = False
             self.canvas.setMapTool(self.navigMapTool)
             self.canvas.setFocus()
-   
-            
-    #Fonction appelée lorsque les touches respectives du clavier sont appuyées
-    #Les touches sont utiles lorsque le mode pan est en cours d'utilisation
-    #Possibilité d'ajouter d'autres fonctions plus tard
+
+    # Bascule entre les deux comportements de navigation :
+    #   décoché : les photos se déplacent sous un curseur immobile au centre
+    #   coché   : le curseur se déplace sur les photos, qui restent fixes
+    # Le changement prend effet au mouvement de souris suivant : mouseMoveEvent()
+    # et wheelActionEvent() lisent l'état de l'outil à chaque appel.
+    def basculerCurseurLibre(self, actif):
+        if not hasattr(self, "navigMapTool"):
+            # Aucune session ouverte. L'état est relu par run() à l'ouverture.
+            return
+
+        self.navigMapTool.curseurLibre = actif
+        self.journal.info(
+            "Comportement de navigation : %s",
+            "le curseur se déplace sur les photos"
+            if actif
+            else "les photos se déplacent sous le curseur",
+        )
+
+    # --- État hors-synchronisation -----------------------------------------
+    #
+    # Les trois récepteurs ci-dessous sont appelés après que l'outil a déjà
+    # déplacé ou zoomé le canevas de QGIS : les vues photo n'ont qu'à s'y
+    # réaligner. C'est l'inverse de setExtent2Canvas(), qui pousse la vue photo
+    # vers le canevas.
+
+    def suivreCanevasHorsSync(self):
+        """Pan « main » : les deux vues suivent le canevas, à échelle égale."""
+        self.recadrerVuesSurCanevas()
+
+    def zoomerHorsSync(self):
+        """Roulette : les deux vues suivent le canevas, échelle comprise."""
+        self.recadrerVuesSurCanevas(ajusterEchelle=True)
+
+    def retourNavigationPhoto(self):
+        """Retour en navigation synchronisée, sur la vue quittée."""
+        if self.enableShow:
+            self.windowHandler("picture")
+
+    def recadrerVuesSurCanevas(self, ajusterEchelle=False):
+        if self.isLoadingPair or not self.enableShow:
+            return
+        if self.cursorAltitude is None or not hasattr(self, "graphWindowLeft"):
+            return
+
+        if ajusterEchelle:
+            # Même calcul que la branche CTRL de wheelActionEvent() : l'échelle
+            # d'affichage des photos se déduit de celle du canevas.
+            self.currentScale = (
+                self.leftPictureManager.groundPixelSize / self.canvas.mapUnitsPerPixel()
+            )
+
+        centre = self.canvas.center()
+        coordCentre = (centre.x(), centre.y())
+
+        pxL, pyL = self.leftPictureManager.coordToPixel(
+            coordCentre, self.cursorAltitude
+        )
+        pxR, pyR = self.rightPictureManager.coordToPixel(
+            coordCentre, self.cursorAltitude
+        )
+
+        pointImageGauche = QPointF(pxL, pyL)
+        scenePointL = self.graphWindowLeft.imageRoot.mapToScene(pointImageGauche)
+        scenePointR = self.graphWindowRight.imageRoot.mapToScene(QPointF(pxR, pyR))
+
+        # La croix marque un point de l'image, pas le centre de la vue : un
+        # déplacement de vue ne doit pas l'emmener avec lui.
+        self.graphWindowLeft.custom_centerOn(
+            scenePointL, self.currentScale, recentrerCroix=False
+        )
+        self.graphWindowRight.custom_centerOn(
+            scenePointR, self.currentScale, recentrerCroix=False
+        )
+
+        self.changerModeleSiBordFranchi(pointImageGauche)
+
+    def chargerRaccourcis(self):
+        """Lit la table des raccourcis et la tient prête pour le clavier.
+
+        Appelée deux fois, et les deux sont nécessaires : au chargement de
+        l'extension, parce que les libellés de la barre d'outils nomment leur
+        touche et que la barre existe avant toute session ; et à chaque
+        ouverture de session, pour qu'une modification du fichier de paramètres
+        prenne effet à la session suivante sans recharger l'extension.
+        """
+        self.raccourcis, self.raccourcisInverses, avertissements = (
+            raccourcisClavier.lire(CHEMIN_PARAMETRES)
+        )
+
+        for phrase in avertissements:
+            self.journal.warning("%s", phrase)
+
+        if avertissements:
+            # Le détail va au journal, le bandeau ne reçoit que le compte : un
+            # fichier mal édité peut porter dix fautes, et dix bandeaux
+            # masqueraient le travail en cours. Mais se taire tout à fait
+            # laisserait l'utilisateur sans explication pour une touche qui ne
+            # répond pas, le fichier n'étant pas visible depuis l'interface.
+            avertir_utilisateur(
+                "%d anomalie(s) dans les raccourcis clavier du fichier de "
+                "paramètres ; les valeurs par défaut s'appliquent. Le détail "
+                "est dans l'onglet StereoPhoto du panneau des journaux."
+                % len(avertissements)
+            )
+
+    def nomTouche(self, event):
+        """Nom canonique de la touche d'un événement clavier, ou None.
+
+        Seuls Ctrl et Alt entrent dans le nom. Maj, Meta et le pavé numérique
+        sont effacés du masque : le « 1 » du pavé arrive avec
+        Qt.KeypadModifier et doit désigner le même raccourci que celui de la
+        rangée des chiffres.
+
+        Le comportement d'origine testait la présence de Ctrl sans exclure les
+        autres modificateurs : Ctrl+Maj+Z annulait, et continue de le faire.
+        """
+        nom = self.TOUCHES_QT.get(event.key())
+        if nom is None:
+            return None
+
+        modificateurs = event.modifiers()
+        presents = [
+            etiquette
+            for code, etiquette in self.MODIFICATEURS_QT
+            if modificateurs & code
+        ]
+        return raccourcisClavier.SEPARATEUR.join(presents + [nom])
+
+    def codesTouches(self, action):
+        """Codes de touche de Qt affectés à une action.
+
+        Sert à doter un outil qui lit le clavier lui-même, sans lui donner la
+        table ni la frontière. Le modificateur est perdu au passage : un
+        raccourci qui en porte un y répondra aussi sans lui, et c'est
+        journalisé plutôt que tu.
+        """
+        valeur = self.raccourcis.get(action, "")
+        noms = valeur if isinstance(valeur, tuple) else ([valeur] if valeur else [])
+
+        codes = set()
+        for nom in noms:
+            if raccourcisClavier.SEPARATEUR in nom:
+                self.journal.info(
+                    "Raccourci %s de « %s » : le modificateur n'est pas "
+                    "distingué hors de la navigation synchronisée",
+                    nom,
+                    action,
+                )
+                nom = nom.rsplit(raccourcisClavier.SEPARATEUR, 1)[-1]
+            for code, etiquette in self.TOUCHES_QT.items():
+                if etiquette == nom:
+                    codes.add(code)
+        return frozenset(codes)
+
+    def annoncerRaccourcis(self):
+        """Recompose tous les textes montrés qui nomment une touche.
+
+        Un seul endroit les compose, et ils suivent la table : aucune touche
+        n'est écrite en dur dans un libellé ni dans une infobulle, sans quoi
+        ils mentiraient dès la première personnalisation. Une action sans
+        touche voit simplement sa mention disparaître, ce qui rend la
+        désaffectation visible dans l'interface et pas seulement au journal.
+
+        Rejouable : appelée au chargement de l'extension pour la barre
+        d'outils, puis à chaque ouverture de session, le panneau n'existant
+        pas avant. L'interface de configuration à venir l'appellera de même
+        après chaque changement.
+        """
+        for action, cible in getattr(self, "libellesRaccourcis", []):
+            base = self.libellesDeBase.get(action, cible.text())
+            mention = self.annonceTouche(action)
+            cible.setText("%s (%s)" % (base, mention) if mention else base)
+
+        self.annoncerRaccourcisDuPanneau()
+
+    def annoncerRaccourcisDuPanneau(self):
+        """Porte les raccourcis de la navigation dans l'infobulle du panneau.
+
+        Le bouton Naviguer est l'endroit où l'utilisateur les cherche : c'est
+        lui qui ouvre la navigation, et pendant celle-ci aucun raccourci natif
+        de QGIS ne répond. Les lignes dont la touche a été retirée sont omises
+        plutôt que laissées vides.
+
+        Seuls les raccourcis de la navigation y figurent. Ceux des outils
+        d'édition sont annoncés par les boutons qui les portent, où l'on va
+        chercher un outil ; les répéter ici donnerait une ligne illisible et
+        une mention en double.
+        """
+        panneau = getattr(self, "optWindow", None)
+        if panneau is None:
+            return
+
+        lignes = ["Ouvrir la navigation stéréo"]
+
+        bascule = self.raccourcis.get(raccourcisClavier.ACTION_BASCULE_FENETRE, "")
+        if bascule:
+            lignes.append("%s : basculer entre QGIS et les photos" % bascule)
+
+        zoom = self.raccourcis.get(raccourcisClavier.ACTION_ZOOM, ())
+        if zoom:
+            lignes.append(
+                "%s : niveaux de zoom, du plus fort (%s) à l'image entière (%s)"
+                % (raccourcisClavier.annonceGroupe(zoom), zoom[0], zoom[-1])
+            )
+
+        panneau.ui.pushButtonShowPicture.setToolTip("\n".join(lignes))
+
+    def annonceTouche(self, action):
+        """Fragment de phrase nommant la touche d'une action, ou rien."""
+        return raccourcisClavier.annonce(self.raccourcis.get(action, ""))
+
+    def executerRaccourci(self, action, argument):
+        """Appelle la méthode de l'action, par la table action vers méthode."""
+        recepteur = self.tableRaccourcis.get(action)
+        if recepteur is None:
+            self.journal.warning(
+                "Raccourci « %s » sans récepteur : touche sans effet", action
+            )
+            return
+
+        if argument is None:
+            recepteur()
+        else:
+            recepteur(argument)
+
+    def basculerFenetre(self):
+        """Quitte les photos pour QGIS, ou en revient.
+
+        Branche d'origine de la cascade du clavier. Le même raccourci fait
+        l'aller et le retour, l'état hors-synchronisation décidant du sens.
+        """
+        if self.horsSynchronisation:
+            self.retourNavigationPhoto()
+        else:
+            self.windowHandler("qgis")
+
+    def basculerSuiviMNT(self):
+        """Bascule le suivi du MNT, et seulement si un MNT est chargé.
+
+        Sans cette garde, le bouton se cocherait sur une session sans modèle
+        numérique de terrain et le curseur suivrait une altitude qui n'existe
+        pas.
+        """
+        if self.optWindow.mntArr is not None:
+            self.actionSuivreMNT.toggle()
+
     def keyboardHandler(self, event):
-        if event.type() == QtCore.QEvent.KeyPress :
-            if event.key() == QtCore.Qt.Key_Escape :
-                
-                self.windowHandler('qgis')
-            
-            elif event.key() in range(QtCore.Qt.Key_F5, QtCore.Qt.Key_F13) :
-                val = event.key() - QtCore.Qt.Key_F5
-                self.keyboardZoom(val)
+        """Dirige une touche vers l'action que la table lui affecte.
 
-            elif event.key() == QtCore.Qt.Key_1 : 
-                if self.optWindow.ui.radioButtonDraw.isChecked() : self.optWindow.ui.radioButtonCut.setChecked(True)
-                else : self.optWindow.ui.radioButtonDraw.setChecked(True)
+        C'était une cascade de sept comparaisons littérales. L'intercepteur
+        clavier de la navigation avalant tout KeyPress et tout
+        ShortcutOverride, ces raccourcis sont le seul accès clavier aux outils
+        pendant la navigation : les figer dans le code revenait à le fermer à
+        qui n'a pas le clavier du poste d'origine.
+        """
+        if event.type() == QEvent.KeyPress:
+            nom = self.nomTouche(event)
+            cible = self.raccourcisInverses.get(nom) if nom else None
+            if cible is not None:
+                self.executerRaccourci(cible[0], cible[1])
 
-            elif event.key() == QtCore.Qt.Key_M : 
-                if self.optWindow.mntArr is not None : self.actionSuivreMNT.toggle() 
-            
-
+        # Accepté quelle que soit la suite, touche affectée ou non : c'est
+        # l'interception volontaire de la navigation, et elle ne doit pas
+        # dépendre du contenu de la table.
         event.accept()
-            
-    def setInitialCursorAltitude(self) :
 
+    def setInitialCursorAltitude(self):
 
-        midLPix = ((self.realCropValueLeft[0] + self.realCropValueLeft[2]) / 2,(self.realCropValueLeft[1] + self.realCropValueLeft[3]) / 2)
-        midRPix = ((self.realCropValueRight[0] + self.realCropValueRight[2]) / 2,(self.realCropValueRight[1] + self.realCropValueRight[3]) / 2)
+        midLPix = (
+            (self.realCropValueLeft[0] + self.realCropValueLeft[2]) / 2,
+            (self.realCropValueLeft[1] + self.realCropValueLeft[3]) / 2,
+        )
+        midRPix = (
+            (self.realCropValueRight[0] + self.realCropValueRight[2]) / 2,
+            (self.realCropValueRight[1] + self.realCropValueRight[3]) / 2,
+        )
 
         Z = self.dualManager.calculateZ(midLPix, midRPix)
         self.cursorAltitude = Z
 
-        if self.buttonPosition : 
+        if self.buttonPosition:
             altitude = self.optWindow.readMNTWithCoord(self.buttonPosition)
-            if altitude is not None : self.cursorAltitude = altitude
+            if altitude is not None:
+                self.cursorAltitude = altitude
 
-        elif self.lastCurrentView : 
+        elif self.lastCurrentView:
             self.cursorAltitude = self.lastCurrentView[2]
 
-        elif self.optWindow.mntArr is not None :
-            middleCoordLeft = self.leftPictureManager.pixelToCoord(midLPix,self.cursorAltitude)
+        elif self.optWindow.mntArr is not None:
+            middleCoordLeft = self.leftPictureManager.pixelToCoord(
+                midLPix, self.cursorAltitude
+            )
             altitude = self.optWindow.readMNTWithCoord(middleCoordLeft)
-            if altitude is not None : self.cursorAltitude = altitude
+            if altitude is not None:
+                self.cursorAltitude = altitude
 
-        #Altitude indéterminée : affichage de repli
-        self.optWindow.ui.labelAltitude.setText(f"{self.cursorAltitude:.3f}" if self.cursorAltitude is not None else "N/D")
+        self.accorderAltitudeAuTerrain(midLPix)
+        self.afficherAltitude()
 
-    
-    def openMNT(self) : pass
-        #if not self.optWindow.currentMNTPath : 
+    def accorderAltitudeAuTerrain(self, pixelCentreGauche):
+        """Ramène l'altitude du curseur au MNT quand elle s'en écarte trop.
+
+        La vue mémorisée a priorité sur le MNT dans la cascade ci-dessus, et
+        cette position est restaurée du fichier de paramètres à l'ouverture du
+        dossier : une altitude héritée d'une autre session, ou d'une lecture
+        fautive, revenait à chaque ouverture sans que rien ne la confronte au
+        terrain sous la paire.
+
+        Ce n'est pas qu'un défaut d'affichage. La croix est projetée dans les
+        vues à l'altitude du curseur, les géométries à celle du MNT : un écart
+        les sépare à l'écran du déplacement dû au relief. Le photo-interprète
+        qui vise une entité dans la photo saisit alors une position fausse
+        d'autant, et rien ne le lui signale.
+
+        Sans MNT, il n'y a rien à confronter : l'altitude reste celle que la
+        cascade a retenue, et la mesure de parallaxe sur les centres des
+        découpes garde le dernier mot.
+        """
+        if self.optWindow.mntArr is None or self.cursorAltitude is None:
+            return
+
+        if self.lastCurrentView:
+            position = self.lastCurrentView[:2]
+        else:
+            position = self.leftPictureManager.pixelToCoord(
+                pixelCentreGauche, self.cursorAltitude
+            )
+
+        altitudeSol = self.optWindow.readMNTWithCoord(position)
+        if altitudeSol is None or altitudeSol == self.optWindow.mntNodata:
+            return
+
+        ecart = abs(self.cursorAltitude - altitudeSol)
+        if ecart <= NAVIGATION_ECART_ALTITUDE_MNT_MAX_M:
+            return
+
+        self.journal.warning(
+            "Altitude du curseur ramenée de %.1f m à %.1f m : %.0f m d'écart "
+            "avec le MNT sous la paire %s",
+            self.cursorAltitude,
+            altitudeSol,
+            ecart,
+            getattr(self, "leftParID", None),
+        )
+        self.cursorAltitude = altitudeSol
+
+    def openMNT(self):
+        pass
+        # if not self.optWindow.currentMNTPath :
         #    self.mntDS = None
         #    return#
 
-        #self.mntDS = gdal.Open(self.optWindow.currentMNTPath,gdal.GA_ReadOnly)
-        #self.mntBand = self.mntDS.GetRasterBand(1)
-        #self.mntGeo = self.mntDS.GetGeoTransform()
-        #self.mntNoData = self.mntBand.GetNoDataValue()
-        #self.mntXSize = self.mntDS.RasterXSize
-        #self.mntYSize = self.mntDS.RasterYSize
+        # self.mntDS = gdal.Open(self.optWindow.currentMNTPath,gdal.GA_ReadOnly)
+        # self.mntBand = self.mntDS.GetRasterBand(1)
+        # self.mntGeo = self.mntDS.GetGeoTransform()
+        # self.mntNoData = self.mntBand.GetNoDataValue()
+        # self.mntXSize = self.mntDS.RasterXSize
+        # self.mntYSize = self.mntDS.RasterYSize
 
+    def readMNTWithCoordinate(self, coordinates):
+        pass
+        # if self.mntDS is None : return None
 
-    def readMNTWithCoordinate(self,coordinates) : pass
-        #if self.mntDS is None : return None
-        
-        #px = math.floor((coordinates[0] - self.mntGeo[0]) / self.mntGeo[1]) 
-        #py = math.floor((coordinates[1] - self.mntGeo[3]) / self.mntGeo[5])
-        #if px < 0 or py < 0 or px >= self.mntXSize or py >= self.mntYSize: return None
+        # px = math.floor((coordinates[0] - self.mntGeo[0]) / self.mntGeo[1])
+        # py = math.floor((coordinates[1] - self.mntGeo[3]) / self.mntGeo[5])
+        # if px < 0 or py < 0 or px >= self.mntXSize or py >= self.mntYSize: return None
 
-        #try : Z = self.mntBand.ReadAsArray(px,py,1,1)[0][0]
-        #except : return None 
-        #if Z == self.mntNoData : return None
-        #return Z
+        # try : Z = self.mntBand.ReadAsArray(px,py,1,1)[0][0]
+        # except : return None
+        # if Z == self.mntNoData : return None
+        # return Z
 
-    def setStartingView(self) : 
+    def setStartingView(self):
 
-        if self.buttonPosition : 
-            
-            pxL, pyL = self.leftPictureManager.coordToPixel(self.buttonPosition,self.cursorAltitude)
-            pxR, pyR = self.rightPictureManager.coordToPixel(self.buttonPosition,self.cursorAltitude)
+        if self.buttonPosition:
+            pxL, pyL = self.leftPictureManager.coordToPixel(
+                self.buttonPosition, self.cursorAltitude
+            )
+            pxR, pyR = self.rightPictureManager.coordToPixel(
+                self.buttonPosition, self.cursorAltitude
+            )
 
             scenePointL = self.graphWindowLeft.imageRoot.mapToScene(QPointF(pxL, pyL))
             scenePointR = self.graphWindowRight.imageRoot.mapToScene(QPointF(pxR, pyR))
 
-            
-            if pxL < 0 or pxL > self.fullLeftPicSize[0] or pyL < 0 or pyL > self.fullLeftPicSize[1] : self.setCenterView()
-            elif pxR < 0 or pxR > self.fullRightPicSize[0] or pyR < 0 or pyR > self.fullRightPicSize[1] : self.setCenterView()
-            
-            else :
+            if (
+                pxL < 0
+                or pxL > self.fullLeftPicSize[0]
+                or pyL < 0
+                or pyL > self.fullLeftPicSize[1]
+            ):
+                self.setCenterView()
+            elif (
+                pxR < 0
+                or pxR > self.fullRightPicSize[0]
+                or pyR < 0
+                or pyR > self.fullRightPicSize[1]
+            ):
+                self.setCenterView()
 
-                scale = self.leftPictureManager.groundPixelSize / self.buttonMapUnit 
+            else:
+                scale = self.leftPictureManager.groundPixelSize / self.buttonMapUnit
                 self.currentScale = scale
 
-                self.graphWindowLeft.custom_centerOn(scenePointL,scale,forceGroupCall=True)
-                self.graphWindowRight.custom_centerOn(scenePointR,scale,forceGroupCall=True)
-                
+                self.graphWindowLeft.custom_centerOn(
+                    scenePointL, scale, forceGroupCall=True
+                )
+                self.graphWindowRight.custom_centerOn(
+                    scenePointR, scale, forceGroupCall=True
+                )
 
+        elif self.lastCurrentView:
+            pxL, pyL = self.leftPictureManager.coordToPixel(
+                self.lastCurrentView[:2], self.cursorAltitude
+            )
+            pxR, pyR = self.rightPictureManager.coordToPixel(
+                self.lastCurrentView[:2], self.cursorAltitude
+            )
 
-        elif self.lastCurrentView : 
-
-            pxL, pyL = self.leftPictureManager.coordToPixel(self.lastCurrentView[:2],self.cursorAltitude)
-            pxR, pyR = self.rightPictureManager.coordToPixel(self.lastCurrentView[:2],self.cursorAltitude)
-            
             scenePointL = self.graphWindowLeft.imageRoot.mapToScene(QPointF(pxL, pyL))
             scenePointR = self.graphWindowRight.imageRoot.mapToScene(QPointF(pxR, pyR))
 
-            if pxL < 0 or pxL > self.fullLeftPicSize[0] or pyL < 0 or pyL > self.fullLeftPicSize[1] : self.setCenterView()
-            elif pxR < 0 or pxR > self.fullRightPicSize[0] or pyR < 0 or pyR > self.fullRightPicSize[1] : self.setCenterView()
-            else : 
-                scale = self.lastCurrentView[-1]  
+            if (
+                pxL < 0
+                or pxL > self.fullLeftPicSize[0]
+                or pyL < 0
+                or pyL > self.fullLeftPicSize[1]
+            ):
+                self.setCenterView()
+            elif (
+                pxR < 0
+                or pxR > self.fullRightPicSize[0]
+                or pyR < 0
+                or pyR > self.fullRightPicSize[1]
+            ):
+                self.setCenterView()
+            else:
+                scale = self.lastCurrentView[-1]
                 self.currentScale = scale
 
-                self.graphWindowLeft.custom_centerOn(scenePointL,scale,forceGroupCall=True)
-                self.graphWindowRight.custom_centerOn(scenePointR,scale,forceGroupCall=True)
+                self.graphWindowLeft.custom_centerOn(
+                    scenePointL, scale, forceGroupCall=True
+                )
+                self.graphWindowRight.custom_centerOn(
+                    scenePointR, scale, forceGroupCall=True
+                )
 
-        else : self.setCenterView()
-        
-        self.updateUserAltitude()
+        else:
+            self.setCenterView()
+
+        # L'altitude du chargement est celle que setInitialCursorAltitude() a
+        # établie : mesurée au centre des découpes, ou lue du MNT, ou reprise de
+        # la vue précédente. La remesurer ici l'écraserait par la position des
+        # vues qu'elle vient elle-même de dicter.
+        self.afficherAltitude()
         self.buttonPosition = None
 
-    def updateUserAltitude(self) : 
+    def afficherAltitude(self):
+        """Porte l'altitude courante au panneau, sans la recalculer.
+
+        La navigation ne mesure pas l'altitude, elle la porte.
+        Les deux vues étant toujours cadrées à partir de cursorAltitude, une
+        mesure prise sur leur position ne pouvait que rendre la valeur déjà
+        écrite, aux arrondis près (pixels entiers du défilement des vues,
+        miroir de la vue droite), et ces arrondis s'accumulaient dans le même
+        sens à chaque mouvement de souris.
+
+        L'altitude ne change donc que par le MNT suivi, par la roulette, ou au
+        chargement d'une paire, où setInitialCursorAltitude() l'établit. C'est
+        la seule mesure de parallaxe qui subsiste, et elle n'est prise qu'une
+        fois par paire, sur les centres des découpes.
+        """
+        # Altitude indéterminée : affichage de repli
+        self.optWindow.ui.labelAltitude.setText(
+            f"{self.cursorAltitude:.3f}" if self.cursorAltitude is not None else "N/D"
+        )
+
+    def setCenterView(self):
         gwL = self.graphWindowLeft.ui.graphicsView
-        gwR = self.graphWindowRight.ui.graphicsView
 
-        sceneCenterL = gwL.mapToScene(gwL.viewport().rect().center())  
-        cPixelL = self.graphWindowLeft.imageRoot.mapFromScene(sceneCenterL)
-
-        sceneCenterR = gwR.mapToScene(gwR.viewport().rect().center())  
-        cPixelR = self.graphWindowRight.imageRoot.mapFromScene(sceneCenterR)
-
-        self.cursorAltitude = self.dualManager.calculateZ((cPixelL.x(), cPixelL.y()), (cPixelR.x(), cPixelR.y())) 
-        #Altitude indéterminée : affichage de repli
-        self.optWindow.ui.labelAltitude.setText(f"{self.cursorAltitude:.3f}" if self.cursorAltitude is not None else "N/D")
-        
-
-
-    def setCenterView(self) : 
-        gwL = self.graphWindowLeft.ui.graphicsView
-        gwR = self.graphWindowRight.ui.graphicsView
-        
         pxL = (self.realCropValueLeft[0] + self.realCropValueLeft[2]) / 2
         pyL = (self.realCropValueLeft[1] + self.realCropValueLeft[3]) / 2
-        pxR = (self.realCropValueRight[0] + self.realCropValueRight[2]) /2
+        pxR = (self.realCropValueRight[0] + self.realCropValueRight[2]) / 2
         pyR = (self.realCropValueRight[1] + self.realCropValueRight[3]) / 2
 
         scenePointL = self.graphWindowLeft.imageRoot.mapToScene(QPointF(pxL, pyL))
         scenePointR = self.graphWindowRight.imageRoot.mapToScene(QPointF(pxR, pyR))
 
-        scaleX  = gwL.viewport().width()  / (self.leftPicSize[0] / 8)
-        scaleY  = gwL.viewport().height() / (self.leftPicSize[1] / 8) 
+        scaleX = gwL.viewport().width() / (self.leftPicSize[0] / 8)
+        scaleY = gwL.viewport().height() / (self.leftPicSize[1] / 8)
 
-        scale  = min(scaleX, scaleY)
+        scale = min(scaleX, scaleY)
         self.currentScale = scale
-        
-        self.graphWindowLeft.custom_centerOn(scenePointL,scale,forceGroupCall=True)
-        self.graphWindowRight.custom_centerOn(scenePointR,scale,forceGroupCall=True)
 
-    def setBaseTransform(self) : 
+        self.graphWindowLeft.custom_centerOn(scenePointL, scale, forceGroupCall=True)
+        self.graphWindowRight.custom_centerOn(scenePointR, scale, forceGroupCall=True)
+
+    def setBaseTransform(self):
         leftTransform = self.getQtransform(self.leftPictureManager)
         rightTransform = self.getQtransform(self.rightPictureManager)
 
-        if not self.optWindow.ui.checkBoxFlip.isChecked() : 
-
+        if not self.optWindow.ui.checkBoxFlip.isChecked():
             mirror_transform = QTransform()
             mirror_transform.scale(-1, 1)
             mirror_transform.translate(-self.rightPicSize[0], 0)
-            rightTransform =  rightTransform * mirror_transform
+            rightTransform = rightTransform * mirror_transform
 
         self.graphWindowLeft.imageRoot.setTransform(leftTransform)
         self.graphWindowRight.imageRoot.setTransform(rightTransform)
-    
-    def setExtent2Canvas(self) : 
-        
+
+    def setExtent2Canvas(self):
+
         LGV = self.graphWindowLeft.ui.graphicsView
-        sceneRect = LGV.mapToScene(LGV.viewport().rect()).boundingRect()  
+        sceneRect = LGV.mapToScene(LGV.viewport().rect()).boundingRect()
         sceneCenter = sceneRect.center()
         centerPixel = self.graphWindowLeft.imageRoot.mapFromScene(sceneCenter)
-        
-        cx, cy = self.leftPictureManager.pixelToCoord((centerPixel.x(), centerPixel.y()), self.cursorAltitude)
+
+        cx, cy = self.leftPictureManager.pixelToCoord(
+            (centerPixel.x(), centerPixel.y()), self.cursorAltitude
+        )
         meters_per_pixel = self.leftPictureManager.groundPixelSize / self.currentScale
         dpi = self.canvas.mapSettings().outputDpi()
-        
-        scale_canvas = meters_per_pixel * dpi / 0.0254 #Valeur pour mètre vers pouce
+
+        scale_canvas = meters_per_pixel * dpi / 0.0254  # Valeur pour mètre vers pouce
         self.canvas.zoomScale(scale_canvas)
         self.canvas.setCenter(QgsPointXY(cx, cy))
         self.canvas.refresh()
 
-    def mouseMoveEvent(self,coordinate) :
-        if self.isLoadingPair : return
+    def mouseMoveEvent(self, coordinate):
+        if self.isLoadingPair:
+            return
 
-        if self.actionSuivreMNT.isChecked() : 
+        if self.actionSuivreMNT.isChecked():
             mntAlt = self.optWindow.readMNTWithCoord(coordinate)
-            if mntAlt is not None and mntAlt != self.optWindow.mntNodata : self.cursorAltitude = mntAlt
+            if mntAlt is not None and mntAlt != self.optWindow.mntNodata:
+                self.cursorAltitude = mntAlt
 
-        pxL, pyL = self.leftPictureManager.coordToPixel(coordinate,self.cursorAltitude)
-        pxR, pyR = self.rightPictureManager.coordToPixel(coordinate,self.cursorAltitude)
+        pxL, pyL = self.leftPictureManager.coordToPixel(coordinate, self.cursorAltitude)
+        pxR, pyR = self.rightPictureManager.coordToPixel(
+            coordinate, self.cursorAltitude
+        )
 
         self.endDrawPointLeft = QPointF(pxL, pyL)
         self.endDrawPointRight = QPointF(pxR, pyR)
@@ -1087,12 +2300,20 @@ class stereoPhoto(object):
         scenePointL = self.graphWindowLeft.imageRoot.mapToScene(self.endDrawPointLeft)
         scenePointR = self.graphWindowRight.imageRoot.mapToScene(self.endDrawPointRight)
 
-        scale = self.currentScale
+        curseurLibre = self.navigMapTool.curseurLibre
+
         self.graphWindowLeft.ui.graphicsView.setUpdatesEnabled(False)
         self.graphWindowRight.ui.graphicsView.setUpdatesEnabled(False)
 
-        self.graphWindowLeft.custom_centerOn(scenePointL,scale)
-        self.graphWindowRight.custom_centerOn(scenePointR,scale)
+        if curseurLibre:
+            # Les photos restent fixes, seule la croix parcourt l'image.
+            self.graphWindowLeft.placerCroix(scenePointL)
+            self.graphWindowRight.placerCroix(scenePointR)
+        else:
+            # Les photos défilent sous la croix, immobile au centre des vues.
+            scale = self.currentScale
+            self.graphWindowLeft.custom_centerOn(scenePointL, scale)
+            self.graphWindowRight.custom_centerOn(scenePointR, scale)
 
         self.graphWindowLeft.ui.graphicsView.setUpdatesEnabled(True)
         self.graphWindowRight.ui.graphicsView.setUpdatesEnabled(True)
@@ -1101,58 +2322,63 @@ class stereoPhoto(object):
         self.graphWindowLeft.ui.graphicsView.viewport().update()
         self.graphWindowRight.ui.graphicsView.viewport().update()
 
-        self.updateUserAltitude()
+        # Le mouvement de souris n'est pas une mesure. Dans les
+        # deux modes, les positions image viennent d'être calculées à partir de
+        # cursorAltitude : en remesurer l'altitude reviendrait à lire la valeur
+        # qu'on vient d'écrire, aux arrondis près, et ces arrondis
+        # s'accumulaient. L'altitude ne change ici que par le MNG suivi, plus
+        # haut dans la fonction.
+        self.afficherAltitude()
 
-        pourcent = 2/100
-        deltaX = self.leftPicSize[0]*pourcent
-        deltaY = self.leftPicSize[1]*pourcent
+        rangeX, rangeY, horsCadre = self.bordFranchi(self.endDrawPointLeft)
 
-        rangeX = (self.realCropValueLeft[0]+deltaX, self.realCropValueLeft[2]-deltaX)
-        rangeY = (self.realCropValueLeft[1]+deltaY, self.realCropValueLeft[3]-deltaY)
-
-    
-        out_x = self.endDrawPointLeft.x() <= rangeX[0]  or self.endDrawPointLeft.x() >= rangeX[1]
-        out_y = self.endDrawPointLeft.y() <= rangeY[0] or self.endDrawPointLeft.y() >= rangeY[1]
-        
-        if self.firstDrawClick and (out_x or out_y) :
-            self.calculNextPairWithPos(rangeX,rangeY,self.endDrawPointLeft)
+        # Un tracé en cours interdit le changement de modèle : la géométrie
+        # serait coupée en deux par le chargement.
+        if not self.traceEnCours and horsCadre:
+            self.calculNextPairWithPos(rangeX, rangeY, self.endDrawPointLeft)
 
             return
 
-        if not self.firstDrawClick and self.enableDraw and self.optWindow.currentMNTPath :
-            
+        if self.traceEnCours and self.enableDraw and self.outilDeTraceActif():
             self.editCurrentWorkingLine()
-        
-    def wheelActionEvent(self,direction,modifier,mousePos):
-        if self.isLoadingPair : return
-        #if mod ctrl zoom
+
+    def wheelActionEvent(self, direction, modifier, mousePos):
+        if self.isLoadingPair:
+            return
+        # if mod ctrl zoom
         if modifier & Qt.ControlModifier:
-            
-            scale = self.leftPictureManager.groundPixelSize / self.canvas.mapUnitsPerPixel()
+            scale = (
+                self.leftPictureManager.groundPixelSize / self.canvas.mapUnitsPerPixel()
+            )
             self.currentScale = scale
             newAltitude = self.cursorAltitude
 
-        else : 
-
-            #Désactiver le suivi du MNT pour permettre l'action de la roulette
+        else:
+            # Désactiver le suivi du MNT pour permettre l'action de la roulette
             self.actionSuivreMNT.setChecked(False)
 
             zoom_level = math.log2(self.currentScale)
 
-            if zoom_level > 2 : meter_changer = 0.1
-            elif zoom_level > 1 : meter_changer = 0.5
-            elif zoom_level > 0 : meter_changer = 1
-            elif zoom_level > -1 : meter_changer = 2
-            else : meter_changer = 4
+            if zoom_level > 2:
+                meter_changer = 0.1
+            elif zoom_level > 1:
+                meter_changer = 0.5
+            elif zoom_level > 0:
+                meter_changer = 1
+            elif zoom_level > -1:
+                meter_changer = 2
+            else:
+                meter_changer = 4
 
-            if direction == 1 : meter_changer *= 1
-            else : meter_changer *= -1
+            if direction == 1:
+                meter_changer *= 1
+            else:
+                meter_changer *= -1
 
             newAltitude = self.cursorAltitude + meter_changer
 
-
-        pxL, pyL = self.leftPictureManager.coordToPixel(mousePos,newAltitude)
-        pxR, pyR = self.rightPictureManager.coordToPixel(mousePos,newAltitude)
+        pxL, pyL = self.leftPictureManager.coordToPixel(mousePos, newAltitude)
+        pxR, pyR = self.rightPictureManager.coordToPixel(mousePos, newAltitude)
 
         self.endDrawPointLeft = QPointF(pxL, pyL)
         self.endDrawPointRight = QPointF(pxR, pyR)
@@ -1160,220 +2386,684 @@ class stereoPhoto(object):
         scenePointL = self.graphWindowLeft.imageRoot.mapToScene(QPointF(pxL, pyL))
         scenePointR = self.graphWindowRight.imageRoot.mapToScene(QPointF(pxR, pyR))
 
-        self.graphWindowLeft.custom_centerOn(scenePointL,self.currentScale)
-        self.graphWindowRight.custom_centerOn(scenePointR,self.currentScale)
+        # En mode curseur libre, la roulette seule règle la parallaxe sans
+        # bouger les photos : la croix se décale sur chaque image. Le zoom
+        # (CTRL + roulette) recadre les vues dans les deux modes, puisqu'il
+        # change l'échelle d'affichage et non la position du curseur.
+        if self.navigMapTool.curseurLibre and not modifier & Qt.ControlModifier:
+            self.graphWindowLeft.placerCroix(scenePointL)
+            self.graphWindowRight.placerCroix(scenePointR)
+        else:
+            self.graphWindowLeft.custom_centerOn(scenePointL, self.currentScale)
+            self.graphWindowRight.custom_centerOn(scenePointR, self.currentScale)
 
-        self.updateUserAltitude()
+        # La roulette commande l'altitude, elle ne la mesure
+        # pas. newAltitude est la valeur voulue : celle du pas de parallaxe, ou
+        # l'altitude inchangée sous CTRL, où la roulette ne fait que zoomer.
+        self.cursorAltitude = newAltitude
+        self.afficherAltitude()
 
-        if not self.firstDrawClick and self.enableDraw and self.optWindow.currentMNTPath :
+        if self.traceEnCours and self.enableDraw and self.outilDeTraceActif():
             self.editCurrentWorkingLine()
-            
-    def editCurrentWorkingLine(self) : 
+
+    def editCurrentWorkingLine(self):
         if not self.currentLeftLineObj:
-            self.currentLeftLineObj = QGraphicsLineItem(parent=self.graphWindowLeft.imageRoot) 
+            self.currentLeftLineObj = QGraphicsLineItem(
+                parent=self.graphWindowLeft.imageRoot
+            )
             self.currentLeftLineObj.setPen(self.my_pen)
             self.graphWindowLeft.drawingLineGroup.addToGroup(self.currentLeftLineObj)
-        
+
         if not self.currentRightLineObj:
-            self.currentRightLineObj = QGraphicsLineItem(parent=self.graphWindowRight.imageRoot)
+            self.currentRightLineObj = QGraphicsLineItem(
+                parent=self.graphWindowRight.imageRoot
+            )
             self.currentRightLineObj.setPen(self.my_pen)
             self.graphWindowRight.drawingLineGroup.addToGroup(self.currentRightLineObj)
 
         lineL = QLineF(self.startDrawPointLeft, self.endDrawPointLeft)
         lineR = QLineF(self.startDrawPointRight, self.endDrawPointRight)
-        
+
         self.currentLeftLineObj.setLine(lineL)
         self.currentRightLineObj.setLine(lineR)
 
+    def bordFranchi(self, pointImageGauche):
+        """Bornes du cadrage et franchissement, dans le repère de la photo gauche.
 
-    def calculNextPairWithPos(self,rangeX,rangeY,qpoint)   :
-        threshold_deg = PAR_CAMERA_ORIENTATION_TOLERANCE_DEG
-        kappa = math.degrees(self.leftPictureManager.kappa)
+        La marge de 2 % du cadrage courant évite de déclencher un changement de
+        modèle sur un tremblement du curseur au ras du bord.
+        """
+        pourcent = 2 / 100
+        deltaX = self.leftPicSize[0] * pourcent
+        deltaY = self.leftPicSize[1] * pourcent
 
-        #Faire une liste des combinaison plutot que de répter 4 fois
-        #Nord à gauche (-90 + 90)
-        if (abs(kappa + 90) < threshold_deg):
-            if qpoint.x() < rangeX[0] and self.currentUpID :
-                self.findNextPair('U')
-            elif qpoint.x() > rangeX[1] and self.currentDownID :
-                self.findNextPair('D')
-            elif qpoint.y() < rangeY[0] and self.currentRightID :
-                self.findNextPair('R')
-            elif qpoint.y() > rangeY[1] and self.currentLeftID :
-                self.findNextPair('L')
-        #Nord à droite (90 - 90)
-        elif (abs(kappa - 90) < threshold_deg) :
-            if qpoint.x() < rangeX[0] and self.currentDownID :
-                self.findNextPair('D')
-            elif qpoint.x() > rangeX[1] and self.currentUpID :
-                self.findNextPair('U')
-            elif qpoint.y() <  rangeY[0] and self.currentLeftID :
-                self.findNextPair('L')
-            elif qpoint.y() >  rangeY[1] and self.currentRightID :
-                self.findNextPair('R')
-        #Nord en bas (+/- 180 +/- 180)
-        elif abs(kappa - 180) < threshold_deg or abs(kappa + 180) < threshold_deg: 
-            if qpoint.x() < rangeX[0] and self.currentRightID :
-                self.findNextPair('R')
-            elif qpoint.x() > rangeX[1] and self.currentLeftID :
-                self.findNextPair('L')
-            elif qpoint.y() < rangeY[0] and self.currentDownID :
-                self.findNextPair('D')
-            elif qpoint.y() > rangeY[1] and self.currentUpID :
-                self.findNextPair('U')
-        #Nord en haut
-        else : 
-            if qpoint.x() < rangeX[0] and self.currentLeftID :
-                self.findNextPair('L')
-            elif qpoint.x() >rangeX[1] and self.currentRightID :
-                self.findNextPair('R')
-            elif qpoint.y() < rangeY[0] and self.currentUpID :
-                self.findNextPair('U')
-            elif qpoint.y() > rangeY[1] and self.currentDownID :
-                self.findNextPair('D')
+        rangeX = (
+            self.realCropValueLeft[0] + deltaX,
+            self.realCropValueLeft[2] - deltaX,
+        )
+        rangeY = (
+            self.realCropValueLeft[1] + deltaY,
+            self.realCropValueLeft[3] - deltaY,
+        )
 
-    def mousePressEvent(self,mouseButton,mousePos) : 
+        horsCadre = (
+            pointImageGauche.x() <= rangeX[0]
+            or pointImageGauche.x() >= rangeX[1]
+            or pointImageGauche.y() <= rangeY[0]
+            or pointImageGauche.y() >= rangeY[1]
+        )
 
-        altitude = self.optWindow.readMNTWithCoord(mousePos)
+        return rangeX, rangeY, horsCadre
 
-        coordTuple = (mousePos[0],mousePos[1],altitude)
-        if self.optWindow.currentMNTPath and self.enableDraw and self.vectorLayer.geometryType() == QgsWkbTypes.PolygonGeometry :
+    def changerModeleSiBordFranchi(self, pointImageGauche):
+        """Charge le modèle voisin si la position donnée sort du cadrage.
 
-            if mouseButton == Qt.LeftButton:
-                if self.firstDrawClick :
-                    pxL, pyL = self.leftPictureManager.coordToPixel(mousePos,self.cursorAltitude)
-                    pxR, pyR = self.rightPictureManager.coordToPixel(mousePos,self.cursorAltitude)
+        En hors-synchronisation, la position à tester est le centre de la vue
+        et non la croix : c'est la vue qui se déplace.
+        """
+        rangeX, rangeY, horsCadre = self.bordFranchi(pointImageGauche)
+        if horsCadre:
+            self.calculNextPairWithPos(rangeX, rangeY, pointImageGauche)
 
-                    self.startDrawPointLeft = QPointF(pxL, pyL)
-                    self.startDrawPointRight = QPointF(pxR, pyR)
+    def calculNextPairWithPos(self, rangeX, rangeY, qpoint):
+        voisinDisponible = {
+            "U": bool(self.currentUpID),
+            "D": bool(self.currentDownID),
+            "L": bool(self.currentLeftID),
+            "R": bool(self.currentRightID),
+        }
 
-                    self.firstDrawClick = False
-                else : 
-                    self.startDrawPointLeft = self.endDrawPointLeft
-                    self.startDrawPointRight = self.endDrawPointRight
-                    self.listLeftLineObj.append(self.currentLeftLineObj)
-                    self.listRightLineObj.append(self.currentRightLineObj)
-                    self.currentLeftLineObj = None
-                    self.currentRightLineObj = None
-                
-                self.listDrawCoord.append(coordTuple)
-                self.list2DPoint.append(QgsPoint(coordTuple[0],coordTuple[1]))
-                self.list3DPoint.append(QgsPoint(coordTuple[0],coordTuple[1],coordTuple[2]))
-                self.listCutCoord.append(QgsPointXY(coordTuple[0],coordTuple[1]))
+        # La table de correspondance bord franchi -> modèle voisin, qui dépend
+        # de l'orientation de la caméra, vit dans orientationModele.py : c'est
+        # la seule pièce de cette décision qui se vérifie sans QGIS.
+        direction = directionProchainModele(
+            math.degrees(self.leftPictureManager.kappa),
+            PAR_CAMERA_ORIENTATION_TOLERANCE_DEG,
+            qpoint.x(),
+            qpoint.y(),
+            rangeX,
+            rangeY,
+            voisinDisponible,
+        )
 
-            elif mouseButton == Qt.RightButton and len(self.listDrawCoord) > 0:
+        if direction is not None:
+            self.findNextPair(direction)
 
-                self.firstDrawClick = True
-                if self.currentLeftLineObj :
-                    self.graphWindowLeft.drawingLineGroup.removeFromGroup(self.currentLeftLineObj)
-                    self.graphWindowLeft.scene.removeItem(self.currentLeftLineObj)
-                self.currentLeftLineObj = None
+    # --- Gestes d'édition ---------------------------------------------------
+    #
+    # La cascade de `if`/`elif` de 133 lignes qui occupait cette place ne
+    # traitait que les polygones et les points : un clic sur une couche de
+    # lignes n'avait aucun effet et ne laissait aucune trace. La décision est
+    # maintenant une table, dans `editionOutils`, et chaque case de la table a
+    # sa méthode ci-dessous, nommée de la même façon.
 
-                if self.currentRightLineObj :
-                    self.graphWindowRight.drawingLineGroup.removeFromGroup(self.currentRightLineObj)
-                    self.graphWindowRight.scene.removeItem(self.currentRightLineObj)
-                self.currentRightLineObj = None
-                
-                for item in self.listLeftLineObj:
-                    if item:
-                        self.graphWindowLeft.drawingLineGroup.removeFromGroup(item)
-                        self.graphWindowLeft.scene.removeItem(item)
-                self.listLeftLineObj = []
+    def mousePressEvent(self, mouseButton, mousePos, modificateurs=Qt.NoModifier):
+        if not self.enableDraw or self.vectorLayer is None:
+            return
 
-                for item in self.listRightLineObj:
-                    if item:
-                        self.graphWindowRight.drawingLineGroup.removeFromGroup(item)
-                        self.graphWindowRight.scene.removeItem(item)
-                self.listRightLineObj = []
-                
-                if self.optWindow.ui.radioButtonDraw.isChecked(): 
-                    firstPoint = self.listDrawCoord[0]
-                    self.listDrawCoord.append(firstPoint)
-                    
-                    lineString2D = QgsLineString(self.list2DPoint)
-                    lineString3D = QgsLineString(self.list3DPoint)
+        cle, motif = editionOutils.resoudreTraitement(
+            self.outilActif,
+            self.typeGeometrieCouche(),
+            self.BOUTONS_QT.get(mouseButton),
+            self.traceEnCours,
+        )
 
-                    polyZstr = createWKTString(self.listDrawCoord,'PolygonZ')
-                    newGeo = QgsGeometry.fromWkt(polyZstr)
-                    currentVectorLayer = self.vectorLayer
-                    
-                    rectCoord = self.getShowRect()
-                    listGeo = list(currentVectorLayer.getFeatures(rectCoord))
-                    #reshapeLayer(lineString2D,listGeo,currentVectorLayer)
-                    
-                    #Détection du feature selon le 
-                    #Gestion des plusieurs intersections à faire
-                    for item in listGeo : 
-                        featureGeo = item.geometry()
-                        
-                        if newGeo.intersects(featureGeo) :
-                            #if self.paramMenu.ui.radioButtonMerge.isChecked() :
-                            mergePolygon(featureGeo, item.id(), newGeo, currentVectorLayer)
-                            #else :
-                            #automaticPolygon(featureGeo, item.id(), newGeo, currentVectorLayer)
-                            break
-                            
-                    else :
-                        addPolygon(currentVectorLayer, newGeo)
-                else :
-                    currentVectorLayer = self.vectorLayer    
-                    cutPolygon(currentVectorLayer, self.listCutCoord)
-                
-                self.listDrawCoord = []
-                self.listCutCoord = []
-                
-                self.list2DPoint = []
-                self.list3DPoint = []
-                self.startPolygonThread()    
-                
-        elif self.enableDraw and self.vectorLayer.geometryType() == QgsWkbTypes.PointGeometry and mouseButton == Qt.LeftButton :
-            
-            if QgsWkbTypes.hasZ(self.vectorLayer.wkbType()) : geo = QgsGeometry(QgsPoint(coordTuple[0],coordTuple[1],coordTuple[2]))
-            else : geo = QgsGeometry.fromPointXY(QgsPointXY(coordTuple[0],coordTuple[1]))
-            
-            self.windowHandler('qgis')
-            feature = addPoint(self.vectorLayer, geo)
-            
-            self.vectorLayer.startEditing()
-            resultForm = self.iface.openFeatureForm(self.vectorLayer, feature)
-            if resultForm == False : 
-                provider =  self.vectorLayer.dataProvider()
-                provider.deleteFeatures([feature.id()]) 
-            self.vectorLayer.commitChanges()
-            self.vectorLayer.triggerRepaint()
-            self.windowHandler('picture')
-            
-            self.startPolygonThread()    
+        if cle is None:
+            if motif:
+                avertir_utilisateur(motif)
+            return
 
-    
-    def keyboardZoom(self,value):
-        zoomLevels = [128, 64, 32, 16, 8, 4, 2, 1]  
-        scaleFactor = zoomLevels[value]
-        
-        scaleX  = self.leftPicSize[0] / scaleFactor
+        self.tableTraitements[cle](mousePos, modificateurs)
+
+    def typeGeometrieCouche(self):
+        """Type de géométrie de la couche éditable, en clé de `editionOutils`."""
+        if self.vectorLayer is None:
+            return None
+        return self.TYPES_GEOMETRIE_QGIS.get(self.vectorLayer.geometryType())
+
+    def coucheAUnZ(self):
+        return self.vectorLayer is not None and QgsWkbTypes.hasZ(
+            self.vectorLayer.wkbType()
+        )
+
+    def outilDeTraceActif(self):
+        return self.outilActif in editionOutils.OUTILS_DE_TRACE
+
+    def altitudeEcriture(self):
+        """Altitude à écrire, ou un refus motivé une seule fois.
+
+        L'altitude vient de `cursorAltitude`, celle que la session porte et que
+        la croix affiche. Le code d'origine relisait le MNT à chaque clic : la
+        cote écrite pouvait donc différer du trait que le photo-interprète
+        voyait à l'écran, de plusieurs mètres sous couvert.
+        """
+        autorise, altitude, motif = editionOutils.altitudeEcriture(
+            self.coucheAUnZ(),
+            self.cursorAltitude,
+            self.annonceTouche(raccourcisClavier.ACTION_SUIVI_MNT),
+        )
+        if autorise:
+            self.altitudeRefusSignalee = False
+            return True, altitude
+
+        if not self.altitudeRefusSignalee:
+            avertir_utilisateur(motif)
+            self.journal.warning("Écriture refusée : %s", motif)
+            self.altitudeRefusSignalee = True
+        return False, None
+
+    def toleranceSelection(self):
+        """Rayon de désignation d'une entité, en unités terrain.
+
+        Huit pixels de canevas, convertis à l'échelle courante : comme
+        `setExtent2Canvas()` accorde l'échelle du canevas à celle des vues
+        photo, la tolérance vaut autant de pixels à l'écran stéréo qu'au
+        canevas. Elle suit donc le zoom, ce qu'une tolérance en mètres ne
+        ferait pas.
+        """
+        unitesParPixel = self.canvas.mapUnitsPerPixel()
+        if not math.isfinite(unitesParPixel) or unitesParPixel <= 0:
+            self.journal.warning(
+                "Échelle du canevas indéterminable (%r) ; tolérance de "
+                "sélection repliée sur un mètre par pixel",
+                unitesParPixel,
+            )
+            unitesParPixel = 1.0
+        return unitesParPixel * EDITION_SELECTION_TOLERANCE_PX
+
+    def selectionner(self, mousePos, modificateurs):
+        """Désigne l'entité sous le clic, dans les trois types de géométrie.
+
+        Aucune sélection n'existait dans l'extension : le seul appel du dépôt
+        était le `removeSelection()` du découpage. La sélection de QGIS est ici
+        la source unique de vérité, et la surbrillance des vues photo la suit
+        par `drawPolygon()`.
+        """
+        tolerance = self.toleranceSelection()
+        rectangle = QgsRectangle(
+            mousePos[0] - tolerance,
+            mousePos[1] - tolerance,
+            mousePos[0] + tolerance,
+            mousePos[1] + tolerance,
+        )
+        pointClic = QgsGeometry.fromPointXY(QgsPointXY(mousePos[0], mousePos[1]))
+        typeGeo = self.typeGeometrieCouche()
+
+        candidats = []
+        for entite in editionVecteur.entitesDansRectangle(self.vectorLayer, rectangle):
+            geometrie = entite.geometry()
+            if geometrie is None or geometrie.isNull():
+                continue
+            if typeGeo == editionOutils.TYPE_POLYGONE:
+                mesure = geometrie.area()
+            elif typeGeo == editionOutils.TYPE_LIGNE:
+                mesure = geometrie.length()
+            else:
+                mesure = 0.0
+            candidats.append(
+                {
+                    "fid": entite.id(),
+                    "type": typeGeo,
+                    "distance": geometrie.distance(pointClic),
+                    "contient": geometrie.intersects(pointClic),
+                    "mesure": mesure,
+                }
+            )
+
+        choisie = editionOutils.choisirEntite(candidats)
+        additive = bool(modificateurs & (Qt.ControlModifier | Qt.ShiftModifier))
+
+        if choisie is None:
+            if not additive:
+                self.vectorLayer.removeSelection()
+            return
+
+        if additive:
+            self.vectorLayer.select(choisie["fid"])
+        else:
+            self.vectorLayer.selectByIds([choisie["fid"]])
+
+        # Le compte est porté au bandeau : sans retour chiffré, l'utilisateur
+        # ne sait pas combien d'entités la combinaison va consommer.
+        avertir_utilisateur(
+            "%d entité(s) sélectionnée(s) sur « %s »."
+            % (self.vectorLayer.selectedFeatureCount(), self.vectorLayerName),
+            niveau=logging.INFO,
+            duree_secondes=3,
+        )
+
+    def viderSelection(self, _mousePos, _modificateurs):
+        """Clic droit sous l'outil Sélectionner : la sélection est vidée."""
+        self.vectorLayer.removeSelection()
+
+    def fusionnerSelection(self, _mousePos, _modificateurs):
+        """Clic droit sous l'outil Combiner : les entités choisies fusionnent."""
+        if editionVecteur.fusionnerSelection(self.vectorLayer):
+            self.rafraichirGeometries()
+
+    def ajouterPoint(self, mousePos, _modificateurs):
+        """Ajoute un point d'un seul clic, puis ouvre son formulaire."""
+        autorise, altitude = self.altitudeEcriture()
+        if not autorise:
+            return
+
+        if altitude is None:
+            geometrie = QgsGeometry.fromPointXY(QgsPointXY(mousePos[0], mousePos[1]))
+        else:
+            geometrie = QgsGeometry(QgsPoint(mousePos[0], mousePos[1], altitude))
+
+        # Les deux vues photo sont en plein écran : la fenêtre de QGIS passe
+        # devant le temps de la saisie des attributs, puis les photos
+        # reviennent. Le `finally` garantit ce retour même si le formulaire
+        # lève, ce que le code d'origine ne faisait pas.
+        self.windowHandler("qgis")
+        try:
+            entite = editionVecteur.ajouterEntite(
+                self.vectorLayer, geometrie, ouvrirFormulaire=True
+            )
+        finally:
+            self.windowHandler("picture")
+
+        if entite is not None:
+            self.rafraichirGeometries()
+
+    def poserSommet(self, mousePos, _modificateurs):
+        """Ajoute un sommet au tracé en cours, pour une ligne ou un polygone.
+
+        Le même geste sert à l'ajout et au découpage, et désormais aux lignes
+        comme aux polygones : c'est le tracé point par point d'origine, dont
+        seule la clôture diffère selon l'outil et le type.
+        """
+        autorise, altitude = self.altitudeEcriture()
+        if not autorise:
+            return
+
+        # Le trait affiché dans les deux vues est projeté à l'altitude portée,
+        # quel que soit le type de la couche : une couche sans Z n'a pas besoin
+        # d'altitude pour son géométrie, mais le tracé en a besoin pour se
+        # dessiner. Sans cette garde, coordToPixel() recevait None.
+        if self.cursorAltitude is None:
+            avertir_utilisateur(
+                editionOutils.motifAltitudeIndeterminee(
+                    self.annonceTouche(raccourcisClavier.ACTION_SUIVI_MNT)
+                )
+            )
+            self.journal.warning("Tracé refusé : aucune altitude portée")
+            return
+
+        if not self.traceEnCours:
+            pxL, pyL = self.leftPictureManager.coordToPixel(
+                mousePos, self.cursorAltitude
+            )
+            pxR, pyR = self.rightPictureManager.coordToPixel(
+                mousePos, self.cursorAltitude
+            )
+            self.startDrawPointLeft = QPointF(pxL, pyL)
+            self.startDrawPointRight = QPointF(pxR, pyR)
+            self.traceEnCours = True
+        else:
+            self.startDrawPointLeft = self.endDrawPointLeft
+            self.startDrawPointRight = self.endDrawPointRight
+            self.listLeftLineObj.append(self.currentLeftLineObj)
+            self.listRightLineObj.append(self.currentRightLineObj)
+            self.currentLeftLineObj = None
+            self.currentRightLineObj = None
+
+        if altitude is None:
+            self.list3DPoint.append(QgsPoint(mousePos[0], mousePos[1]))
+        else:
+            self.list3DPoint.append(QgsPoint(mousePos[0], mousePos[1], altitude))
+
+    def cloreLigne(self, _mousePos, _modificateurs):
+        """Clic droit : la ligne tracée est ajoutée telle quelle, sans anneau."""
+        sommets = list(self.list3DPoint)
+        self.annulerTraceEnCours()
+
+        if len(sommets) < 2:
+            avertir_utilisateur(
+                "Une ligne demande au moins deux sommets : le tracé est abandonné."
+            )
+            return
+
+        geometrie = QgsGeometry(QgsLineString(sommets))
+        if editionVecteur.ajouterEntite(self.vectorLayer, geometrie) is not None:
+            self.rafraichirGeometries()
+
+    def clorePolygone(self, _mousePos, _modificateurs):
+        """Clic droit : l'anneau est refermé et le polygone ajouté.
+
+        Un tracé sous l'outil Ajouter produit toujours une entité neuve, même
+        s'il touche ou recoupe ses voisins. Le code d'origine fusionnait avec
+        le premier polygone intersecté, ce qu'un simple contact de limite
+        suffisait à déclencher : des peuplements adjacents, qui partagent
+        toujours une limite, s'avalaient l'un l'autre. La combinaison est
+        maintenant un geste explicite, par l'outil Combiner.
+        """
+        sommets = list(self.list3DPoint)
+        self.annulerTraceEnCours()
+
+        distincts = {(sommet.x(), sommet.y()) for sommet in sommets}
+        if len(distincts) < 3:
+            avertir_utilisateur(
+                "Un polygone demande au moins trois sommets distincts : le "
+                "tracé est abandonné."
+            )
+            return
+
+        anneau = QgsLineString(sommets + [sommets[0]])
+        geometrie = QgsGeometry(QgsPolygon(anneau))
+        if editionVecteur.ajouterEntite(self.vectorLayer, geometrie) is not None:
+            self.rafraichirGeometries()
+
+    def cloreDecoupe(self, _mousePos, _modificateurs):
+        """Clic droit sous l'outil Découper : la ligne de coupe est appliquée."""
+        sommets = list(self.list3DPoint)
+        self.annulerTraceEnCours()
+
+        if editionVecteur.decouper(self.vectorLayer, sommets):
+            self.rafraichirGeometries()
+
+    def annulerTraceEnCours(self):
+        """Abandonne le tracé en cours : sommets accumulés et traits cyan.
+
+        Le ménage n'était fait qu'au clic droit. Partout ailleurs, seul le
+        drapeau revenait à son état initial : au changement de modèle, les
+        sommets du geste précédent restaient dans les listes et les traits
+        cyan dans les scènes, et la géométrie suivante enjambait deux modèles.
+        """
+        self.traceEnCours = False
+        self.list3DPoint = []
+
+        for fenetre, nomCourant, nomListe in (
+            (
+                getattr(self, "graphWindowLeft", None),
+                "currentLeftLineObj",
+                "listLeftLineObj",
+            ),
+            (
+                getattr(self, "graphWindowRight", None),
+                "currentRightLineObj",
+                "listRightLineObj",
+            ),
+        ):
+            traits = list(getattr(self, nomListe, []))
+            traits.append(getattr(self, nomCourant, None))
+            if fenetre is not None:
+                for trait in traits:
+                    if trait is None:
+                        continue
+                    fenetre.drawingLineGroup.removeFromGroup(trait)
+                    fenetre.scene.removeItem(trait)
+            setattr(self, nomListe, [])
+            setattr(self, nomCourant, None)
+
+        # La bande élastique du canevas de QGIS porte le même tracé : la
+        # laisser en place afficherait un geste qui n'existe plus.
+        if hasattr(self, "navigMapTool"):
+            self.navigMapTool.reinitialiserTrace()
+
+    def rafraichirGeometries(self):
+        """Relance le calcul des géométries affichées, si les vues sont là.
+
+        Une édition faite avant l'affichage des photos ne doit pas lancer le
+        fil : il lit les emprises de la paire courante, qui n'existe pas
+        encore.
+        """
+        if self.enableShow and hasattr(self, "graphWindowLeft"):
+            self.startPolygonThread()
+
+    # --- État des outils d'édition ----------------------------------------
+
+    def changerOutilActif(self, action):
+        """Prend acte du changement d'outil d'édition."""
+        self.outilActif = action.data()
+
+        if not hasattr(self, "optWindow"):
+            # Aucune session ouverte : l'outil est mémorisé et vaudra à
+            # l'ouverture, comme le fait le bouton du curseur libre.
+            return
+
+        # Un tracé commencé avec l'outil précédent n'a plus de sens.
+        self.annulerTraceEnCours()
+        self.majActivationTrace()
+        self.journal.info("Outil d'édition : %s", self.outilActif)
+
+    def basculerOutilTrace(self):
+        """Alterne entre Ajouter et Découper.
+
+        Geste d'origine, du temps où ces deux outils étaient les seuls et
+        où la bascule portait une touche. Les quatre outils se désignent
+        maintenant directement, et cette action n'a plus de touche par
+        défaut : l'entrée reste dans la table pour qui veut lui en rendre
+        une. Depuis un outil qui ne trace pas, elle ramène au tracé.
+        """
+        if self.outilActif == editionOutils.OUTIL_AJOUTER:
+            voulu = editionOutils.OUTIL_DECOUPER
+        elif self.outilActif == editionOutils.OUTIL_DECOUPER:
+            voulu = editionOutils.OUTIL_AJOUTER
+        else:
+            self.journal.info(
+                "Bascule de tracé depuis l'outil %s : retour au tracé",
+                self.outilActif,
+            )
+            voulu = editionOutils.OUTIL_AJOUTER
+
+        self.choisirOutil(voulu)
+
+    def choisirOutil(self, cle):
+        """Active un outil d'édition par sa clé, comme un clic sur son bouton.
+
+        Point d'entrée commun au clavier et à la bascule : le groupe
+        d'actions est exclusif, et c'est lui qui porte l'état de l'outil
+        actif depuis que les radios du panneau ont été retirées.
+        """
+        action = self.actionsOutil.get(cle)
+        if action is None:
+            self.journal.warning("Outil %r inconnu : aucun bouton ne le porte", cle)
+            return
+
+        action.setChecked(True)
+        self.changerOutilActif(action)
+
+    def majActivationTrace(self):
+        """Accorde la bande élastique du canevas à l'outil et à la couche.
+
+        Elle était conditionnée à la présence d'un MNT et à une couche
+        polygonale. Le MNT n'est plus exigé pour éditer et les lignes se
+        tracent aussi : la condition est désormais un outil de tracé et un
+        type de géométrie qui se trace.
+        """
+        if not hasattr(self, "navigMapTool"):
+            return
+
+        self.navigMapTool.activateDrawing = bool(
+            self.enableDraw
+            and self.outilDeTraceActif()
+            and self.typeGeometrieCouche()
+            in (editionOutils.TYPE_LIGNE, editionOutils.TYPE_POLYGONE)
+        )
+
+    # --- Session d'édition --------------------------------------------------
+
+    def raccorderCoucheEditable(self, couche):
+        """Suit l'état d'édition et la sélection de la couche choisie.
+
+        Le raccordement est rompu avant d'en poser un autre : la couche change
+        au fil de la session, et les connexions s'y empileraient sans cela.
+        """
+        self.rompreRaccordementCouche()
+        if couche is None:
+            return
+
+        couche.editingStarted.connect(self.majEtatActionsEdition)
+        couche.editingStopped.connect(self.majEtatActionsEdition)
+        couche.layerModified.connect(self.majEtatActionsEdition)
+        couche.selectionChanged.connect(self.selectionCoucheChangee)
+        couche.afterRollBack.connect(self.retourArriereCouche)
+        couche.undoStack().canUndoChanged.connect(self.majEtatActionsEdition)
+
+        self.coucheRaccordee = couche
+        self.majEtatActionsEdition()
+
+    def rompreRaccordementCouche(self):
+        couche = self.coucheRaccordee
+        self.coucheRaccordee = None
+        if couche is None:
+            return
+
+        for nomSignal, recepteur in (
+            ("editingStarted", self.majEtatActionsEdition),
+            ("editingStopped", self.majEtatActionsEdition),
+            ("layerModified", self.majEtatActionsEdition),
+            ("selectionChanged", self.selectionCoucheChangee),
+            ("afterRollBack", self.retourArriereCouche),
+        ):
+            try:
+                getattr(couche, nomSignal).disconnect(recepteur)
+            except (TypeError, RuntimeError):
+                # Connexion déjà rompue, ou couche détruite par QGIS.
+                self.journal.debug("Signal %s de couche déjà rompu", nomSignal)
+
+        try:
+            couche.undoStack().canUndoChanged.disconnect(self.majEtatActionsEdition)
+        except (TypeError, RuntimeError):
+            self.journal.debug("Pile d'annulation de couche déjà rompue")
+
+    def majEtatActionsEdition(self, *_args):
+        """Active ou grise les boutons Enregistrer et Annuler."""
+        couche = self.vectorLayer
+        enAttente, _nombre = editionVecteur.modificationsEnAttente(couche)
+        self.actionEnregistrerEdition.setEnabled(bool(enAttente))
+
+        peutAnnuler = False
+        if couche is not None and couche.isEditable():
+            try:
+                peutAnnuler = couche.undoStack().canUndo()
+            except RuntimeError:
+                peutAnnuler = False
+        self.actionAnnulerEdition.setEnabled(bool(peutAnnuler))
+
+    def retourArriereCouche(self):
+        """La couche a été ramenée à son dernier état enregistré, hors d'ici.
+
+        Fermer le mode édition dans QGIS en refusant les modifications vide le
+        tampon de la couche. Les vues photo ne lisent pas la couche : elles
+        affichent le résultat du dernier calcul du fil, qui n'est relancé que
+        par les gestes d'édition faits ici. Sans cette relance, les entités
+        abandonnées restaient dessinées dans les deux vues alors qu'elles
+        n'existaient plus nulle part.
+        """
+        self.journal.info(
+            "Retour en arrière sur la couche %s : les vues sont redessinées",
+            self.vectorLayerName,
+        )
+        # Les sommets accumulés appartenaient à la session qui vient d'être
+        # abandonnée : les garder ferait enjamber deux sessions au geste suivant.
+        self.annulerTraceEnCours()
+        self.rafraichirGeometries()
+        self.majEtatActionsEdition()
+
+    def selectionCoucheChangee(self, *_args):
+        """La sélection a changé, ici ou dans QGIS : la surbrillance suit.
+
+        Aucun calcul n'est relancé : les formes sont déjà projetées, seule leur
+        mise en évidence change. Relancer le fil à chaque clic de sélection
+        serait un gel perceptible, puisqu'il attend son prédécesseur sur le
+        thread d'interface.
+        """
+        self.majEtatActionsEdition()
+        if self.enableShow and self.polygonL2Draw:
+            self.drawPolygon()
+
+    def enregistrerEdition(self):
+        """Écrit les modifications en attente de la couche éditable."""
+        if self.vectorLayer is None:
+            avertir_utilisateur("Aucune couche vectorielle choisie.")
+            return
+
+        editionVecteur.enregistrer(self.vectorLayer)
+        self.majEtatActionsEdition()
+
+    def annulerEdition(self):
+        """Défait le dernier geste d'édition sur la couche éditable."""
+        if self.vectorLayer is None:
+            return
+
+        if editionVecteur.annulerDernier(self.vectorLayer):
+            self.rafraichirGeometries()
+        self.majEtatActionsEdition()
+
+    def demanderSortEditions(self):
+        """Propose d'enregistrer les modifications en attente de la couche.
+
+        Appelée à la fermeture de session et au changement de couche d'édition,
+        les deux moments où la barre StereoPhoto cesse de commander le tampon.
+
+        Rien n'est perdu si l'utilisateur décline : le tampon d'édition
+        appartient à la couche, qui survit à la session StereoPhoto, et QGIS le
+        conserve. La question évite que le photo-interprète s'en aille en
+        croyant son travail écrit, et lui épargne de rouvrir la session pour
+        cela. Elle n'offre donc pas d'annuler la fermeture : il n'y a rien à
+        sauver de la fermeture elle-même.
+        """
+        couche = self.vectorLayer
+        enAttente, nombre = editionVecteur.modificationsEnAttente(couche)
+        if not enAttente:
+            return
+
+        boite = QMessageBox(self.iface.mainWindow())
+        boite.setWindowTitle("StereoPhoto : modifications en attente")
+        boite.setIcon(QMessageBox.Question)
+        boite.setText(
+            "La couche « %s » porte %d modification(s) non enregistrée(s)."
+            % (couche.name(), nombre)
+        )
+        boite.setInformativeText(
+            "Les enregistrer maintenant ? Sinon elles restent en attente dans "
+            "QGIS, qui les conservera jusqu'à l'enregistrement de la couche."
+        )
+        boutonEnregistrer = boite.addButton("Enregistrer", QMessageBox.AcceptRole)
+        boite.addButton("Laisser en attente", QMessageBox.RejectRole)
+        boite.setDefaultButton(boutonEnregistrer)
+        boite.exec_()
+
+        if boite.clickedButton() is boutonEnregistrer:
+            editionVecteur.enregistrer(couche)
+        else:
+            self.journal.info(
+                "%d modification(s) laissée(s) en attente sur la couche %s",
+                nombre,
+                couche.name(),
+            )
+
+    def keyboardZoom(self, value):
+        scaleFactor = NAVIGATION_ZOOM_NIVEAUX[value]
+
+        scaleX = self.leftPicSize[0] / scaleFactor
         scaleY = self.leftPicSize[1] / scaleFactor
 
         gwL = self.graphWindowLeft.ui.graphicsView
         gwR = self.graphWindowRight.ui.graphicsView
-    
-        scaleW  = gwL.viewport().width()  / scaleX
-        scaleH  = gwL.viewport().height() / scaleY
 
-        scale  = min(scaleW, scaleH)
+        scaleW = gwL.viewport().width() / scaleX
+        scaleH = gwL.viewport().height() / scaleY
+
+        scale = min(scaleW, scaleH)
         self.currentScale = scale
 
         center_scene_L = gwL.mapToScene(gwL.viewport().rect().center())
         center_scene_R = gwR.mapToScene(gwR.viewport().rect().center())
 
-        self.graphWindowLeft.custom_centerOn(center_scene_L,self.currentScale)
-        self.graphWindowRight.custom_centerOn(center_scene_R,self.currentScale)
+        # Le zoom clavier recadre sur le centre des vues. En mode curseur libre,
+        # la croix marque un point de l'image : la ramener au centre la ferait
+        # sauter le temps d'un zoom, puis se replacer au mouvement suivant.
+        recentrerCroix = not self.navigMapTool.curseurLibre
+
+        self.graphWindowLeft.custom_centerOn(
+            center_scene_L, self.currentScale, recentrerCroix=recentrerCroix
+        )
+        self.graphWindowRight.custom_centerOn(
+            center_scene_R, self.currentScale, recentrerCroix=recentrerCroix
+        )
 
         self.setExtent2Canvas()
-
-        
-
-
-
-
-
-

@@ -1,4 +1,4 @@
-'''
+"""
 L'entièreté du code a été réalisé par Frédérick Pineault (frederick.pineault@mffp.gouv.qc.ca)
 
 Ce dossier contient plusieurs classes qui réalise le traitement d'imageries des fichiers TIF de grandes tailles
@@ -6,16 +6,16 @@ Ce dossier contient plusieurs classes qui réalise le traitement d'imageries des
 La première classe (enhanceManager) gère la QMainWindow qui offre un interface utilisateur de rehaussement
 Sur la MainWindow il est possible de :
     - modifier le constraste, la saturation, la luminosité et la netteté
-    - ajouter du rouge, du vert ou du bleu dans l'image. 
+    - ajouter du rouge, du vert ou du bleu dans l'image.
     - couper les valeurs RGB en dessous de 5% et au dessus de 95% de l'histogramme
-    - effectuer l'opération Min/Max en considérant seulement la région observée seulement 
+    - effectuer l'opération Min/Max en considérant seulement la région observée seulement
     - Zoom et Pan disponible avec la souris pour faciliter la navigation et l'observation
     - Changer entre les deux photos importées dans le menu des options
     - Appliquer le rehaussement sur les photos affichées sur les écrans planars
 
 La deuxième classe (threadShow) gère l'affichage des images de grandes résolutions via un thread
 Elle s'occupe de modifier les images en fonctions des paramètres demandés (rehaussement, rotation, miroir)
-La photo en cours est affiché en 3 temps. Chaque itération du thread augmente la résolution de l'image 
+La photo en cours est affiché en 3 temps. Chaque itération du thread augmente la résolution de l'image
 se qui permet d'observer la photo rehaussée dans son entièreté
 Elle expédie l'image par petite portion.
 
@@ -24,40 +24,55 @@ Elle applique le constraste, la saturation, la luminosité et la netteté, l'ajo
 
 La fonction pictureLayout réalise les effets de rotation et de miroir
 
-Optimisation futur 
+Optimisation futur
     Gestion des photos à 4 couches (RGBA) et à une seule couche (Grayscale)
-'''
+"""
 
 import numpy as np
 
-from qgis.gui import *
-from qgis.core import *
-from qgis.PyQt.QtWidgets import *
-from qgis.PyQt.QtCore import *
-from qgis.PyQt.QtGui import *
+from qgis.PyQt.QtCore import (
+    QObject,
+    QPoint,
+    QRectF,
+    Qt,
+    QThread,
+    QTimer,
+    pyqtSignal,
+)
+from qgis.PyQt.QtGui import QImage, QPixmap, QTransform
+from qgis.PyQt.QtWidgets import (
+    QApplication,
+    QGraphicsPixmapItem,
+    QGraphicsScene,
+    QGraphicsView,
+)
 
 
 from .ui_enhancement import enhanceWindow
-import sys, os, time, threading, traceback, gc
+import gc
 from scipy.ndimage import uniform_filter
 from osgeo import gdal
 from math import ceil
+from .config import NAVIGATION_ARRET_THREAD_DELAI_MAX_MS
+from .lectureRaster import ouvrir_raster
 from .journal import obtenir_journal
 
 _journal = obtenir_journal(__name__)
 
 
-#Gestionnaire de la QMainWindow qui permet le rehaussement d'image
+# Gestionnaire de la QMainWindow qui permet le rehaussement d'image
 class enhanceManager(QObject):
     listParamSignal = pyqtSignal(list)
-    def __init__(self, pathLeft, pathRight, listParam=None,nameLeft='',nameRight=''):
+
+    def __init__(self, pathLeft, pathRight, listParam=None, nameLeft="", nameRight=""):
         QObject.__init__(self)
-        if listParam is None : listParam = []
+        if listParam is None:
+            listParam = []
         self.pathLeft = pathLeft
         self.pathRight = pathRight
 
         self.prevListParam = listParam
-    
+
         self.colorWindow = enhanceWindow()
         self.colorWindow.ui.radioButtonPremiere.setText(nameLeft)
         self.colorWindow.ui.radioButtonDeuxieme.setText(nameRight)
@@ -67,139 +82,167 @@ class enhanceManager(QObject):
         self.colorWindow.ui.applyButton.pressed.connect(self.applyEnhance)
         self.colorWindow.ui.cancelButton.pressed.connect(self.cancelEnhance)
         self.colorWindow.closeEvent = self.cancelEnhance
-        
+
         self.spinBoxesTimer = QTimer(self)
         self.spinBoxesTimer.setSingleShot(True)
         self.spinBoxesTimer.timeout.connect(self.enhancePicture)
-        
+
         self.scene = QGraphicsScene(self.colorWindow.ui.graphicsView)
         self.colorWindow.ui.graphicsView.setScene(self.scene)
         self.colorWindow.show()
 
         self.statusKeepCurrentView = False
 
+        # Threads d'aperçu dont l'arrêt a dépassé le délai : conservés le temps
+        # qu'ils se terminent, pour ne pas détruire un QThread en exécution.
+        self.threadsEnArret = []
+
         self.colorWindow.ui.zoomInButton.clicked.connect(self.zoomIn)
         self.colorWindow.ui.zoomOutButton.clicked.connect(self.zoomOut)
-        
+
         self.colorWindow.setWindowState(Qt.WindowMaximized)
 
         self.zoomState = 0
         self.setConnection(True)
         self.colorWindow.ui.buttonBoxReset.clicked.connect(self.reset)
-        
-        if self.prevListParam :
+
+        if self.prevListParam:
             self.reset("set")
         else:
             self.reset()
-    
-    #Remet la photo à son affichage d'origine ou à l'état en cours du rehaussement
-    def reset(self, setBox=False) : 
+
+    # Remet la photo à son affichage d'origine ou à l'état en cours du rehaussement
+    def reset(self, setBox=False):
         self.setConnection(False)
-        if setBox == "set" :
-            self.setBoxValues() 
-        else :
+        if setBox == "set":
+            self.setBoxValues()
+        else:
             self.resetBox()
         self.enhancePicture("reset")
         self.setConnection(True)
 
-    def removeCurrentScene(self) : 
+    def removeCurrentScene(self):
 
         if hasattr(self, "tSeek"):
-            if self.tSeek.showThreadInProcess : 
-                self.tSeek.blockSignals(True)
-                self.tSeek.keepRunning = False
-                self.tSeek.wait()
-                self.tSeek.showThreadInProcess = False
+            # Même garde que stereoPhoto.arreterThreadAffichage(), et pour la
+            # même raison : showThreadInProcess est posé et retiré dans run(),
+            # donc faux entre start() et l'entrée dans run() comme entre la fin
+            # du travail et celle du thread. Conditionner l'attente à ce drapeau
+            # laissait relâcher la dernière référence d'un QThread en cours
+            # d'exécution, et Qt interrompait le processus.
+            self.tSeek.blockSignals(True)
+            self.tSeek.keepRunning = False
+            if self.tSeek.isRunning() and not self.tSeek.wait(
+                NAVIGATION_ARRET_THREAD_DELAI_MAX_MS
+            ):
+                # Thread toujours vivant : il est gardé de côté plutôt que
+                # relâché. L'aperçu de rehaussement est jetable, la fenêtre se
+                # ferme sans lui ; le processus, non.
+                _journal.warning(
+                    "Thread d'aperçu encore en cours après %d ms : conservé le "
+                    "temps qu'il se termine.",
+                    NAVIGATION_ARRET_THREAD_DELAI_MAX_MS,
+                )
+                self.threadsEnArret.append(self.tSeek)
+            self.tSeek.showThreadInProcess = False
             del self.tSeek
-        
+
         for item in list(self.scene.items()):
             if isinstance(item, QGraphicsPixmapItem):
                 self.scene.removeItem(item)
-        
+
         gc.collect()
         QApplication.processEvents()
 
-    #Fonction appeler pour démarrer le rehaussement
-    #Elle affiche le rehaussement sur une version de basse résolution 
-    #puis lance un thread pour gérer les images de plus grande résolution
-    #Elle peut annoncer au thread d'annuler son processus 
-    #si elle désire repartir le traitement avec des nouveaux paramètres
+    # Fonction appeler pour démarrer le rehaussement
+    # Elle affiche le rehaussement sur une version de basse résolution
+    # puis lance un thread pour gérer les images de plus grande résolution
+    # Elle peut annoncer au thread d'annuler son processus
+    # si elle désire repartir le traitement avec des nouveaux paramètres
     def enhancePicture(self, ajustView=False):
 
         self.removeCurrentScene()
-        
+
         self.getBoxValues(ajustView)
-        if self.colorWindow.ui.radioButtonPremiere.isChecked():        
+        if self.colorWindow.ui.radioButtonPremiere.isChecked():
             currentPath = self.pathLeft
-        else :
+        else:
             currentPath = self.pathRight
 
         GV = self.colorWindow.ui.graphicsView
         vp = GV.viewport()
         sceneRect = GV.mapToScene(vp.rect()).boundingRect()
-        self.tSeek = threadShow(currentPath, self.listParam,sceneRect=sceneRect)
+        self.tSeek = threadShow(currentPath, self.listParam, sceneRect=sceneRect)
         self.tSeek.newImage.connect(self.addPixmap)
         self.tSeek.finished.connect(self.seekDone)
-        
+
         self.tSeek.start(QThread.IdlePriority)
-        
+
         if ajustView == "reset":
-            self.colorWindow.ui.graphicsView.fitInView(self.tSeek.rect, Qt.KeepAspectRatio)
+            self.colorWindow.ui.graphicsView.fitInView(
+                self.tSeek.rect, Qt.KeepAspectRatio
+            )
             self.zoomState = 0
 
-
-    #Fonction appelée par le emit du thread pour ajouter une portion de l'image sur l'affichage
-    def addPixmap(self, q_img, scaleX, scaleY, topX, topY, groupId) :
-        #q_img = QImage(tile.data, tile.shape[1], tile.shape[0],tile.shape[1]*3, QImage.Format_RGB888).copy()
+    # Fonction appelée par le emit du thread pour ajouter une portion de l'image sur l'affichage
+    def addPixmap(self, q_img, scaleX, scaleY, topX, topY, groupId):
+        # q_img = QImage(tile.data, tile.shape[1], tile.shape[0],tile.shape[1]*3, QImage.Format_RGB888).copy()
         pixmap = QPixmap.fromImage(q_img)
         d = self.colorWindow.ui.graphicsView.scene().addPixmap(pixmap)
         d.setPos(topX, topY)
-        #setScale() est isotrope : on passe par une transformation pour appliquer
-        #une échelle distincte sur chaque axe.
+        # setScale() est isotrope : on passe par une transformation pour appliquer
+        # une échelle distincte sur chaque axe.
         d.setTransform(QTransform().scale(scaleX, scaleY))
-    
-    #Fonction exécutée lorsque le thread d'affichage se termine
-    #Elle relance le thread avec la même résolution si une requête a été faite sinon
-    #elle relance le thread avec une plus grande résolution d'image 
+
+    # Fonction exécutée lorsque le thread d'affichage se termine
+    # Elle relance le thread avec la même résolution si une requête a été faite sinon
+    # elle relance le thread avec une plus grande résolution d'image
     def seekDone(self):
         sender = self.sender()
         sender.showThreadInProcess = False
         gc.collect()
         QApplication.processEvents()
 
-    #Fonction qui permet de réaliser le Pan 
+    # Fonction qui permet de réaliser le Pan
     def mMoveEvent(self, ev):
-        if self.colorWindow.ui.zoomPanButton.isChecked() :
+        if self.colorWindow.ui.zoomPanButton.isChecked():
             gView = self.colorWindow.ui.graphicsView
             delta = ev.pos() - self.panPosition
-            gView.horizontalScrollBar().setValue(gView.horizontalScrollBar().value() - delta.x())
-            gView.verticalScrollBar().setValue(gView.verticalScrollBar().value() - delta.y())
+            gView.horizontalScrollBar().setValue(
+                gView.horizontalScrollBar().value() - delta.x()
+            )
+            gView.verticalScrollBar().setValue(
+                gView.verticalScrollBar().value() - delta.y()
+            )
             self.panPosition = ev.pos()
 
-    #Fonction qui détecte que la souris a été cliquée pour faire le Pan, elle enregistre la position
+    # Fonction qui détecte que la souris a été cliquée pour faire le Pan, elle enregistre la position
     def mPressEvent(self, ev):
         self.panPosition = ev.pos()
         self.pressPosition = ev.pos()
 
-    #Fonction qui détecte que la souris a été relâchée à la fin du Pan
+    # Fonction qui détecte que la souris a été relâchée à la fin du Pan
     def mReleaseEvent(self, ev):
         if self.colorWindow.ui.zoomPanButton.isChecked():
-            #Conserver et additioner le delta? 
+            # Conserver et additioner le delta?
             delta = ev.pos() - self.pressPosition
-            if abs(delta.x()) > 100 or abs(delta.y()) > 100 :
-                if self.colorWindow.ui.radioButtonCurrent.isChecked() and self.statusKeepCurrentView == False :
-                    self.enhancePicture(1)  
+            if abs(delta.x()) > 100 or abs(delta.y()) > 100:
+                if (
+                    self.colorWindow.ui.radioButtonCurrent.isChecked()
+                    and not self.statusKeepCurrentView
+                ):
+                    self.enhancePicture(1)
 
-    #Fonction qui permet le zoom avec la roulette de la souris
-    #Elle permet aussi de "zoomer" en considérant la position de la souris comme point central
+    # Fonction qui permet le zoom avec la roulette de la souris
+    # Elle permet aussi de "zoomer" en considérant la position de la souris comme point central
     def wheelEvent(self, event):
         factor = 1.41 ** (event.angleDelta().y() / 240.0)
-        
+
         oldPos = self.colorWindow.ui.graphicsView.mapToScene(event.pos())
-        
-        if factor > 1 : 
+
+        if factor > 1:
             self.zoomIn(True)
-        else :
+        else:
             self.zoomOut(True)
 
         newPos = self.colorWindow.ui.graphicsView.mapToScene(event.pos())
@@ -207,259 +250,311 @@ class enhanceManager(QObject):
 
         self.colorWindow.ui.graphicsView.setTransformationAnchor(QGraphicsView.NoAnchor)
         self.colorWindow.ui.graphicsView.translate(delta.x(), delta.y())
-        self.colorWindow.ui.graphicsView.setTransformationAnchor(QGraphicsView.AnchorViewCenter)
+        self.colorWindow.ui.graphicsView.setTransformationAnchor(
+            QGraphicsView.AnchorViewCenter
+        )
 
-        if self.colorWindow.ui.radioButtonCurrent.isChecked() and self.statusKeepCurrentView == False:
+        if (
+            self.colorWindow.ui.radioButtonCurrent.isChecked()
+            and not self.statusKeepCurrentView
+        ):
             self.enhancePicture(1)
-    
-    #Fonction qui permet d'agrandir la taille de l'image via un Zoom avant
+
+    # Fonction qui permet d'agrandir la taille de l'image via un Zoom avant
     def zoomIn(self, pressed):
 
         self.zoomState += 1
         ZoomInFactor = 1.1874
         self.colorWindow.ui.graphicsView.scale(ZoomInFactor, ZoomInFactor)
-        
-    #Fonction qui permet de réduire la taille de l'image via un Zoom arrière
+
+    # Fonction qui permet de réduire la taille de l'image via un Zoom arrière
     def zoomOut(self, pressed):
 
         self.zoomState -= 1
 
-        if self.zoomState > -2 :
+        if self.zoomState > -2:
             ZoomOutFactor = 0.8421
-            self.colorWindow.ui.graphicsView.scale(ZoomOutFactor,ZoomOutFactor)
+            self.colorWindow.ui.graphicsView.scale(ZoomOutFactor, ZoomOutFactor)
 
-        else : 
-            self.zoomState = -1 
-    
-    #Retourne les paramètres de rehaussement désirés
-    def applyEnhance(self) : 
+        else:
+            self.zoomState = -1
+
+    # Retourne les paramètres de rehaussement désirés
+    def applyEnhance(self):
         self.getBoxValues()
         self.listParamSignal.emit(self.listParam)
         self.cancelEnhance()
 
-    #Ferme la fenêtre sans conserver les paramètres modifiés
-    def cancelEnhance(self,event=None):
+    # Ferme la fenêtre sans conserver les paramètres modifiés
+    def cancelEnhance(self, event=None):
         self.removeCurrentScene()
         self.scene.clear()
         self.colorWindow.close()
 
-    def closeEvent(self,event):
+    def closeEvent(self, event):
         self.cancelEnhance()
 
-    #Permet de changer la photo selon les 2 déjà importées
-    def switchPicture(self, value) :
+    # Permet de changer la photo selon les 2 déjà importées
+    def switchPicture(self, value):
         self.enhancePicture("reset")
-        
-    #Fonction appellée quand le checkbox min/max est utilisé
-    #Active les radios button du groupBox Min/Max
+
+    # Fonction appellée quand le checkbox min/max est utilisé
+    # Active les radios button du groupBox Min/Max
     def minmaxActivate(self, value):
         self.colorWindow.ui.radioButtonCurrent.setEnabled(False)
         self.colorWindow.ui.radioButtonComplete.setEnabled(value)
         self.enhancePicture(value)
 
-    #Fonction pour activer le bouton de conservation de l'histogramme 
+    # Fonction pour activer le bouton de conservation de l'histogramme
     def currentViewActivate(self, value):
         self.colorWindow.ui.currentStatusButton.setEnabled(value)
         self.enhancePicture(value)
 
-    #Gestion du choix de la conservation des valeurs min/max de l'histogramme
+    # Gestion du choix de la conservation des valeurs min/max de l'histogramme
     def keepCurrentView(self):
         self.statusKeepCurrentView = not self.statusKeepCurrentView
-        if self.statusKeepCurrentView :
+        if self.statusKeepCurrentView:
             self.colorWindow.ui.currentStatusButton.setText("Modifier")
-        else :
+        else:
             self.colorWindow.ui.currentStatusButton.setText("Conserver")
             self.enhancePicture(True)
 
-    def startSpinboxesTimer(self,value):
+    def startSpinboxesTimer(self, value):
         self.spinBoxesTimer.start(250)
-    
-    #Active/Desactive les connections des différents objets (boutons) de l'application
-    def setConnection(self, enable) : 
+
+    # Active/Desactive les connections des différents objets (boutons) de l'application
+    def setConnection(self, enable):
 
         self.colorWindow.ui.zoomInButton.setEnabled(enable)
         self.colorWindow.ui.zoomOutButton.setEnabled(enable)
         self.colorWindow.ui.zoomPanButton.setEnabled(enable)
 
-        if enable : 
-            self.colorWindow.ui.spinBoxContrast.valueChanged.connect(self.startSpinboxesTimer)
-            self.colorWindow.ui.spinBoxLuminosite.valueChanged.connect(self.startSpinboxesTimer)
-            self.colorWindow.ui.spinBoxSaturation.valueChanged.connect(self.startSpinboxesTimer)
-            self.colorWindow.ui.spinBoxNettete.valueChanged.connect(self.startSpinboxesTimer)
-            self.colorWindow.ui.spinBoxRed.valueChanged.connect(self.startSpinboxesTimer)
-            self.colorWindow.ui.spinBoxGreen.valueChanged.connect(self.startSpinboxesTimer)
-            self.colorWindow.ui.spinBoxBlue.valueChanged.connect(self.startSpinboxesTimer)
+        if enable:
+            self.colorWindow.ui.spinBoxContrast.valueChanged.connect(
+                self.startSpinboxesTimer
+            )
+            self.colorWindow.ui.spinBoxLuminosite.valueChanged.connect(
+                self.startSpinboxesTimer
+            )
+            self.colorWindow.ui.spinBoxSaturation.valueChanged.connect(
+                self.startSpinboxesTimer
+            )
+            self.colorWindow.ui.spinBoxNettete.valueChanged.connect(
+                self.startSpinboxesTimer
+            )
+            self.colorWindow.ui.spinBoxRed.valueChanged.connect(
+                self.startSpinboxesTimer
+            )
+            self.colorWindow.ui.spinBoxGreen.valueChanged.connect(
+                self.startSpinboxesTimer
+            )
+            self.colorWindow.ui.spinBoxBlue.valueChanged.connect(
+                self.startSpinboxesTimer
+            )
             self.colorWindow.ui.groupBoxMinMax.toggled.connect(self.minmaxActivate)
             self.colorWindow.ui.graphicsView.mouseMoveEvent = self.mMoveEvent
             self.colorWindow.ui.graphicsView.mousePressEvent = self.mPressEvent
             self.colorWindow.ui.graphicsView.mouseReleaseEvent = self.mReleaseEvent
-            self.colorWindow.ui.graphicsView.wheelEvent = self.wheelEvent   
-        else : 
-            self.colorWindow.ui.spinBoxContrast.valueChanged.disconnect(self.startSpinboxesTimer)
-            self.colorWindow.ui.spinBoxLuminosite.valueChanged.disconnect(self.startSpinboxesTimer)   
-            self.colorWindow.ui.spinBoxSaturation.valueChanged.disconnect(self.startSpinboxesTimer)   
-            self.colorWindow.ui.spinBoxNettete.valueChanged.disconnect(self.startSpinboxesTimer)  
-            self.colorWindow.ui.spinBoxRed.valueChanged.disconnect(self.startSpinboxesTimer) 
-            self.colorWindow.ui.spinBoxGreen.valueChanged.disconnect(self.startSpinboxesTimer) 
-            self.colorWindow.ui.spinBoxBlue.valueChanged.disconnect(self.startSpinboxesTimer) 
+            self.colorWindow.ui.graphicsView.wheelEvent = self.wheelEvent
+        else:
+            self.colorWindow.ui.spinBoxContrast.valueChanged.disconnect(
+                self.startSpinboxesTimer
+            )
+            self.colorWindow.ui.spinBoxLuminosite.valueChanged.disconnect(
+                self.startSpinboxesTimer
+            )
+            self.colorWindow.ui.spinBoxSaturation.valueChanged.disconnect(
+                self.startSpinboxesTimer
+            )
+            self.colorWindow.ui.spinBoxNettete.valueChanged.disconnect(
+                self.startSpinboxesTimer
+            )
+            self.colorWindow.ui.spinBoxRed.valueChanged.disconnect(
+                self.startSpinboxesTimer
+            )
+            self.colorWindow.ui.spinBoxGreen.valueChanged.disconnect(
+                self.startSpinboxesTimer
+            )
+            self.colorWindow.ui.spinBoxBlue.valueChanged.disconnect(
+                self.startSpinboxesTimer
+            )
             self.colorWindow.ui.groupBoxMinMax.toggled.disconnect(self.minmaxActivate)
-            self.colorWindow.ui.graphicsView.mouseMoveEvent = QGraphicsView.mouseMoveEvent 
-            self.colorWindow.ui.graphicsView.mousePressEvent = QGraphicsView.mousePressEvent
+            self.colorWindow.ui.graphicsView.mouseMoveEvent = (
+                QGraphicsView.mouseMoveEvent
+            )
+            self.colorWindow.ui.graphicsView.mousePressEvent = (
+                QGraphicsView.mousePressEvent
+            )
             self.colorWindow.ui.graphicsView.wheelEvent = QGraphicsView.wheelEvent
-            self.colorWindow.ui.graphicsView.mouseReleaseEvent = QGraphicsView.mouseReleaseEvent
+            self.colorWindow.ui.graphicsView.mouseReleaseEvent = (
+                QGraphicsView.mouseReleaseEvent
+            )
 
-    #Permet de mettre les paramètres de rehaussement à leur origine
-    def resetBox(self) : 
+    # Permet de mettre les paramètres de rehaussement à leur origine
+    def resetBox(self):
         self.colorWindow.ui.spinBoxContrast.setValue(0)
-        self.colorWindow.ui.spinBoxLuminosite.setValue(0)   
-        self.colorWindow.ui.spinBoxSaturation.setValue(0)   
-        self.colorWindow.ui.spinBoxNettete.setValue(0)  
-        self.colorWindow.ui.spinBoxRed.setValue(0) 
-        self.colorWindow.ui.spinBoxGreen.setValue(0) 
-        self.colorWindow.ui.spinBoxBlue.setValue(0) 
+        self.colorWindow.ui.spinBoxLuminosite.setValue(0)
+        self.colorWindow.ui.spinBoxSaturation.setValue(0)
+        self.colorWindow.ui.spinBoxNettete.setValue(0)
+        self.colorWindow.ui.spinBoxRed.setValue(0)
+        self.colorWindow.ui.spinBoxGreen.setValue(0)
+        self.colorWindow.ui.spinBoxBlue.setValue(0)
         self.colorWindow.ui.groupBoxMinMax.setChecked(False)
-    
-    #Retourne les valeurs des paramètres de rehaussement dans une liste
-    def getBoxValues(self, changePixVal=False): 
+
+    # Retourne les valeurs des paramètres de rehaussement dans une liste
+    def getBoxValues(self, changePixVal=False):
         con = self.colorWindow.ui.spinBoxContrast.value()
-        lum = self.colorWindow.ui.spinBoxLuminosite.value()   
-        sat = self.colorWindow.ui.spinBoxSaturation.value()   
-        net = self.colorWindow.ui.spinBoxNettete.value()  
-        red = self.colorWindow.ui.spinBoxRed.value() 
-        gre = self.colorWindow.ui.spinBoxGreen.value() 
-        blu = self.colorWindow.ui.spinBoxBlue.value() 
+        lum = self.colorWindow.ui.spinBoxLuminosite.value()
+        sat = self.colorWindow.ui.spinBoxSaturation.value()
+        net = self.colorWindow.ui.spinBoxNettete.value()
+        red = self.colorWindow.ui.spinBoxRed.value()
+        gre = self.colorWindow.ui.spinBoxGreen.value()
+        blu = self.colorWindow.ui.spinBoxBlue.value()
         bmm = self.colorWindow.ui.groupBoxMinMax.isChecked()
-        
+
         cv = self.colorWindow.ui.radioButtonCurrent.isChecked()
 
         pix = []
 
-        #Cas activiation avec les boutons MIN/MAX (push et radio buttons et checkbox) du GUI
-        if cv and changePixVal and self.statusKeepCurrentView == False :
-            pointZero = self.colorWindow.ui.graphicsView.mapToScene(QPoint(0,0))
+        # Cas activiation avec les boutons MIN/MAX (push et radio buttons et checkbox) du GUI
+        if cv and changePixVal and not self.statusKeepCurrentView:
+            pointZero = self.colorWindow.ui.graphicsView.mapToScene(QPoint(0, 0))
             GV = self.colorWindow.ui.graphicsView
-            pointMax = self.colorWindow.ui.graphicsView.mapToScene(QPoint(GV.width(),GV.height()))
+            pointMax = self.colorWindow.ui.graphicsView.mapToScene(
+                QPoint(GV.width(), GV.height())
+            )
             pix = self.calculHistogram(pointZero, pointMax)
             self.currentPixVal = pix
 
-        #Cas activation avec les options de rehaussement (spinBox)
-        #Avec un certain recule je ne suis pas certain que cette option soit pertinante puisqu'on pert l'histogramme qu'on souhaite conserver
-        #Aucune influence sans déplacement, y a-t-il une raison pour avoir cette fonctionnalité? À réfléchir
+        # Cas activation avec les options de rehaussement (spinBox)
+        # Avec un certain recule je ne suis pas certain que cette option soit pertinante puisqu'on pert l'histogramme qu'on souhaite conserver
+        # Aucune influence sans déplacement, y a-t-il une raison pour avoir cette fonctionnalité? À réfléchir
         elif cv and self.statusKeepCurrentView and type(changePixVal) is int:
-            pointZero = self.colorWindow.ui.graphicsView.mapToScene(QPoint(0,0))
+            pointZero = self.colorWindow.ui.graphicsView.mapToScene(QPoint(0, 0))
             GV = self.colorWindow.ui.graphicsView
-            pointMax = self.colorWindow.ui.graphicsView.mapToScene(QPoint(GV.width(),GV.height()))
+            pointMax = self.colorWindow.ui.graphicsView.mapToScene(
+                QPoint(GV.width(), GV.height())
+            )
             pix = self.calculHistogram(pointZero, pointMax)
             self.currentPixVal = pix
-       
-        elif cv :
+
+        elif cv:
             pix = self.currentPixVal
 
         self.listParam = [con, lum, sat, net, red, gre, blu, bmm, cv, pix]
 
-    #Fonction pour rétablir les anciennes valeurs de rehaussement sauvegardées lors de la fermeture par le bouton Appliquer
-    def setBoxValues(self) :
+    # Fonction pour rétablir les anciennes valeurs de rehaussement sauvegardées lors de la fermeture par le bouton Appliquer
+    def setBoxValues(self):
 
         self.colorWindow.ui.spinBoxContrast.setValue(self.prevListParam[0])
-        self.colorWindow.ui.spinBoxLuminosite.setValue(self.prevListParam[1])   
-        self.colorWindow.ui.spinBoxSaturation.setValue(self.prevListParam[2])   
-        self.colorWindow.ui.spinBoxNettete.setValue(self.prevListParam[3])  
-        self.colorWindow.ui.spinBoxRed.setValue(self.prevListParam[4]) 
-        self.colorWindow.ui.spinBoxGreen.setValue(self.prevListParam[5]) 
+        self.colorWindow.ui.spinBoxLuminosite.setValue(self.prevListParam[1])
+        self.colorWindow.ui.spinBoxSaturation.setValue(self.prevListParam[2])
+        self.colorWindow.ui.spinBoxNettete.setValue(self.prevListParam[3])
+        self.colorWindow.ui.spinBoxRed.setValue(self.prevListParam[4])
+        self.colorWindow.ui.spinBoxGreen.setValue(self.prevListParam[5])
         self.colorWindow.ui.spinBoxBlue.setValue(self.prevListParam[6])
         self.colorWindow.ui.groupBoxMinMax.setChecked(self.prevListParam[7])
 
-        if self.prevListParam[7] :
+        if self.prevListParam[7]:
             self.colorWindow.ui.radioButtonCurrent.setEnabled(False)
             self.colorWindow.ui.radioButtonComplete.setEnabled(True)
-            if self.prevListParam[8] :
+            if self.prevListParam[8]:
                 self.statusKeepCurrentView = True
                 self.colorWindow.ui.currentStatusButton.setText("Modifier")
                 self.colorWindow.ui.currentStatusButton.setEnabled(True)
                 self.colorWindow.ui.groupBoxMinMax.setChecked(True)
-                self.colorWindow.ui.radioButtonCurrent.toggled.disconnect(self.currentViewActivate)
+                self.colorWindow.ui.radioButtonCurrent.toggled.disconnect(
+                    self.currentViewActivate
+                )
                 self.colorWindow.ui.radioButtonCurrent.setChecked(False)
-                self.colorWindow.ui.radioButtonCurrent.toggled.connect(self.currentViewActivate)
+                self.colorWindow.ui.radioButtonCurrent.toggled.connect(
+                    self.currentViewActivate
+                )
                 self.currentPixVal = self.prevListParam[9]
-                    
 
-            
-    #Calcul de l'histogramme sur une portion de la photo lorsque l'on veut conserver le min/max pour la vue courante
-    #ATTENTION (registre B-02, item P1-E) : la fonction retourne une plage fixe 0-255 par bande.
-    #Le calcul réel de l'histogramme se trouvait après ce return et n'a donc jamais été exécuté;
-    #il a été retiré le 2026-09-17 comme code mort (récupérable dans l'historique Git).
-    #Conséquence fonctionnelle : l'option « conserver le min/max de la vue courante » est sans effet,
-    #l'étirement min/max utilise toujours la plage complète. Comportement à valider avec la DIF
-    #avant de rétablir le calcul.
+    # Calcul de l'histogramme sur une portion de la photo lorsque l'on veut conserver le min/max pour la vue courante
+    # ATTENTION : la fonction retourne une plage fixe 0-255 par bande.
+    # Le calcul réel de l'histogramme se trouvait après ce return et n'a donc jamais été exécuté;
+    # il a été retiré le 2026-09-17 comme code mort (récupérable dans l'historique Git).
+    # Conséquence fonctionnelle : l'option « conserver le min/max de la vue courante » est sans effet,
+    # l'étirement min/max utilise toujours la plage complète. Comportement à valider avec la DIF
+    # avant de rétablir le calcul.
     def calculHistogram(self, top, low):
 
-        return [0,255,0,255,0,255]
-    
+        return [0, 255, 0, 255, 0, 255]
+
+
 class threadShow(QThread):
-    #Le signal transporte une échelle par axe : les ratios X et Y d'un aperçu
-    #diffèrent dès que les dimensions de l'image ne sont pas des multiples
-    #exacts du niveau d'aperçu.
+    # Le signal transporte une échelle par axe : les ratios X et Y d'un aperçu
+    # diffèrent dès que les dimensions de l'image ne sont pas des multiples
+    # exacts du niveau d'aperçu.
     newImage = pyqtSignal(QImage, float, float, float, float, int)
-    
-    def __init__(self, picturePath, listParam,cropValue=None, sceneRect=None):
+
+    def __init__(self, picturePath, listParam, cropValue=None, sceneRect=None):
         super().__init__()
         self.picturePath = picturePath
         self.sceneRect = sceneRect
         self.listParam = listParam
         self.cropValue = cropValue
-        self.perform_Enhancing = True if self.listParam[:8] != [0,0,0,0,0,0,0,False] else False
+        self.perform_Enhancing = (
+            True if self.listParam[:8] != [0, 0, 0, 0, 0, 0, 0, False] else False
+        )
         self.keepRunning = True
-        self.showThreadInProcess = False 
+        self.showThreadInProcess = False
         self.target_tile_size = 512
 
         # Open GDAL dataset ONCE here
-        #gdal.SetCacheMax(256 * 1024 * 1024)
-        self.ds = gdal.Open(self.picturePath, gdal.GA_ReadOnly)
-        #Vérification avant tout accès : elle suivait les trois lignes ci-dessous et
-        #ne pouvait donc jamais se déclencher (AttributeError levée avant).
+        # gdal.SetCacheMax(256 * 1024 * 1024)
+        # ouvrir_raster() ramène à None les deux conventions d'erreur de GDAL :
+        # sans lui, le RuntimeError levé en session QGIS passait devant la garde
+        # ci-dessous, qui ne voyait que le retour None.
+        self.ds = ouvrir_raster(self.picturePath)
+        # Vérification avant tout accès : elle suivait les trois lignes ci-dessous et
+        # ne pouvait donc jamais se déclencher (AttributeError levée avant).
         if self.ds is None:
             raise ValueError(f"Image illisible : {self.picturePath}")
 
         self.height = self.ds.RasterYSize
         self.width = self.ds.RasterXSize
-        self.rect = QRectF(0,0,self.width,self.height)
-        
+        self.rect = QRectF(0, 0, self.width, self.height)
+
         self.stats = self.get_global_stats_from_overview()
-        
-    
+
     def run(self):
         gc.disable()
-        self.showThreadInProcess = True 
-        try : 
+        self.showThreadInProcess = True
+        try:
             rects_L0 = self.calculate_load_rects()
-            
+
             for i in range(0, 5):
-                if not self.keepRunning: return
+                if not self.keepRunning:
+                    return
                 self.load_tiled_rect(rects_L0[i], ovr_index=1, groupId=2)
-            
+
             self.load_tiled_rect(rects_L0[0], ovr_index=0, groupId=1)
             self.load_tiled_rect(rects_L0[0], ovr_index=-1, groupId=0)
-            
 
             for i in range(1, 5):
-                if not self.keepRunning: return
+                if not self.keepRunning:
+                    return
                 self.load_tiled_rect(rects_L0[i], ovr_index=0, groupId=1)
-            
+
             for i in range(1, 5):
-                if not self.keepRunning: return
+                if not self.keepRunning:
+                    return
                 self.load_tiled_rect(rects_L0[i], ovr_index=-1, groupId=0)
 
         except Exception:
             _journal.exception("Erreur lors du chargement des images")
-        
-        finally : 
+
+        finally:
             gc.enable()
-            gc.collect() 
+            gc.collect()
             self.showThreadInProcess = False
 
-    def set_SceneRect(self,rect) :
+    def set_SceneRect(self, rect):
         self.sceneRect = rect
-    
+
     def calculate_load_rects(self):
 
         if self.cropValue is not None:
@@ -473,70 +568,82 @@ class threadShow(QThread):
             x1 = self.width
             y1 = self.height
 
-        #Bornage des deux côtés. La vue peut se retrouver entièrement hors de
-        #l'image pendant la navigation; sans la borne opposée, topX/topY
-        #dépassaient x1/y1 et lowX/lowY devenaient négatifs, ce qui produisait
-        #un rectangle central inversé (donc vide) et des bandes périphériques
-        #hors raster.
+        # Bornage des deux côtés. La vue peut se retrouver entièrement hors de
+        # l'image pendant la navigation; sans la borne opposée, topX/topY
+        # dépassaient x1/y1 et lowX/lowY devenaient négatifs, ce qui produisait
+        # un rectangle central inversé (donc vide) et des bandes périphériques
+        # hors raster.
         topX = min(max(x0, int(self.sceneRect.left() - 1024)), x1)
         topY = min(max(y0, int(self.sceneRect.top() - 1024)), y1)
         lowX = max(min(x1, int(self.sceneRect.right() + 1024)), x0)
         lowY = max(min(y1, int(self.sceneRect.bottom() + 1024)), y0)
 
-
         middleRect = [topX, topY, lowX, lowY]
-        firstRect = [x0,y0,topX, y1]
+        firstRect = [x0, y0, topX, y1]
         secondRect = [lowX, y0, x1, y1]
         thridRect = [topX, y0, lowX, topY]
         fourthRect = [topX, lowY, lowX, y1]
-        
+
         rects = [middleRect, firstRect, secondRect, thridRect, fourthRect]
 
-        #Anomalie recherchée : la vue ne recoupe pas du tout la zone utile de
-        #la photo, donc aucune tuile n'est chargée et l'affichage reste vide.
-        #Signalée en avertissement pour rester visible au niveau INFO.
-        if (self.sceneRect.right() < x0 or self.sceneRect.left() > x1
-                or self.sceneRect.bottom() < y0 or self.sceneRect.top() > y1):
+        # Anomalie recherchée : la vue ne recoupe pas du tout la zone utile de
+        # la photo, donc aucune tuile n'est chargée et l'affichage reste vide.
+        # Signalée en avertissement pour rester visible au niveau INFO.
+        if (
+            self.sceneRect.right() < x0
+            or self.sceneRect.left() > x1
+            or self.sceneRect.bottom() < y0
+            or self.sceneRect.top() > y1
+        ):
             _journal.warning(
-                "Vue hors de la zone utile — image %sx%s, rognage %s, "
+                "Vue hors de la zone utile : image %sx%s, rognage %s, "
                 "vue [%.1f, %.1f, %.1f, %.1f]; aucune tuile à charger",
-                self.width, self.height, (x0, y0, x1, y1),
-                self.sceneRect.left(), self.sceneRect.top(),
-                self.sceneRect.right(), self.sceneRect.bottom(),
+                self.width,
+                self.height,
+                (x0, y0, x1, y1),
+                self.sceneRect.left(),
+                self.sceneRect.top(),
+                self.sceneRect.right(),
+                self.sceneRect.bottom(),
             )
 
-        #Trace de diagnostic temporaire : la vue s'est déjà retrouvée à des
-        #dizaines de milliers de pixels de l'image sans que la cause amont soit
-        #identifiée. À retirer une fois le positionnement de la vue validé.
+        # Trace de diagnostic temporaire : la vue s'est déjà retrouvée à des
+        # dizaines de milliers de pixels de l'image sans que la cause amont soit
+        # identifiée. À retirer une fois le positionnement de la vue validé.
         _journal.debug(
-            "Rectangles de chargement — image %sx%s, rognage %s, "
+            "Rectangles de chargement : image %sx%s, rognage %s, "
             "vue [%.1f, %.1f, %.1f, %.1f], rectangles %s",
-            self.width, self.height, (x0, y0, x1, y1),
-            self.sceneRect.left(), self.sceneRect.top(),
-            self.sceneRect.right(), self.sceneRect.bottom(), rects,
+            self.width,
+            self.height,
+            (x0, y0, x1, y1),
+            self.sceneRect.left(),
+            self.sceneRect.top(),
+            self.sceneRect.right(),
+            self.sceneRect.bottom(),
+            rects,
         )
 
         return rects
-    
+
     def load_tiled_rect(self, rect_full_res, ovr_index, groupId):
-        
+
         if ovr_index == -1:
             maxX, maxY = self.width, self.height
             scaleX = scaleY = 1.0
         else:
             ovr_band = self.ds.GetRasterBand(1).GetOverview(ovr_index)
             maxX, maxY = ovr_band.XSize, ovr_band.YSize
-            #Un facteur par axe : les deux ratios diffèrent dès que les
-            #dimensions ne sont pas des multiples exacts du niveau d'aperçu
-            #(11310/2828 = 3,99929 contre 17310/4328 = 3,99954). Un facteur
-            #unique appliqué aux deux axes décale la conversion et peut faire
-            #sortir la fenêtre de lecture du raster.
+            # Un facteur par axe : les deux ratios diffèrent dès que les
+            # dimensions ne sont pas des multiples exacts du niveau d'aperçu
+            # (11310/2828 = 3,99929 contre 17310/4328 = 3,99954). Un facteur
+            # unique appliqué aux deux axes décale la conversion et peut faire
+            # sortir la fenêtre de lecture du raster.
             scaleX = self.width / maxX
             scaleY = self.height / maxY
 
-        #Bornage sur les dimensions réelles du raster lu : un rectangle issu de
-        #la vue peut sortir de l'image, et GDAL lève alors « Access window out
-        #of range in RasterIO() », ce qui avorte tout le chargement.
+        # Bornage sur les dimensions réelles du raster lu : un rectangle issu de
+        # la vue peut sortir de l'image, et GDAL lève alors « Access window out
+        # of range in RasterIO() », ce qui avorte tout le chargement.
         lx0 = max(0, min(int(rect_full_res[0] / scaleX), maxX))
         ly0 = max(0, min(int(rect_full_res[1] / scaleY), maxY))
         lx1 = max(0, min(int(rect_full_res[2] / scaleX), maxX))
@@ -545,7 +652,8 @@ class threadShow(QThread):
         if lx1 <= lx0 or ly1 <= ly0:
             _journal.debug(
                 "Rectangle vide ou hors image ignoré : %s (aperçu %s)",
-                rect_full_res, ovr_index,
+                rect_full_res,
+                ovr_index,
             )
             return
 
@@ -556,37 +664,43 @@ class threadShow(QThread):
         for i in range(nbDivX):
             curr_lx = lx0 + i * self.target_tile_size
             tile_w = min(self.target_tile_size, lx1 - curr_lx)
-            if tile_w <= 0: continue
-            
+            if tile_w <= 0:
+                continue
+
             for j in range(nbDivY):
-                if not self.keepRunning: return
+                if not self.keepRunning:
+                    return
                 curr_ly = ly0 + j * self.target_tile_size
                 tile_h = min(self.target_tile_size, ly1 - curr_ly)
-                if tile_h <= 0: continue
+                if tile_h <= 0:
+                    continue
 
                 # Fetch the actual pixels from GDAL
                 tile = self.fetch_tile(curr_lx, curr_ly, tile_w, tile_h, ovr_index)
-                
+
                 if self.perform_Enhancing:
                     tile = self.applyEnhancements(tile, self.listParam)
                 tile = np.ascontiguousarray(tile)
-                #tile_32 = np.empty((tile_h, tile_w, 4), dtype=np.uint8)
+                # tile_32 = np.empty((tile_h, tile_w, 4), dtype=np.uint8)
 
                 # 2. Copy your 3-channel RGB data into the first 3 channels (channel 4 is left empty as padding)
-                #tile_32[:, :, :3] = tile
-                q_img = QImage(tile.data, tile_w, tile_h, tile_w * 3, QImage.Format_RGB888).copy()
-                #pixmap = QPixmap.fromImage(q_img)
-                
-                self.newImage.emit(q_img, scaleX, scaleY,
-                                   curr_lx * scaleX, curr_ly * scaleY, groupId)
+                # tile_32[:, :, :3] = tile
+                q_img = QImage(
+                    tile.data, tile_w, tile_h, tile_w * 3, QImage.Format_RGB888
+                ).copy()
+                # pixmap = QPixmap.fromImage(q_img)
+
+                self.newImage.emit(
+                    q_img, scaleX, scaleY, curr_lx * scaleX, curr_ly * scaleY, groupId
+                )
                 QThread.msleep(1)
-        
+
     def fetch_tile(self, x, y, w, h, ovr_index):
-        
+
         if ovr_index == -1:
-            raw_data = self.ds.ReadRaster(x, y, w, h, 
-                                        band_list=[1, 2, 3],
-                                        buf_type=gdal.GDT_Byte)
+            raw_data = self.ds.ReadRaster(
+                x, y, w, h, band_list=[1, 2, 3], buf_type=gdal.GDT_Byte
+            )
         else:
             band_arrays = []
             for i in range(1, 4):
@@ -596,40 +710,43 @@ class threadShow(QThread):
 
         img = np.frombuffer(raw_data, dtype=np.uint8)
         img = img.reshape((3, h, w))
-        
+
         # 3. Transpose to (Height, Width, Bands) for QImage/OpenCV
         return np.transpose(img, (1, 2, 0))
 
     def applyEnhancements(self, arr, params):
         arr = arr.astype(np.float32, copy=False)
 
-        # --- Min–Max Stretch ---
+        # --- Min/Max Stretch ---
         if params[7]:  # stretch flag
             stats = []
-            if self.stats is None : 
-                for c in range(3) : 
-                    ch = arr[:,:,c]
+            if self.stats is None:
+                for c in range(3):
+                    ch = arr[:, :, c]
                     low, high = np.percentile(ch, [5, 95])
                     stats.append((low, high))
 
-            else : stats = self.stats
+            else:
+                stats = self.stats
 
-            lows  = np.array([s[0] for s in stats], np.float32).reshape(1,1,3)
-            highs = np.array([s[1] for s in stats], np.float32).reshape(1,1,3)
+            lows = np.array([s[0] for s in stats], np.float32).reshape(1, 1, 3)
+            highs = np.array([s[1] for s in stats], np.float32).reshape(1, 1, 3)
 
             # In-place: (arr - lows) / (highs - lows) * 255
-            arr -= lows               
-            arr /= (highs - lows)  
-            arr *= 255.0    
-        
+            arr -= lows
+            arr /= highs - lows
+            arr *= 255.0
+
         contrast = params[0]
         saturation = params[2]
         need_grayscale = contrast != 0 or saturation != 0
         grayscale = None
-        
+
         # Convert to grayscale using PIL weights
-        if need_grayscale : 
-            grayscale = (arr[:, :, 0] * 0.299 + arr[:, :, 1] * 0.587 + arr[:, :, 2] * 0.114)
+        if need_grayscale:
+            grayscale = (
+                arr[:, :, 0] * 0.299 + arr[:, :, 1] * 0.587 + arr[:, :, 2] * 0.114
+            )
 
         # Contrast
         if contrast != 0:
@@ -649,33 +766,30 @@ class threadShow(QThread):
                 channel = arr[:, :, c]
                 channel[:] = mean + (channel - mean) * factor
 
-        #Saturation
+        # Saturation
         if saturation != 0:
-
             if saturation > 0:
                 factor = 1 + (0.05 * saturation)
             else:
                 factor = 1 + (saturation / 100)
-            
+
             for c in range(3):
                 channel = arr[:, :, c]
                 channel[:] = grayscale + (channel - grayscale) * factor
-
 
         # R/G/B adjustment
         for i, ch_param in enumerate(params[4:7]):
             if ch_param != 0:
                 factor = 1.0 + (ch_param / 100.0)
-                arr[:,:,i] *= factor
+                arr[:, :, i] *= factor
 
-
-        # Sharpness 
+        # Sharpness
         sharpness = params[3]
         if sharpness != 0:
-            sharp_factor = sharpness / 10.0 + 1  
-            blurred = uniform_filter(arr,size=(3, 3, 1))
+            sharp_factor = sharpness / 10.0 + 1
+            blurred = uniform_filter(arr, size=(3, 3, 1))
             arr[:] = blurred + (arr - blurred) * sharp_factor
-                  
+
         # Brightness
         brightness = params[1]
         if brightness != 0:
@@ -686,10 +800,10 @@ class threadShow(QThread):
 
         return arr.astype(np.uint8, copy=False)
 
-    def get_global_stats_from_overview(self,band_numbers=None, lower=5, upper=95):
-        if band_numbers is None : band_numbers = [1, 2, 3]
+    def get_global_stats_from_overview(self, band_numbers=None, lower=5, upper=95):
+        if band_numbers is None:
+            band_numbers = [1, 2, 3]
         stats = []
-        band_arrays = []
         for bandNumber in band_numbers:
             band = self.ds.GetRasterBand(bandNumber)
 
@@ -698,27 +812,34 @@ class threadShow(QThread):
                 ovr_band = band.GetOverview(3)
                 self.widthOverview = ovr_band.XSize
                 self.heightOverview = ovr_band.YSize
-                if self.cropValue is not None: 
-                    
-                    scale = min(self.width/self.widthOverview, self.height/self.heightOverview)
-                    oX = max(0,int(self.cropValue[0]/ scale))
-                    oY = max(0,int(self.cropValue[1]/ scale))
-                    sX = min(self.widthOverview ,int((self.cropValue[2] - self.cropValue[0])/ scale))
-                    sY = min(self.heightOverview,int((self.cropValue[3] - self.cropValue[1])/ scale))
+                if self.cropValue is not None:
+                    scale = min(
+                        self.width / self.widthOverview,
+                        self.height / self.heightOverview,
+                    )
+                    oX = max(0, int(self.cropValue[0] / scale))
+                    oY = max(0, int(self.cropValue[1] / scale))
+                    sX = min(
+                        self.widthOverview,
+                        int((self.cropValue[2] - self.cropValue[0]) / scale),
+                    )
+                    sY = min(
+                        self.heightOverview,
+                        int((self.cropValue[3] - self.cropValue[1]) / scale),
+                    )
 
-                    arr = ovr_band.ReadAsArray(oX,oY,sX,sY).astype(np.float32)
+                    arr = ovr_band.ReadAsArray(oX, oY, sX, sY).astype(np.float32)
                     self.overviewStartX = self.cropValue[0]
                     self.overviewStartY = self.cropValue[1]
 
-                
-                else : 
+                else:
                     arr = ovr_band.ReadAsArray().astype(np.float32)
                     self.overviewStartX = 0
-                    self.overviewStartY = 0 
+                    self.overviewStartY = 0
 
             else:
-                #Retour None (et non None, None) : applyEnhancements() teste « if self.stats is None »,
-                #un tuple aurait franchi la garde et fait échouer l'étirement min/max (registre B-02, item P1-G).
+                # Retour None (et non None, None) : applyEnhancements() teste « if self.stats is None »,
+                # un tuple aurait franchi la garde et fait échouer l'étirement min/max.
                 return None
 
             arr_flat = arr[np.isfinite(arr)]
@@ -728,6 +849,4 @@ class threadShow(QThread):
 
             stats.append((low, high))
 
-        
         return stats
-    
