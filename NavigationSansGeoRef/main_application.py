@@ -1,4 +1,5 @@
 #from PIL import Image, ImageDraw, ImageEnhance
+import argparse
 import numpy as np
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
@@ -7,17 +8,26 @@ from ui_graphicsWindow import graphicsWindow
 import sys, os, time, threading, math
 from osgeo import gdal, ogr, osr
 
+def parseArguments(argv):
+    parser = argparse.ArgumentParser(description="Navigation stéréoscopique sans géoréférencement")
+    parser.add_argument("--image-bas", required=True, help="Chemin de l'image à afficher sur l'écran du bas")
+    parser.add_argument("--image-haut", required=True, help="Chemin de l'image à afficher sur l'écran du haut")
+    parser.add_argument("--ecran-bas", type=int, default=1, help="Numéro de l'écran du bas (défaut: 1)")
+    parser.add_argument("--ecran-haut", type=int, default=2, help="Numéro de l'écran du haut (défaut: 2)")
+    parser.add_argument("--mirroir", action="store_true", help="Active l'effet miroir sur l'écran du haut")
+    return parser.parse_known_args(argv[1:])[0]
+
 class app(QApplication):
-    def __init__(self, argv):
+    def __init__(self, argv, args):
         QApplication.__init__(self,argv)
 
-        self.numeroEcranBas = 1
-        self.numeroEcranHaut = 2
+        self.numeroEcranBas = args.ecran_bas
+        self.numeroEcranHaut = args.ecran_haut
 
-        self.cheminImageBas = 'c:/Users/PINFR1/OneDrive - BuroVirtuel/_Documents_U$/Photos/q18067_171_rgb.tif'
-        self.cheminImageHaut = 'c:/Users/PINFR1/OneDrive - BuroVirtuel/_Documents_U$/Photos/q18067_172_rgb.tif'
+        self.cheminImageBas = args.image_bas
+        self.cheminImageHaut = args.image_haut
 
-        self.effetMirroir = False
+        self.effetMirroir = args.mirroir
 
         self.graphWindowHaut = graphicsWindow("Écran du haut")
         self.graphWindowBas = graphicsWindow("Écran du bas")
@@ -279,8 +289,9 @@ class app(QApplication):
                 hautView.verticalScrollBar().setValue(hautView.verticalScrollBar().value() + 1)
                 hautView.horizontalScrollBar().setValue(hautView.horizontalScrollBar().value() + 1)
 
-if __name__ == '__main__' : 
-    app = app(sys.argv)
+if __name__ == '__main__' :
+    args = parseArguments(sys.argv)
+    app = app(sys.argv, args)
     sys.exit(app.exec_())
 
 exit()
